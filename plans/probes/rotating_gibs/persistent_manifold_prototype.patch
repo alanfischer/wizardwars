@@ -1,0 +1,151 @@
+--- hop/solid.h	2026-09-08 18:26:47
++++ /private/tmp/claude-501/-Users-fischer-wizardwars/abf8a2b3-7d26-493c-8f8c-800d09927e37/scratchpad/hop-mf/hop/solid.h	2026-09-08 21:54:41
+@@ -58,6 +58,7 @@
+ 		solid<T> * partner = nullptr;
+ 		vec3<T>    normal;            // points from partner toward this solid (the separating direction for self)
+ 		vec3<T>    impact;            // world contact point on the surface (lever-arm origin for angular surface velocity)
++		vec3<T>    local_lever;       // PROBE: lever in the body's own frame, so a persisted point follows the body's rotation
+ 		vec3<T>    lever;             // contact point relative to THIS solid's center at discovery (impact − swept center). Sweep-independent body-frame offset; the angular solver anchors it at the current center so a fast oblique impact doesn't fabricate a tangential lever arm (which would spin a frictionless sphere)
+ 		T          accum_n {};        // accumulated normal impulse magnitude (>= 0)
+ 		vec3<T>    accum_t;           // accumulated friction impulse (this-side convention: the impulse applied to self)
+--- hop/simulator.h	2026-09-08 18:26:47
++++ /private/tmp/claude-501/-Users-fischer-wizardwars/abf8a2b3-7d26-493c-8f8c-800d09927e37/scratchpad/hop-mf/hop/simulator.h	2026-09-08 21:57:27
+@@ -516,6 +516,11 @@
+ 
+ 	void constraint_link(vec3<T> & result, solid<T> * s, const vec3<T> & solid_pos, const vec3<T> & solid_vel);
+ 	// Force one active constraint exerts on `s` at the given trial pos/vel, plus the
++	void store_local_lever(solid<T> * s, typename solid<T>::touch & slot, const vec3<T> & lever);
++#ifdef HOP_PROBE_MANIFOLD
++	typename solid<T>::touch * probe_pick_slot(solid<T> * s, const solid<T> * partner, const vec3<T> & lever);
++	void probe_revive_manifold(int tick);
++#endif
+ 	// world-space lever arm from s's center to its anchor. Returns false if `s` is
+ 	// not an active endpoint of `c`. Shared by constraint_link (linear) and the
+ 	// Phase 10 anchor torque (angular).
+@@ -1782,6 +1787,14 @@
+ 	// to a continuous contact, so warm-starting from it would be unsound.
+ 	for (int i = 0; i < s->touch_count_; ++i) {
+ 		auto & slot = s->touches_[i];
++#ifdef HOP_PROBE_MANIFOLD
++		// A partner may hold several points now, so a fresh witness refreshes the one
++		// it actually IS. probe_pick_slot decides which — the nearest kept point when
++		// the witness coincides with one or the partner's four are all taken, and
++		// "none, start a new one" otherwise.
++		if (slot.partner == partner && &slot != probe_pick_slot(s, partner, lever))
++			continue;
++#endif
+ 		if (slot.partner == partner) {
+ 			if (slot.last_tick != tick && slot.last_tick != tick - 1) {
+ 				slot.accum_n = zero_val;
+@@ -1790,6 +1803,8 @@
+ 			slot.normal.set(normal);
+ 			slot.impact.set(impact);
+ 			slot.lever.set(lever);
++		store_local_lever(s, slot, lever);
++			store_local_lever(s, slot, lever);
+ 			if (slot.last_tick != tick) {
+ 				slot.impact_speed = impact_speed;
+ 			} else if (impact_speed > slot.impact_speed) {
+@@ -1808,6 +1823,7 @@
+ 		slot.normal.set(normal);
+ 		slot.impact.set(impact);
+ 		slot.lever.set(lever);
++		store_local_lever(s, slot, lever);
+ 		slot.accum_n = zero_val;
+ 		slot.accum_t.reset();
+ 		slot.impact_speed = impact_speed;
+@@ -1843,9 +1859,94 @@
+ 	slot.last_tick = tick;
+ 	return &slot;
+ }
++
++template <typename T>
++void simulator<T>::store_local_lever(solid<T> * s, typename solid<T>::touch & slot, const vec3<T> & lever) {
++	mat3<T> Rt;
++	transpose(Rt, s->get_orientation());
++	mul(slot.local_lever, Rt, lever);
++}
++
++#ifdef HOP_PROBE_MANIFOLD
++// How far apart two kept points must be to count as different contacts.
++template <typename T> static T probe_merge_radius() { return scalar_traits<T>::from_milli(60); }
++// How far a kept point may drift off the live contact plane before it is dropped.
++template <typename T> static T probe_break_tol() { return scalar_traits<T>::from_milli(20); }
+ 
++// Which kept point a fresh witness IS. Nearest one within the merge radius; failing
++// that, nearest of all four once the partner's budget is spent (a manifold has a
++// FIXED width — letting a turning body keep adding points is how it ends up held at
++// a dozen places at once and thrown across the map). Null means "a new point".
+ template <typename T>
++typename solid<T>::touch * simulator<T>::probe_pick_slot(solid<T> * s, const solid<T> * partner, const vec3<T> & lever) {
++	typename solid<T>::touch * nearest = nullptr;
++	T best {};
++	int n = 0;
++	for (int i = 0; i < s->touch_count_; ++i) {
++		auto & o = s->touches_[i];
++		if (o.partner != partner) continue;
++		++n;
++		vec3<T> d;
++		sub(d, o.lever, lever);
++		const T dist = length(d);
++		if (!nearest || dist < best) { nearest = &o; best = dist; }
++	}
++	if (!nearest) return nullptr;
++	if (best <= probe_merge_radius<T>()) return nearest;
++	return (n >= 4) ? nearest : nullptr;
++}
++
++// Points discovered on earlier ticks are re-anchored on the body and re-measured
++// against the live contact plane. One that still lies in the plane is solved this
++// tick alongside the fresh one; one that has lifted off is dropped. This is what
++// turns a witness that alternates end to end into a manifold that holds both ends.
++template <typename T>
++void simulator<T>::probe_revive_manifold(int tick) {
++	const T tol = probe_break_tol<T>();
++	for (auto & sp : solids_) {
++		solid<T> * s = sp.get();
++		if (!s->active_) continue;
++		for (int i = 0; i < s->touch_count_; ++i) {
++			auto & slot = s->touches_[i];
++			if (!slot.partner || slot.last_tick != tick - 1) continue;
++			// The live plane comes from a sibling point on the same partner that the
++			// narrowphase refreshed this tick; with none, there is no contact to join.
++			const typename solid<T>::touch * fresh = nullptr;
++			for (int j = 0; j < s->touch_count_; ++j) {
++				const auto & o = s->touches_[j];
++				if (o.partner == slot.partner && o.last_tick == tick) { fresh = &o; break; }
++			}
++			if (!fresh) continue;
++
++			vec3<T> lever;
++			mul(lever, s->get_orientation(), slot.local_lever);
++			vec3<T> world_pt;
++			add(world_pt, s->position_, lever);
++			vec3<T> off;
++			sub(off, world_pt, fresh->impact);
++			const T gap = dot(off, fresh->normal);
++			if (gap > tol || gap < -tol) continue;   // lifted off, or buried: not this contact
++
++			slot.lever.set(lever);
++			slot.impact.set(world_pt);
++			slot.normal.set(fresh->normal);
++			// A revived point may SUPPORT the body but must never ask for more
++			// penetration recovery than the point the narrowphase actually measured:
++			// four points each demanding their own push is how a resting box gets
++			// launched. Clamp to the fresh point's separation as the floor.
++			slot.separation = (gap > T {}) ? fresh->separation + gap : fresh->separation;
++			slot.impact_speed = fresh->impact_speed;
++			slot.last_tick = tick;
++		}
++	}
++}
++#endif
++
++template <typename T>
+ void simulator<T>::solve_contacts(T dt, bool has_speculative) {
++#ifdef HOP_PROBE_MANIFOLD
++	probe_revive_manifold(current_tick_);
++#endif
+ 	const T zero_val {};
+ 	const T one = tr::one();
+ 	// Used by the speculative target to convert a separation distance into an

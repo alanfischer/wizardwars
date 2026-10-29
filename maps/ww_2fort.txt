@@ -1,0 +1,18 @@
+================================
+2 Fortresses - For Wizard Wars
+	- Capture The Grail -
+================================
+by Rikers
+
+Objective: Enter the enemy Base and make
+your way to where their Grail resides in the
+Basement. Grab it and bring it back to your
+Battlements. Bring it to the center to
+Capture it. 
+
+Scoring: 10 Points to Capturing Person.
+		 10 Points to Capturing Team.
+
+Other Notes: Grail carriers drop the Flag when
+they die. Dropped Grails return to their Base
+after 60 seconds.

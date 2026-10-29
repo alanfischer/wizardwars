@@ -1,0 +1,13 @@
+ww_library - by Blight
+
+Object: Get the glowing green Tome from the main library room and capture it.
+Red team - Bring it to the the portal in blue spawn area.
+Blue Team - Bring it to the glowing cube in the "sun tower".
+
+When someone captures the tome, all players are reset and tome is teleported back to the library.
+
+Story:
+After years of arduous research the key to begin decoding a mystic text that once belonged to Hazeroth Gul has finally been uncovered.  The Abolishers, unwilling to permit its secrets to be revealed outside the order, have mounted an assault on the Vault of Concordia, one of the largest libraries maintained outside the guardianship of the Praetors.  
+The Abolishers, and their allies the Nihilists, have chosen to assault the library in an attempt to recover the book and disrupt the research of the orders there.  
+
+The stewards however, must get the Tome to the stasis vault at the top of the grand tower.  Once it is there it will be safe, secure from all but the Archmages who possess the knowledge of retrieving the Tome, and beyond the Abolishers reach.

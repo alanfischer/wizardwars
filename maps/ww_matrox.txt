@@ -1,0 +1,23 @@
+================================
+   matrox - For Wizard Wars
+    - Capture The Grail -
+================================
+by Final_Commando
+
+Objective: Enter the enemy Base and make
+your way to where their Grail resides in the
+courtyards. Grab it and bring it back to your
+Battlements and capture it by touching the 
+rune on the ground. 
+
+Scoring: 10 Points to Capturing Person.
+         10 Points to Capturing Team.
+
+Other Notes: Grail carriers drop the grail 
+when they die. Dropped Grails return to 
+their Base after 60 seconds of inactivity.
+
+Each team has a Dragon guarding their part of the
+bridge.  It will attack any enemy players that
+try to cross it,  If a dragon is killed, it will
+respawn again shortly.

@@ -1,0 +1,10 @@
+// Sound aliases: "<alias> <target>", one pair per line, both paths relative to sounds/.
+// AssetLoader.load_sound() rewrites the alias to the target before it looks for a file,
+// so one wav can answer to every name GoldSrc content calls it by without shipping a
+// byte-identical copy per spelling. Aliases resolve one hop — a target must be a real file.
+//
+// VOX spells its digits both ways ("point 3 secured" / "point three secured").
+vox/1.wav	vox/one.wav
+vox/2.wav	vox/two.wav
+vox/3.wav	vox/three.wav
+vox/4.wav	vox/four.wav

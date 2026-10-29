@@ -1,0 +1,11 @@
+ww_atrocity - Capture the Grail
+made by redux
+-
+Objective:  Enter the enemy castle and go to where their grail resides
+Take it and return it to your battlements.
+-
+Scoring: You gain 10 points for every grail capture.  
+Your team also gains 10 points for every capture
+-
+Other Notes: Grail carriers drop the grail when they die. 
+Dropped grails return after 60 seconds.

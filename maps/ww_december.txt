@@ -1,0 +1,14 @@
+ww_december - Capture and hold
+made by redux
+-
+Objective:  Take your grail to the church and capture it at the altar.
+Hold it as long as you can to gain points.
+-
+Scoring: You gain points every few seconds you hold the church.  
+Your team gains additional points for capturing.
+The player who captures recieves 5 additional frags.
+-
+Other Notes: Grail carriers drop the grail when they die. 
+Dropped grails return after 30 seconds.
+-
+Map uses a heavily modified version of the koth entity set by FlintMan

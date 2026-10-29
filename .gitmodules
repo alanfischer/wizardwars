@@ -1,0 +1,12 @@
+[submodule "extern/goldsrc-godot"]
+	path = extern/goldsrc-godot
+	url = ssh://git@github.com/alanfischer/goldsrc-godot
+[submodule "extern/hop-godot"]
+	path = extern/hop-godot
+	url = ssh://git@github.com/alanfischer/hop-godot
+[submodule "extern/goldnet-godot"]
+	path = extern/goldnet-godot
+	url = ssh://git@github.com/alanfischer/goldnet-godot
+[submodule "extern/pmove-godot"]
+	path = extern/pmove-godot
+	url = ssh://git@github.com/alanfischer/pmove-godot

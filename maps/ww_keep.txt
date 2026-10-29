@@ -1,0 +1,17 @@
+================================
+      THE WIZARD'S KEEP
+    - Capture The Grail -
+================================
+by Rikers
+
+Objective: Enter the enemy Base and make
+your way to where their Grail resides. 
+Grab it and bring it back to your Flag
+Room. Place it on your grail to capture it.
+
+Scoring: 10 Points to Capturing Person.
+         10 Points to Capturing Team.
+
+Other Notes: Grail carriers drop the Flag when
+they die. Dropped Grails return to their Base
+after 60 seconds.

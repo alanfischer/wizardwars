@@ -1,0 +1,12 @@
+ww_wolteg - Crystal Ball Push
+
+Created By:  Trepid Mapping
+                 trepid.net
+
+Blue and Red Objectives: 
+Take the crystal ball to cap inside the enemy base.
+- 5 frags awarded to player that captures the crystal ball.
+- 10 points awarded to team that captures the crystal ball.
+
+Other Info:
+Dropped crystal ball returns after 5 seconds.

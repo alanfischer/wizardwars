@@ -1,0 +1,45 @@
+--------------------------------------------------------------------------------
+                           *** FILE INFORMATION ***
+--------------------------------------------------------------------------------
+
+
+Title:			"Plain Skymap"
+Filename:		null_plainsky.zip
+Version:		2001-05-30
+Filesize:		1707 kb
+Author:			Jauhn "null" Dabz
+Email:			jauhn@yahoo.com
+Homepage:		http://nullpoint.fragland.net
+
+
+---- Installation -----
+
+Extract all files into your "mapname/env" folder. If you can't find a folder
+"env" there, create one.
+
+
+----- Description -----
+
+Format: tga
+Resolution: 512 x 512
+
+Sky as far as the eye can see...
+
+
+----- Copyrights ------
+
+Copyright 2001 Nullpoint
+
+You are NOT allowed to commercially exploit this skymap, i.e. put it on a CD or
+ any other electronic medium that is sold for money without my explicit
+permission. You might get it through contacting me via Email. Feel free to
+distribute this skymap, but only if the original zipfile stays intact: the
+skymap files and this txt file.
+
+Please be kind enough to give credit where credit is due by noting me in your readmes.
+Thats more than enough for me. Thanks for your time :)
+
+PS:
+Thanks to Marc Schroeder for this text file.
+audion@spaceman.de
+http://www.spaceman.de/audion

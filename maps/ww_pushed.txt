@@ -1,0 +1,14 @@
+ww_pushed by redux
+-
+http://www.angelfire.com/nt/page202
+-
+Objective: Get the flag from the middle area and 
+run it into the ENEMY base and place it on the raised 
+team logo in front of the waterfall to score.
+-
+Scoring: 
+10 points per goal.
+-
+Other Notes: flag carriers drop the flag when
+they die. Dropped flag stay where it is.
+All players are reset whenever a goal is scored.

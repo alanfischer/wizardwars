@@ -1,0 +1,14 @@
+Volcano - Assassination / Escort
+-
+Objective: The Archmage must reach the volcano
+alive. The Assassins need to kill The Archmage.
+The Bodyguards need to protect The Archmage.
+-
+Scoring: If The Archmage dies, the Assassins get
+25 points. If The Archmage reaches the volcano, 
+he and the Bodyguards get 50 points.
+-
+Other Notes: Whenever The Archmage dies or
+makes it to the volcano, all players are moved
+back to their starting positions.
+-

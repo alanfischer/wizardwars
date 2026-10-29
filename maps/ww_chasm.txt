@@ -1,0 +1,18 @@
+ww_chasm
+By: Alan Fischer
+
+On the edge of a mountain range of Arathas, two forces fight for control.
+The team of light, blue, must try to gain all of the capture points, and as they do, the clouds will part, and the rain will leave.
+But as the dark team, red, gains the points, the storm will become stronger.
+
+The blue team has the help of a yellow dragon rider, as the red has the help of a green dragon rider.
+
+The 5 points to control are:
+
+1.  The Chasm
+2.  The Hillside
+3.  The Treestump
+4.  The Brush
+5.  The Hut
+
+Note: The teams must capture the points in order, either 1,2,3,4,5 for blue, or 5,4,3,2,1 for red.

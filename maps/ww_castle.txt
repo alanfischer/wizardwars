@@ -1,0 +1,11 @@
+ww_castle - By Blight
+hunted/assisination variation
+-----------------------------
+Blue Archmage: Get to the cellar in the castle and escape through the portal in the summoning chamber.  The chamber door opens at random intervals so you may only escape periodically.
+Red Team:  Protect the archmage from the yellow wizards and escort him to the summoning chamber.
+Yellow Team: Assasinate the blue archmage and eliminate any bodyguards that stand in your way
+
+Story:
+A band of mages have arrived at a ruined town, intent on slaying the sage who lives in the castle there.  The sage's apprentices must get the old archmage to the summoning chamber in the cellars, through which lies safety.  However, the assassins summoned an aether storm to prevent such teleportation, and the spell has affected the wards on the summoning chamber door.  It now opens and closes at random whims of the  etherial tempest.
+
+As a side note, there are many nooks and crevices in which an Aquamancer can get stuck teleporting to, be cautious...

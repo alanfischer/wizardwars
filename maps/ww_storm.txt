@@ -1,0 +1,31 @@
+WW_STORM by Zouave
+
+Incremental Capture The Chalice
+
+Objective: Enter the enemy castle and make
+your way to where their chalice resides in the
+basement. Grab it and bring it back to your
+tower. Place it on the raised square to
+Capture it. 
+
+Scoring: 
+1 point for exiting through the spirals with
+the Chalice
+1 point for exiting through the castle doors
+with the Chalice
+8 points per Capture.
+
+Scoring Note:
+The exit points are only scored by using the
+primary entrances and exits.  Usin shortcuts or 
+flying in and out will not score the points.
+
+Other Notes: Chalice carriers drop the Flag when
+they die. Dropped chalices return to their Castle
+after 60 seconds if not touched by the eneny team.
+
+A Pyromancer can create a reality fissure to open the 
+grate above the grailroom to create a shortcut,
+it may also be re-sealed by creating a reality fissure
+where the grate was.
+

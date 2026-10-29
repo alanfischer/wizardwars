@@ -1,0 +1,24 @@
+ww_leyline - Sequential Territorial Control
+-------------------------------------------
+A DuckHunt Creation
+-------------------------------------------
+
+Objective:  Capture each node in order of
+their distance from your spawn to open a
+portal out of the desolate wasteland.
+
+As each node is captured, a portal opens
+at points further from your spawn.
+
+When the final node is captured, a portal
+nearby opens to escape through. This
+portal remains open for 30 seconds.
+-
+Scoring:
+Node Capture: 1 personal point, 1 team point
+Final Node: 5 personal points, 5 team points
+Escape: 1 personal point, 1 team point
+-
+Other Notes: Standing in the beam of a node
+your team controls will restore health, mana
+and sheidls.

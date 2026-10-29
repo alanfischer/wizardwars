@@ -1,0 +1,497 @@
+[gd_scene format=3 uid="uid://b03tspghy1qff"]
+
+[ext_resource type="Script" path="res://src/systems/hud.gd" id="1_k4iq4"]
+[ext_resource type="Texture2D" path="res://maps/worlds/cross.tga" id="2_e6p03"]
+[ext_resource type="PackedScene" path="res://src/systems/bar.tscn" id="3_bar"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ufou1"]
+content_margin_left = 18.0
+content_margin_top = 18.0
+content_margin_right = 18.0
+content_margin_bottom = 18.0
+bg_color = Color(0.05, 0.05, 0.08, 0.85)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.6, 0.6, 0.7, 0.8)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_3syal"]
+content_margin_left = 12.0
+content_margin_top = 12.0
+content_margin_right = 12.0
+content_margin_bottom = 12.0
+bg_color = Color(0, 0, 0, 0.75)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_s5nuy"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0, 0, 0, 0.6)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[node name="HUD" type="CanvasLayer"]
+layer = 10
+script = ExtResource("1_k4iq4")
+
+[node name="PerfLabel" type="Label" parent="."]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -160.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = 28.0
+theme_override_colors/font_color = Color(0.8, 0.8, 0.8, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 13
+horizontal_alignment = 2
+
+[node name="RenderDebugLabel" type="Label" parent="."]
+visible = false
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -200.0
+offset_top = 32.0
+offset_right = -8.0
+offset_bottom = 90.0
+theme_override_colors/font_color = Color(0.4, 1, 0.4, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 13
+horizontal_alignment = 2
+
+[node name="PosLabel" type="Label" parent="."]
+visible = false
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -260.0
+offset_top = 96.0
+offset_right = -8.0
+offset_bottom = 140.0
+theme_override_colors/font_color = Color(1, 0.9, 0.4, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 13
+horizontal_alignment = 2
+
+[node name="ResourceBars" type="HBoxContainer" parent="."]
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -225.0
+offset_top = -50.0
+offset_right = 225.0
+offset_bottom = -10.0
+mouse_filter = 2
+theme_override_constants/separation = 6
+alignment = 1
+
+[node name="HealthColumn" type="Control" parent="ResourceBars"]
+custom_minimum_size = Vector2(110, 40)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+
+[node name="BeanstalkBar" parent="ResourceBars/HealthColumn" instance=ExtResource("3_bar")]
+fill_color = Color(0.45, 0.8, 0.35, 1)
+caption = "Beanstalk"
+visible = false
+custom_minimum_size = Vector2(110, 18)
+anchors_preset = 0
+anchor_right = 1.0
+offset_bottom = 18.0
+size_flags_vertical = 4
+
+[node name="HealthBar" parent="ResourceBars/HealthColumn" instance=ExtResource("3_bar")]
+fill_color = Color(0.8, 0.15, 0.15, 1)
+caption = "Health:"
+custom_minimum_size = Vector2(110, 18)
+anchors_preset = 0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -18.0
+size_flags_vertical = 4
+
+[node name="Overheal" type="ColorRect" parent="ResourceBars/HealthColumn/HealthBar" index="1"]
+visible = false
+layout_mode = 0
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.9, 0.8, 0.1, 1)
+
+[node name="ManaColumn" type="Control" parent="ResourceBars"]
+custom_minimum_size = Vector2(110, 40)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+
+[node name="ThornplantBar" parent="ResourceBars/ManaColumn" instance=ExtResource("3_bar")]
+fill_color = Color(0.5, 0.75, 0.3, 1)
+caption = "Thornplant"
+visible = false
+custom_minimum_size = Vector2(110, 18)
+anchors_preset = 0
+anchor_right = 1.0
+offset_bottom = 18.0
+size_flags_vertical = 4
+
+[node name="ManaBar" parent="ResourceBars/ManaColumn" instance=ExtResource("3_bar")]
+fill_color = Color(0.2, 0.4, 0.9, 1)
+caption = "Mana:"
+custom_minimum_size = Vector2(110, 18)
+anchors_preset = 0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -18.0
+size_flags_vertical = 4
+
+[node name="SatchelColumn" type="Control" parent="ResourceBars"]
+custom_minimum_size = Vector2(150, 40)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+
+[node name="Satchels" type="HBoxContainer" parent="ResourceBars/SatchelColumn"]
+layout_mode = 0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -23.0
+offset_bottom = 5.0
+mouse_filter = 2
+theme_override_constants/separation = 4
+alignment = 1
+
+[node name="StatusIcons" type="HBoxContainer" parent="."]
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -80.0
+offset_top = -98.0
+offset_right = 80.0
+offset_bottom = -54.0
+mouse_filter = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="DamageOverlay" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(1, 0, 0, 0)
+
+[node name="FadeOverlay" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+
+[node name="HitOverlay" type="ColorRect" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -16.0
+offset_top = -16.0
+offset_right = 16.0
+offset_bottom = 16.0
+mouse_filter = 2
+color = Color(1, 1, 1, 0)
+
+[node name="Crosshair" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 1
+grow_vertical = 1
+mouse_filter = 2
+
+[node name="TargetID" type="Label" parent="."]
+visible = false
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -300.0
+offset_top = -74.0
+offset_right = 300.0
+offset_bottom = -54.0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+
+[node name="CenterMessage" type="Label" parent="."]
+visible = false
+modulate = Color(1, 1, 1, 0)
+anchors_preset = -1
+anchor_top = 0.33
+anchor_right = 1.0
+anchor_bottom = 0.33
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 28
+horizontal_alignment = 1
+
+[node name="MatchClock" type="Label" parent="."]
+visible = false
+custom_minimum_size = Vector2(200, 0)
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -100.0
+offset_top = 8.0
+offset_right = -100.0
+offset_bottom = 8.0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+
+[node name="SiegeWave" type="Label" parent="."]
+visible = false
+custom_minimum_size = Vector2(240, 0)
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -120.0
+offset_top = 32.0
+offset_right = -120.0
+offset_bottom = 32.0
+theme_override_colors/font_color = Color(1, 0.75, 0.4, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+
+[node name="SiegeAltarBar" parent="." instance=ExtResource("3_bar")]
+fill_color = Color(0.45, 0.75, 1, 1)
+caption = "Altar"
+caption_font_size = 11
+visible = false
+custom_minimum_size = Vector2(240, 14)
+layout_mode = 3
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -120.0
+offset_top = 54.0
+offset_right = -120.0
+offset_bottom = 54.0
+grow_horizontal = 1
+size_flags_vertical = 4
+
+[node name="MapVote" type="Label" parent="."]
+visible = false
+anchors_preset = -1
+anchor_top = 0.47
+anchor_right = 1.0
+anchor_bottom = 0.47
+theme_override_colors/font_color = Color(0.85, 0.9, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+
+[node name="MapInfo" type="PanelContainer" parent="."]
+visible = false
+modulate = Color(1, 1, 1, 0)
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.06
+anchor_right = 0.5
+anchor_bottom = 0.06
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_ufou1")
+
+[node name="Content" type="VBoxContainer" parent="MapInfo"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="WorldMap" type="TextureRect" parent="MapInfo/Content"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 2
+expand_mode = 1
+
+[node name="Cross" type="TextureRect" parent="MapInfo/Content/WorldMap"]
+visible = false
+layout_mode = 0
+mouse_filter = 2
+texture = ExtResource("2_e6p03")
+expand_mode = 1
+
+[node name="CrossBlink" type="Timer" parent="MapInfo/Content/WorldMap"]
+wait_time = 0.4
+
+[node name="Title" type="Label" parent="MapInfo/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.4, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 24
+
+[node name="BodyScroll" type="ScrollContainer" parent="MapInfo/Content"]
+custom_minimum_size = Vector2(640, 0)
+layout_mode = 2
+mouse_filter = 2
+horizontal_scroll_mode = 0
+
+[node name="Body" type="Label" parent="MapInfo/Content/BodyScroll"]
+custom_minimum_size = Vector2(640, 0)
+layout_mode = 2
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 16
+autowrap_mode = 3
+
+[node name="Hint" type="Label" parent="MapInfo/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.7, 0.75, 1)
+theme_override_font_sizes/font_size = 12
+text = "scroll to read · any key to close"
+horizontal_alignment = 2
+
+[node name="Channel0" type="Label" parent="."]
+visible = false
+modulate = Color(1, 1, 1, 0)
+theme_override_font_sizes/font_size = 24
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Channel1" type="Label" parent="."]
+visible = false
+modulate = Color(1, 1, 1, 0)
+theme_override_font_sizes/font_size = 24
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Channel2" type="Label" parent="."]
+visible = false
+modulate = Color(1, 1, 1, 0)
+theme_override_font_sizes/font_size = 24
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Channel3" type="Label" parent="."]
+visible = false
+modulate = Color(1, 1, 1, 0)
+theme_override_font_sizes/font_size = 24
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Scoreboard" type="PanelContainer" parent="."]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250.0
+offset_top = -200.0
+offset_right = 250.0
+offset_bottom = 200.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_3syal")
+
+[node name="ScoreTable" type="VBoxContainer" parent="Scoreboard"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="WeaponRow" type="VBoxContainer" parent="."]
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 10.0
+offset_bottom = 10.0
+mouse_filter = 2
+theme_override_constants/separation = 3
+
+[node name="KillFeed" type="VBoxContainer" parent="."]
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 60.0
+offset_right = -10.0
+size_flags_horizontal = 8
+mouse_filter = 2
+
+[node name="ChatLog" type="VBoxContainer" parent="."]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = -130.0
+offset_right = 390.0
+offset_bottom = -68.0
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="ChatInput" type="PanelContainer" parent="."]
+visible = false
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = -66.0
+offset_right = 390.0
+offset_bottom = -42.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_s5nuy")
+
+[node name="Row" type="HBoxContainer" parent="ChatInput"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Prefix" type="Label" parent="ChatInput/Row"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.4, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 14
+
+[node name="Input" type="LineEdit" parent="ChatInput/Row"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 14
+placeholder_text = "Press Enter to send, Escape to cancel"
+max_length = 128
+
+[connection signal="draw" from="Crosshair" to="." method="_draw_crosshair"]
+[connection signal="timeout" from="MapInfo/Content/WorldMap/CrossBlink" to="." method="_blink_motd_cross"]
+[connection signal="text_submitted" from="ChatInput/Row/Input" to="." method="_on_chat_text_submitted"]
+[connection signal="gui_input" from="ChatInput/Row/Input" to="." method="_on_chat_input_gui_input"]

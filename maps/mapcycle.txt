@@ -1,0 +1,16 @@
+# Map rotation. One map per line, '#' starts a comment; blank lines are ignored.
+# When a match ends (see the timelimit and scorelimit server vars) the server loads the
+# next line, wrapping at the bottom. Names not installed on the server are skipped.
+#
+# To run a shorter rotation, delete the lines you don't want — or drop an edited copy in the
+# server's user:// directory as mapcycle.txt, which is read in preference to this one.
+
+ww_2fort
+ww_ravine
+ww_storm
+ww_hunt
+ww_chasm
+ww_roc2
+ww_wstland4
+ww_golem
+ww_monoliths

@@ -1,0 +1,22 @@
+================================
+ countryside - For Wizard Wars
+    - Capture The Grail -
+================================
+by Final_Commando
+
+Objective: Enter the enemy castle and make
+your way to where their Grail resides in 
+the chapel. Grab it and bring it back to your
+capture point in your respawn room.
+
+Scoring: 10 Points to Capturing Person.
+         10 Points to Capturing Team.
+
+Other Notes: Grail carriers drop the grail when
+they die. Dropped Grails return to their Base
+after 60 seconds of inactivity.
+
+Rideable dragons are available in your base 
+to use against the opposition! 
+Use them wisely, however, because when a dragon 
+dies, it will not respawn again for a few minutes.

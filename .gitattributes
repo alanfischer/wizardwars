@@ -1,0 +1,34 @@
+# Normalize line endings: the repository stores text files with LF, and they
+# are checked out with LF on every platform. Keeps diffs clean and avoids the
+# mixed CRLF/LF state a repo drifts into once one file is committed from a
+# Windows editor — from then on any tool that rewrites it shows a whole-file diff.
+* text=auto eol=lf
+
+# Windows batch files are the one thing that genuinely wants CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# GoldSrc / Half-Life assets — never normalize or diff as text.
+*.bsp binary
+*.mdl binary
+*.spr binary
+*.wad binary
+*.bmp binary
+*.tga binary
+*.pcx binary
+*.wav binary
+*.ogg binary
+
+# Images, fonts, build artifacts.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.ttf binary
+*.pck binary
+*.so binary
+*.dll binary
+*.dylib binary
+*.pdb binary
+*.a binary
+*.lib binary

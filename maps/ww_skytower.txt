@@ -1,0 +1,12 @@
+ww_skytower - by tyther
+
+scenario: deathmatch/king of the hill
+
+Objective: climb to the top of the tower and
+get the dragon, then kill all the other 
+wizards in sight!  
+
+Scoring: Standard deathmatch scoring.
+
+Other Notes: If the dragon dies, a new one 
+will respawn at the top of the tower shortly.

@@ -1,0 +1,39 @@
+================================
+         ww_checkmate
+     - Rescue The King -
+	  by Sinistar 
+================================
+
+Story:  Two castles (black and white) 
+are at war. The Wizards of Arathas have been 
+called in from a nearby dimension to help 
+bring order out of chaos.
+ 
+Main objective:  Offense - Go to the enemy 
+dungeon and break your king out of the dungeon, 
+then bring him back to your castle and back 
+to his rightful place on his throne. 
+Defense - Prevent the enemy team from
+rescuing their king!
+
+The blue team is allied with the white castle.
+The Red team is allied with the black castle.
+ 
+Scoring: 10 Points to rescuing Person.
+         10 Points to rescuing Team.
+
+2nd objective:  Your dragon has been kidnapped
+by the enemy team.  You must free your dragon!
+Simply destroy the metal cage that surrounds
+him. Once you do, he will be yours to ride! If
+Dragon dies, he will respawn again shortly.
+
+Other Notes: Players can touch their team's 
+queen to restock mana, health, and satchels!
+The Queen only restocks every 5 seconds or so.
+
+King carriers will drop him in place if they 
+die. Dropped kings will return to the enemy 
+prison after 30 seconds.
+
+Read ww_checkmate_info.txt for more info!

@@ -1,0 +1,10 @@
+================================
+         ww_ravine
+    - Capture The Grail -
+================================
+by siralanf
+
+Objective: Find the enemy grail and
+bring it to your battlements.
+
+Scoring: 10 Points to Capturing Team

@@ -1,0 +1,29 @@
+ww_memnate - Ring Control
+
+Created By:  Trepid Mapping
+				 Trepid.net
+
+Blue and Red Objectives:  
+- Take control of the Ring
+- Jump through the Ring to gain control
+- The Ring can only be controlled for 30 seconds
+- After the 30 seconds, Yellow regains control
+
+Yellow Objective: 
+- Defend the Ring
+- Stop Blue and Red from controlling the Ring
+- The Ring returns to Yellow control after 30 seconds
+
+Scoring:
+- 1 point for taking control of the Ring
+- 1 point per 6 seconds of controlling the Ring
+- 1 bonus point to Blue and Red for holding
+	 the Ring the entire 30 seconds
+
+Notes:
+- There is "safe" time after taking control of the Ring.
+- This means if two players are going for the Ring at
+	 the same time, the first player through the Ring
+	 will ensure control of the Ring for their team
+	 for the next few seconds.
+- This basically makes it a race for the ring.

@@ -1,0 +1,34 @@
+============================================
+		   	   OSAKA 
+
+			  Invade or defend
+============================================
+
+		  by Bryan "Zouave" Dillow
+
+Only one stronghold remains against the 
+unification of Japan... Osaka Castle.  The
+Ii, loyal retainers of the Tokugawa, must 
+take the castle by force.   Opposing them
+are the warriors of the Goto family.
+
+Objective: Red team must take their flag to
+Blue team's Castle to win the game. 
+There are two command points on the way 
+which must be secured in order.
+
+Scoring: Blue team - 5 points per minute
+	 Red team - 40 points for capturing 
+			the village
+		  - 50 points for capturing 
+			the castle gate
+		  - 60 points for capturing 	
+			the castle keep
+
+Other Notes: 
+
+- Dropped flags return after 60 seconds
+- When a capture point is secured, 
+spawn points are revised and a new flag 
+appears. 
+- Rounds last 25 minutes.

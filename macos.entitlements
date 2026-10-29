@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Voice chat opens an audio input device. Only enforced under the hardened runtime or the
+	     App Sandbox, neither of which the ad-hoc signature in build.sh turns on — it is declared
+	     anyway so enabling either does not silently take the microphone away. The microphone
+	     prompt itself comes from NSMicrophoneUsageDescription, in the macOS export preset. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+</dict>
+</plist>

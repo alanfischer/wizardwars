@@ -1,0 +1,31 @@
+=========================
+  Unfinished Symphony of Worldcraft Goodness
+=========================
+---General Information---
+Title 				feudal wars by Miscast Death Wizard
+Filename			ww_feudal.bsp
+Homepage			http://www.planethalflife.com/wizardwars
+
+---Play Information------
+Map Description			Annoy the other team by spamming their respawn
+Map Objective			Capture the grail, spam the respawn, and annoy dragons.
+Scoring Information		10 points per capture
+Number of Teams			2
+Recommended # of Players:	4 minus Hankey
+
+---Map Information-------
+New Textures            	Yes. My own Runicus
+New Sounds			None
+Inn structure inspired by Alan fisher(in memory of ww_hunt)
+---Construction----------
+Base				None
+Editor(s) used          	  WorldCraft
+Compile Machine			 800mhz PIII
+Compile time		 	 Long As hell!
+
+---Copyright-Permissions--------------------------------------------
+Wizard Wars only(because I doubt itll work in any other game ;) )
+St. Claire use is limited to the Fischers!
+I hope I can improve upon this thing!
+Flame me in the Wizard Wars forums if you need to.
+If the wrold map crashes you, buy another graphics card!

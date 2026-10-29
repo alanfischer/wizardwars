@@ -1,0 +1,21 @@
+WizardWars HUNTed
+by Zouave
+
+Assassination/Escort
+
+Red players must escort the
+archmage through town and down
+to the Galley.  Yellow players
+must stop him at all costs.
+Evry time the Archamge is killed
+or reaches the Galley, players
+are return to the start.
+
+(C) 2000 by Zouave (Zouave@mrsucko.org)
+
+This map uses textures created by:
+[WTF?]Evile Dick
+(EvileDick@digital-e.demon.co.uk)
+and Crista Forest
+(csforest@planetunreal.com)
+

@@ -1,0 +1,12 @@
+Roc2 - Capture The Flag Variant
+
+Objective: Steal the Key from the enemy
+Castle. Take it across to the other
+side of the enemy fort to the top of their
+tower to release the Deathcloud.  
+
+Scoring: 10 points for each Gas Release.
+
+Other Notes: To survive the Gas, only
+water is safe. Red gas kills blue, blue
+gas kills red.

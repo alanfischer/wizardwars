@@ -1,0 +1,21 @@
+ww_monoliths by Zouave
+----------------------
+Story:
+High above the land of Arathas, the rival wizard teams try to 
+gain control of a magical floating island in the sky.
+
+Objective: Sequential Territorial Control - Capture all five 
+command points in the map in sequential order by running over 
+each rune to capture that area.
+
+Scoring: 30 points for capturing all the command points.
+
+Other Notes:
+
+Command Points are color indicated by whichever team controls 
+it currently.
+A white stream indicates neural status.
+Once a point has been captured, it cannot be re-captured for 
+15 seconds.  Points have a panel covering them when they 
+cannot be re-captured.
+

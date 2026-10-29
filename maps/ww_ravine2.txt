@@ -1,0 +1,15 @@
+ww_ravine2 - Capture the Grail
+made by redux
+map design originally by SirAlanF
+-
+Objective:  Enter the enemy castle and go to where their grail resides.
+Take it and return it to your lower battlements.
+-
+Scoring: You gain 10 points for every grail capture.  
+Your team also gains 10 points for every capture
+-
+Other Notes: Grail carriers drop the grail when they die. 
+Dropped grails return after 60 seconds.
+-
+Rock and grass textures by Kamakazi (DOD Team)
+Base textures by Credence.
