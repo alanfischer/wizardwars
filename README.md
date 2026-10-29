@@ -12,6 +12,12 @@ the teams. It runs on macOS, Windows, Linux and Meta Quest (VR).
   <img src="docs/screenshots/bridge_blue_fort.jpg" width="49%" alt="Wizards pushing toward the blue fort">
 </p>
 
+## How to play
+
+- [The Wizards](docs/wizards.md): every class, its spells, satchel and tips.
+- [Combo Spells](docs/combo_spells.md): the eight two-element spells, and how to earn one by
+  clashing staves with a teammate.
+
 ## Libraries
 
 The engine-side work lives in four GDExtensions, each its own MIT-licensed repo, pulled in as
