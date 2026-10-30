@@ -109,7 +109,7 @@ everything they sweep through.
 
 <img src="images/portrait_ice.jpg" align="right" width="200" alt="The Cryomancer">
 
-> *A master of ice and illusion, the Frost Mage is possibly the most versatile wizard of all.
+> *A master of ice and illusion, the Cryomancer is possibly the most versatile wizard of all.
 > He slips unseen through the smallest portal, and, when it suits his purpose, completely
 > disappears. No one is safe; for just when you think you're alone he slams you in the back
 > with the crystal staff.*
@@ -128,7 +128,7 @@ everything they sweep through.
 |---|---|
 | <img src="images/ice_freezeray.jpg" alt="Freeze Ray"><br>**Freeze Ray** | <img src="images/ice_invisibility.jpg" alt="Invisibility"><br>**Invisibility** |
 
-**Satchel: Frozen Satchel.** It doesn't explode. When the fuse runs out, you're teleported to
+**Satchel: Teleport Satchel.** It doesn't explode. When the fuse runs out, you're teleported to
 wherever it landed. Throw it up a ledge, over a wall or into the enemy base, and follow it.
 
 **Combos:** with a Phytomancer → [Giant Plant](combo_spells.md#giant-plant); with a
@@ -149,7 +149,7 @@ Fulgomancer → [Lightning Cloud](combo_spells.md#lightning-cloud).
 
 <img src="images/portrait_lightning.jpg" align="right" width="200" alt="The Fulgomancer">
 
-> *Bringer of the Thunderous Storm, the Tempest commands the power of maelstroms,
+> *Bringer of the Thunderous Storm, the Fulgomancer commands the power of maelstroms,
 > thunderheads, squalls, and hurricanes, though the power most fear is that of lightning.
 > Any contesting the strike of a well-placed bolt often are found, struck down.*
 
@@ -224,7 +224,7 @@ Cryomancer → [Lightning Cloud](combo_spells.md#lightning-cloud).
 
 <img src="images/portrait_wind.jpg" align="right" width="200" alt="The Aeromancer">
 
-> *Walker upon the Four Winds, the Zephyrist is that which brings the storm, and causes
+> *Walker upon the Four Winds, the Aeromancer is that which brings the storm, and causes
 > devastation to the countryside far and wide. There is little haven against the gales, and
 > it soon throws about those caught in its fury.*
 
@@ -260,9 +260,9 @@ Cryomancer → [Lightning Cloud](combo_spells.md#lightning-cloud).
 
 <img src="images/portrait_nature.jpg" align="right" width="200" alt="The Phytomancer">
 
-> *Watcher over the Verdant Plains, the Sylvanist controls the forces of nature, whether
+> *Watcher over the Verdant Plains, the Phytomancer controls the forces of nature, whether
 > fern, bush, or oak, raising the forests to defend themself from the imperial onslaught.
-> The Sylvanist's focus towards protection of plants may be misconstrued as weakness; the
+> The Phytomancer's focus towards protection of plants may be misconstrued as weakness; the
 > wrath of the forest is one few tempt.*
 
 **Health** 90 · **Speed** fast
@@ -310,9 +310,9 @@ Sanomancer → [Spirit Wizard](combo_spells.md#spirit-wizard).
 
 <img src="images/portrait_life.jpg" align="right" width="200" alt="The Sanomancer">
 
-> *Master over the Divine Arts, the Cleric is trained in the judgement of the world, lending
+> *Master over the Divine Arts, the Sanomancer is trained in the judgement of the world, lending
 > aid in the form of mending to allies, and striking those that would oppose their crusade.
-> Few dispute the unrivalled aid a Cleric brings to the battlegrounds of Arathas.*
+> Few dispute the unrivalled aid a Sanomancer brings to the battlegrounds of Arathas.*
 
 **Health** 75 · **Speed** fastest
 
@@ -348,7 +348,7 @@ Geomancer → [Wally the Wombat](combo_spells.md#wally-the-wombat).
 <img src="images/portrait_death.jpg" align="right" width="200" alt="The Necromancer">
 
 > *Lord over all that is Death, the Necromancer brings the souls of the dead back, to undeath,
-> for a corpse has no fear or sense of pain, and thus makes the perfect soldier. The Black Magi
+> for a corpse has no fear or sense of pain, and thus makes the perfect soldier. Necromancers
 > tend to find new means to sustain themselves, such as siphoning the life of wayward
 > travelers.*
 
