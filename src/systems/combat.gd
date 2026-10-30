@@ -7,6 +7,12 @@ extends Node
 # point and the beam-origin fallback so the two cannot drift.
 const _EYE_DROP := Vector3(0, -8 * GameConsts.SCALE_FACTOR, 0)
 
+# CBaseMonster::TakeDamage/DamageForce: a blow shoves its victim 5 u/s per point (a player's
+# hull), capped at 1000, away from an inflictor taken to sit 10 units low so bodies lift.
+const _DAMAGE_FORCE_PER_POINT := 5.0 * GameConsts.SCALE_FACTOR
+const _DAMAGE_FORCE_MAX := 1000.0 * GameConsts.SCALE_FACTOR
+const _INFLICTOR_DROP := Vector3(0, -10 * GameConsts.SCALE_FACTOR, 0)
+
 # Reused for find_homing_target's visibility ray: it runs over the whole damageable group on
 # every monster's and homing projectile's think. Safe to share — `from`/`to`/`exclude` are all
 # written per candidate, and collision_mask is the same constant on every call.
@@ -18,6 +24,9 @@ var _los_excludes: Array[RID] = []
 ## Visibility rays find_homing_target has issued; zeroed and read by test_homing_target and
 ## src/tests/homing_probe.tscn.
 var homing_ray_count := 0
+## Where the blow being dealt right now comes from, when that isn't the attacker (a blast, a
+## projectile) — GoldSrc's pevInflictor. INF = the attacker. Read by damage_force.
+var _inflictor_pos := Vector3.INF
 
 
 ## Resolve aim origin and direction from an attacker node.
@@ -267,12 +276,31 @@ func find_damageable(collider: Object) -> Node:
 ## Damage whatever `collider` belongs to. Returns the node that took it, or null when the
 ## collider was world geometry. The one way anything hits a single target — a projectile, a
 ## melee swing, a spell — so a change to what counts as a damageable body lands everywhere.
-func damage_chain(collider: Object, damage: float, damage_type: int, attacker: Node3D = null) -> Node:
+## `from` is the inflictor's position for a blow that isn't the attacker's own (a projectile).
+func damage_chain(collider: Object, damage: float, damage_type: int, attacker: Node3D = null,
+		from := Vector3.INF) -> Node:
 	var target := find_damageable(collider)
 	if target == null:
 		return null
+	var outer := _inflictor_pos
+	_inflictor_pos = from
 	target.take_damage(damage, damage_type, attacker)
+	_inflictor_pos = outer
 	return target
+
+
+## The shove `damage` gives `victim` (see _DAMAGE_FORCE_PER_POINT). A blow with neither an
+## inflictor nor an attacker — lava, a fall, a burn — shoves nothing, as in the original.
+func damage_force(victim: Node3D, damage: float, attacker: Node3D) -> Vector3:
+	var from := _inflictor_pos
+	if from == Vector3.INF:
+		if attacker == null or not is_instance_valid(attacker):
+			return Vector3.ZERO
+		from = SpatialQuery.collision_center(attacker)
+	var dir := SpatialQuery.collision_center(victim) - (from + _INFLICTOR_DROP)
+	if dir.length_squared() < 0.0001:
+		return Vector3.ZERO
+	return dir.normalized() * minf(damage * _DAMAGE_FORCE_PER_POINT, _DAMAGE_FORCE_MAX)
 
 
 ## Apply damage to the target of a hitscan ray, honoring headshot multipliers
@@ -319,6 +347,8 @@ func apply_aoe_damage(space: PhysicsDirectSpaceState3D, impact_pos: Vector3, dam
 	var results := space.intersect_shape(shape_params, 32)
 	var foe_only := skip_friendly and attacker != null
 	var damaged := {}
+	var outer := _inflictor_pos
+	_inflictor_pos = impact_pos
 	for r in results:
 		if los_blocked(space, impact_pos, r.collider):
 			continue
@@ -349,6 +379,7 @@ func apply_aoe_damage(space: PhysicsDirectSpaceState3D, impact_pos: Vector3, dam
 		if node.has_method("take_damage"):
 			damaged[node] = true
 			node.take_damage(damage, damage_type, attacker)
+	_inflictor_pos = outer
 
 
 ## Quake-style radial push from an explosion. Speed is `strength` at the impact point,

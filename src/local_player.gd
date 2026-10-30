@@ -372,7 +372,7 @@ func _on_died(_attacker: Node3D, type: int = GameConsts.DamageType.PHYSICAL,
 	_clear_all_statuses()
 	if weapon:
 		weapon.stop_firing(self, true)  # reset secondary state (e.g. zoom)
-	var death_velocity := velocity
+	var death_velocity := corpse_velocity(velocity)
 	_movement.clear()
 	_pending_server_states.clear()
 	_last_input_cmd = null

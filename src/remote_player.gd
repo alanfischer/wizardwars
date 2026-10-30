@@ -1445,7 +1445,9 @@ func _on_died(attacker: Node3D, type: int = GameConsts.DamageType.PHYSICAL,
 	# it takes the wizard's body to make the skeleton, so there is nothing left for the next book
 	# to raise.
 	if Player.death_type_leaves_corpse(type):
-		var death_velocity := _server_movement.state.velocity if _server_movement else Vector3.ZERO
+		# The body, not the movement state: a knockback from this same blow is written to the
+		# body and only reaches the state on the next movement tick.
+		var death_velocity := corpse_velocity(velocity)
 		# Only a body that is going to lie there needs the pose it died in — a burst throws it
 		# away, and reading one off the skeleton is 22 bones of work on the busiest machine.
 		var pose := PackedFloat32Array() if GameConsts.damage_gibs(damage) else capture_bone_pose()
