@@ -12,6 +12,12 @@ the teams. It runs on macOS, Windows, Linux and Meta Quest (VR).
   <img src="docs/screenshots/bridge_blue_fort.jpg" width="49%" alt="Wizards pushing toward the blue fort">
 </p>
 
+## How to play
+
+- [The Wizards](docs/wizards.md): every class, its spells, satchel and tips.
+- [Combo Spells](docs/combo_spells.md): the eight two-element spells, and how to earn one by
+  clashing staves with a teammate.
+
 ## Libraries
 
 The engine-side work lives in four GDExtensions, each its own MIT-licensed repo, pulled in as
@@ -86,7 +92,7 @@ connected). It needs the Android export templates and SDK set up in the editor.
 | `extern/` | The four library submodules |
 | `addons/` | Godot plugins: symlinks into `extern/`, plus TwoVoIP and OpenXR |
 | `maps/`, `models/`, `sounds/`, `sprites/`, `sky/`, `*.wad` | Game assets in their GoldSrc formats |
-| `tools/` | Asset tools (`mdl.py`, `spr.py`, `wad.py`, `bsp.py`), the `*_art.py` generators that made the replacement art, one-off map patches (`ww_*.py`), and `probe_*.gd` debug scenes |
+| `tools/` | Asset tools (`mdl.py`, `spr.py`, `wad.py`, `bsp.py`), the `*_art.py` generators that made the replacement art, one-off map patches (`ww_*.py`), `probe_*.gd` debug scenes, and the screenshot scenes behind the README (`readme_shots`) and the player docs (`doc_shots`) |
 | `plans/`, `TODO.md` | Design notes and open work |
 
 The Python tools need a venv with `numpy`, `scipy` and `pillow`; the sound generator also uses
