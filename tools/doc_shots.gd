@@ -23,7 +23,7 @@ const CASTER_AT := Vector2(0.0, -120.0)
 const TARGET_AT := Vector2(0.0, 280.0)
 
 ## id: [element, slot or combo key, options]. Options: hold (s of held fire), casts (taps),
-## frames (s after the first cast), cam (over | close | wide), target_m (enemy distance),
+## frames (s after the first cast), cam (over | close | wide | front), target_m (enemy distance),
 ## aim (target | ground | feet), charge, extra (enemies placed around the caster), no_target, special,
 ## from / toward / up (GoldSrc xy to stand at and face, and height over the deck, for a spell the deck
 ## cannot hold).
@@ -73,7 +73,7 @@ const SHOTS := {
 
 	"death_missile": [E.DEATH, 1, {target_m = 12.0, casts = 2, frames = [0.03, 0.06, 0.09, 0.12, 0.15, 0.2, 0.25]}],
 	"death_deathray": [E.DEATH, 2, {hold = 2.0, frames = [0.5, 1.0, 1.5]}],
-	"death_skull": [E.DEATH, 3, {casts = 2, frames = [0.3, 0.6, 0.9, 1.3, 1.8]}],
+	"death_skull": [E.DEATH, 3, {target_m = 11.0, cam = "front", frames = [0.02, 0.04, 0.06, 0.08]}],
 	"death_grimfeast": [E.DEATH, 4, {target_m = 1.5, cam = "close", special = "corpse", frames = [-0.3, 0.05, 0.3, 0.8]}],
 
 	"archmage_missile": [E.ARCHMAGE, 1, {target_m = 12.0, casts = 2, frames = [0.03, 0.06, 0.09, 0.12, 0.15, 0.2, 0.25]}],
@@ -270,6 +270,10 @@ func _frame_cam(kind: String, caster: Vector3, target: Vector3) -> void:
 			_cam.fov = 40.0
 			eye = caster + fwd * 1.8 + side * 3.0 + Vector3(0, 1.5, 0)
 			look = caster + fwd * 0.9 + Vector3(0, 1.0, 0)
+		"front":
+			_cam.fov = 40.0
+			eye = caster + fwd * 6.5 + side * 1.2 + Vector3(0, 1.7, 0)
+			look = caster + fwd * 2.0 + Vector3(0, 1.3, 0)
 		"wide":
 			_cam.fov = 50.0
 			eye = caster - fwd * 3.0 + side * 2.0 + Vector3(0, 2.8, 0)
