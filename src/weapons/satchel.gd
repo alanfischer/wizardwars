@@ -85,6 +85,7 @@ static func precache() -> void:
 	for sound_path in ELEMENT_SOUNDS.values():
 		SoundSystem.precache(sound_path)
 	AssetLoader.precache_sprite("sprites/fexplo1.spr")  # fire spiral
+	SoundSystem.precache(FireSpiral.SOUND)
 	AssetLoader.precache_model("models/npc/cocklebur.mdl")
 	SoundSystem.precache("spells/satchels/cocklebur.wav")
 	SatchelBurstEffect.precache()

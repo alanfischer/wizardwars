@@ -1,17 +1,19 @@
 class_name FireSpiral
 extends Node3D
 
-## Fire satchel spiral — two arms of flame that smoothly spin outward from center,
-## dealing damage to anything they touch.
+## Fire satchel spiral (CFireSpiral) — two flames 180 degrees apart that spin outward from center,
+## each shedding a trail of flames that swirl after it, dealing damage to anything they touch.
 
-const MAX_RADIUS := 5.0
-const DURATION := 2.0
-const TURNS := 2.0             # full rotations over the duration
-const FLAME_INTERVAL := 0.05  # seconds between flame spawns per arm
+const DURATION := 3.0  # FIRESPIRAL_LIFE
+const SPIN := 8.0  # rad/s: the original's theta = 8t
+# The original stepped 3*theta units every 0.1s think, which at SPIN traces a radius of 30t units.
+const GROWTH := 30.0 * GameConsts.SCALE_FACTOR
+const FLAME_INTERVAL := 0.025  # seconds between trail flames per arm
 const DAMAGE_INTERVAL := 0.1  # seconds between damage ticks per arm position
 const DAMAGE := 12.0
 const DAMAGE_RADIUS := 1.25    # AoE around each sampled arm point
 const DAMAGE_TYPE := GameConsts.DamageType.FIRE
+const SOUND := "spells/satchels/pyro_spiral.wav"
 
 var owner_node: Node3D
 var team := 0
@@ -38,9 +40,8 @@ func setup(data: Dictionary, is_host := true) -> void:
 
 func _ready() -> void:
 	_scene_root = get_tree().current_scene
-
-	if _entity.is_host:
-		pass  # replication handled by the dynamic-entity MultiplayerSpawner
+	# The wav runs 5.4s; it dies with the spiral, as the original STOP_SOUNDs it.
+	SoundSystem.spawn_on(self, SOUND)
 
 
 func _physics_process(delta: float) -> void:
@@ -53,9 +54,8 @@ func _physics_process(delta: float) -> void:
 		_die()
 		return
 
-	var t := _age / DURATION  # 0→1
-	var radius := t * MAX_RADIUS
-	var angle := _start_angle + t * TURNS * TAU
+	var radius := GROWTH * _age
+	var angle := _start_angle + SPIN * _age
 
 	# Two arms, 180 degrees apart
 	var arm1_pos := _origin + Vector3(cos(angle) * radius, 0.0, sin(angle) * radius)
@@ -69,16 +69,13 @@ func _physics_process(delta: float) -> void:
 			_head1.global_position = arm1_pos
 			_head2.global_position = arm2_pos
 
+	# Every peer runs this spiral, so the trail is drawn locally on each rather than replicated.
 	_flame_timer += delta
 	if _flame_timer >= FLAME_INTERVAL:
 		_flame_timer -= FLAME_INTERVAL
 		if is_instance_valid(_scene_root):
-			var online := NetworkManager.is_online()
-			var f1 := FireSpiralEffect.spawn(_scene_root, arm1_pos)
-			var f2 := FireSpiralEffect.spawn(_scene_root, arm2_pos)
-			if online and _entity.is_host:
-				NetworkManager.register_effect(f1, "res://src/effects/fire_spiral_effect.gd")
-				NetworkManager.register_effect(f2, "res://src/effects/fire_spiral_effect.gd")
+			FireSpiralEffect.spawn_trail(_scene_root, _origin, angle, radius, SPIN)
+			FireSpiralEffect.spawn_trail(_scene_root, _origin, angle + PI, radius, SPIN)
 
 	if _entity.is_host:
 		_damage_timer += delta
