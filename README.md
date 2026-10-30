@@ -92,7 +92,7 @@ connected). It needs the Android export templates and SDK set up in the editor.
 | `extern/` | The four library submodules |
 | `addons/` | Godot plugins: symlinks into `extern/`, plus TwoVoIP and OpenXR |
 | `maps/`, `models/`, `sounds/`, `sprites/`, `sky/`, `*.wad` | Game assets in their GoldSrc formats |
-| `tools/` | Asset tools (`mdl.py`, `spr.py`, `wad.py`, `bsp.py`), the `*_art.py` generators that made the replacement art, one-off map patches (`ww_*.py`), and `probe_*.gd` debug scenes |
+| `tools/` | Asset tools (`mdl.py`, `spr.py`, `wad.py`, `bsp.py`), the `*_art.py` generators that made the replacement art, one-off map patches (`ww_*.py`), `probe_*.gd` debug scenes, and the screenshot scenes behind the README (`readme_shots`) and the player docs (`doc_shots`) |
 | `plans/`, `TODO.md` | Design notes and open work |
 
 The Python tools need a venv with `numpy`, `scipy` and `pillow`; the sound generator also uses

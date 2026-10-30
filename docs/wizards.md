@@ -67,6 +67,8 @@ Any healing cures all three: a Sanomancer's ray or satchel, a wombat, a health p
 
 ## Pyromancer (fire)
 
+<img src="images/portrait_fire.jpg" align="right" width="200" alt="The Pyromancer">
+
 > *Evoker of the Arcane Flame, the Pyromancer utilizes the unchecked powers of fire to turn
 > those before him to ash and smoke. There are few able, or willing, to stand against a
 > Pyromancer in a Wizard's Duel, for there are none as destructive.*
@@ -80,6 +82,10 @@ Any healing cures all three: a Sanomancer's ray or satchel, a wombat, a health p
 | 3 | Flame Lick | 5 | An instant burst of flame where you aim: 15 to everything within 3 m of the impact, setting it alight. Twice a second. |
 | 4 | Fireball | 20 | A fireball that bursts for 40 within 4 m, knocks wizards back and sets them burning. |
 | 5 | Reality Fissure | 90 | Pins you in place for 3 seconds while a tear in reality opens in front of you, then detonates for 500 within 3 m. It also blows open walls that a map marks for demolition. |
+
+| <img src="images/fire_flamelick.jpg" alt="Flame Lick"><br>**Flame Lick** | <img src="images/fire_fireball.jpg" alt="Fireball"><br>**Fireball** |
+|---|---|
+| <img src="images/fire_fissure.jpg" alt="Reality Fissure"><br>**Reality Fissure** |  |
 
 **Satchel: Pyro Satchel.** Two arms of flame spiral outward to 5 m over two seconds, burning
 everything they sweep through.
@@ -101,6 +107,8 @@ everything they sweep through.
 
 ## Cryomancer (ice)
 
+<img src="images/portrait_ice.jpg" align="right" width="200" alt="The Cryomancer">
+
 > *A master of ice and illusion, the Frost Mage is possibly the most versatile wizard of all.
 > He slips unseen through the smallest portal, and, when it suits his purpose, completely
 > disappears. No one is safe; for just when you think you're alone he slams you in the back
@@ -115,6 +123,10 @@ everything they sweep through.
 | 3 | Ice Poke | 5 | A ring of six ice shards, 10 each, every one of them frosting what it hits. |
 | 4 | Freeze Ray | 4, then 1/s | A beam you hold on someone: 5 damage four times a second, every pulse frosting them longer. |
 | 5 | Invisibility | 8, then 2.5/s | Hold to fade out. Standing still you're completely invisible; at a full sprint you're half visible. Let go, or run out of mana, and you reappear. |
+
+| <img src="images/ice_mindmissile.jpg" alt="Mind Missile"><br>**Mind Missile** | <img src="images/ice_icepoke.jpg" alt="Ice Poke"><br>**Ice Poke** |
+|---|---|
+| <img src="images/ice_freezeray.jpg" alt="Freeze Ray"><br>**Freeze Ray** | <img src="images/ice_invisibility.jpg" alt="Invisibility"><br>**Invisibility** |
 
 **Satchel: Frozen Satchel.** It doesn't explode. When the fuse runs out, you're teleported to
 wherever it landed. Throw it up a ledge, over a wall or into the enemy base, and follow it.
@@ -135,6 +147,8 @@ Fulgomancer → [Lightning Cloud](combo_spells.md#lightning-cloud).
 
 ## Fulgomancer (lightning)
 
+<img src="images/portrait_lightning.jpg" align="right" width="200" alt="The Fulgomancer">
+
 > *Bringer of the Thunderous Storm, the Tempest commands the power of maelstroms,
 > thunderheads, squalls, and hurricanes, though the power most fear is that of lightning.
 > Any contesting the strike of a well-placed bolt often are found, struck down.*
@@ -149,6 +163,9 @@ Fulgomancer → [Lightning Cloud](combo_spells.md#lightning-cloud).
 
 The Fulgomancer has no magic missile: Lightning Bolt does that job, and does it better at
 range.
+
+| <img src="images/lightning_bolt.jpg" alt="Lightning Bolt"><br>**Lightning Bolt** | <img src="images/lightning_spotbolt.jpg" alt="Spot Bolt"><br>**Spot Bolt** |
+|---|---|
 
 **Satchel: Lightning Satchel.** Three lightning strikes on the spot, 0.4 seconds apart, each
 for 40 to 75.
@@ -166,6 +183,8 @@ Cryomancer → [Lightning Cloud](combo_spells.md#lightning-cloud).
 
 ## Geomancer (earth)
 
+<img src="images/portrait_earth.jpg" align="right" width="200" alt="The Geomancer">
+
 > *Conjurer of the Unmoving Earth, the Geomancer calls forth the animals of the realm, and
 > even the stone of the realms themself, to fell his opponents. Within everything, birds,
 > bears, and rocks, exists a spirit, and the Geomancer seeks to unify with them, even melding
@@ -180,6 +199,10 @@ Cryomancer → [Lightning Cloud](combo_spells.md#lightning-cloud).
 | 3 | Pebble Blast | 10 | A shotgun of eight pebbles, 6 each. Brutal up close. |
 | 4 | Art of Falconry | 5 | A falcon that flies off, finds the nearest enemy within 13 m and dives at them for 20. |
 | 5 | Bear Form | 20 | Turns you into a bear: 200 health, a bite for 150, and slower than anything else on the field. Costs 5 mana every 2.5 seconds to stay a bear, and you change back when the mana runs out or you cast it again. |
+
+| <img src="images/earth_rollingstone.jpg" alt="Rolling Stone"><br>**Rolling Stone** | <img src="images/earth_pebbleblast.jpg" alt="Pebble Blast"><br>**Pebble Blast** |
+|---|---|
+| <img src="images/earth_falconry.jpg" alt="Art of Falconry"><br>**Art of Falconry** | <img src="images/earth_bear.jpg" alt="Bear Form"><br>**Bear Form** |
 
 **Satchel: Earthquake Satchel.** Three shockwaves, half a second apart, each for 40 to 75.
 
@@ -199,6 +222,8 @@ Cryomancer → [Lightning Cloud](combo_spells.md#lightning-cloud).
 
 ## Aeromancer (wind)
 
+<img src="images/portrait_wind.jpg" align="right" width="200" alt="The Aeromancer">
+
 > *Walker upon the Four Winds, the Zephyrist is that which brings the storm, and causes
 > devastation to the countryside far and wide. There is little haven against the gales, and
 > it soon throws about those caught in its fury.*
@@ -212,6 +237,9 @@ Cryomancer → [Lightning Cloud](combo_spells.md#lightning-cloud).
 | 3 | Updraft | 5 | An instant gust where you aim that throws everyone within 3 m upward and away, for 5 damage. Including you: aim at your feet to launch yourself. |
 | 4 | Levitate | 5, then 2/s | Hold to float: a lift off the ground, a tenth of normal gravity and full air steering. Let go to drop. |
 | 5 | Clone | 15 | At a run, splits you in two: you veer 45° one way while a decoy of you peels off 45° the other. **Secondary fire** mirrors which way each of you goes. You have to be on the ground and moving fast. |
+
+| <img src="images/wind_mindmissile.jpg" alt="Mind Missile"><br>**Mind Missile** | <img src="images/wind_updraft.jpg" alt="Updraft"><br>**Updraft** |
+|---|---|
 
 **Satchel: Cyclone Satchel.** A blast that throws everyone near it, you included, for 10 to
 50. Land one at your own feet for a rocket jump.
@@ -229,6 +257,8 @@ Cryomancer → [Lightning Cloud](combo_spells.md#lightning-cloud).
 ---
 
 ## Phytomancer (nature)
+
+<img src="images/portrait_nature.jpg" align="right" width="200" alt="The Phytomancer">
 
 > *Watcher over the Verdant Plains, the Sylvanist controls the forces of nature, whether
 > fern, bush, or oak, raising the forests to defend themself from the imperial onslaught.
@@ -253,6 +283,10 @@ Cryomancer → [Lightning Cloud](combo_spells.md#lightning-cloud).
 | 2 | 200 | 15 | 0.375 s | 19 m |
 | 3 | 300 | 20 + poison spores | 0.25 s | 22 m |
 
+| <img src="images/nature_thornblast.jpg" alt="Thornblast"><br>**Thornblast** | <img src="images/nature_beanstalk.jpg" alt="Beanstalk"><br>**Beanstalk** |
+|---|---|
+| <img src="images/nature_thornplant.jpg" alt="Thornplant"><br>**Thornplant** |  |
+
 **Satchel: Cocklebur Satchel.** A burst for 10 to 50 that leaves three cockleburs on the
 ground. They sit as traps, and an enemy who walks over one gets it stuck to them, slowing them
 down and eating at their health.
@@ -274,6 +308,8 @@ Sanomancer → [Spirit Wizard](combo_spells.md#spirit-wizard).
 
 ## Sanomancer (life)
 
+<img src="images/portrait_life.jpg" align="right" width="200" alt="The Sanomancer">
+
 > *Master over the Divine Arts, the Cleric is trained in the judgement of the world, lending
 > aid in the form of mending to allies, and striking those that would oppose their crusade.
 > Few dispute the unrivalled aid a Cleric brings to the battlegrounds of Arathas.*
@@ -287,6 +323,9 @@ Sanomancer → [Spirit Wizard](combo_spells.md#spirit-wizard).
 | 3 | Life Ray | 2, then 1/s | A beam: 10 damage four times a second on an enemy, or 5 healing on a teammate. It can overheal a teammate to 150%. |
 | 4 | Force Blast | 5 | A shockwave around you that hurls enemies away and gives you a kick in the direction you're moving. |
 | 5 | Sacrifice | 10 | Four seconds after you cast it, you go up in a ring of white light. Every enemy within 3 m is blinded and left at half health. You die. |
+
+| <img src="images/life_liferay.jpg" alt="Life Ray"><br>**Life Ray** | <img src="images/life_forceblast.jpg" alt="Force Blast"><br>**Force Blast** |
+|---|---|
 
 **Satchel: Heal-Hurt Satchel.** One burst within 3 m: 10 to 50 healing for every teammate,
 10 to 50 damage for every enemy.
@@ -306,6 +345,8 @@ Geomancer → [Wally the Wombat](combo_spells.md#wally-the-wombat).
 
 ## Necromancer (death)
 
+<img src="images/portrait_death.jpg" align="right" width="200" alt="The Necromancer">
+
 > *Lord over all that is Death, the Necromancer brings the souls of the dead back, to undeath,
 > for a corpse has no fear or sense of pain, and thus makes the perfect soldier. The Black Magi
 > tend to find new means to sustain themselves, such as siphoning the life of wayward
@@ -320,6 +361,10 @@ Geomancer → [Wally the Wombat](combo_spells.md#wally-the-wombat).
 | 3 | Death Ray | 2, then 1/s | A beam: 10 damage four times a second, half of which heals you. |
 | 4 | Seeking Skull | 5 | A flying skull that hunts down the nearest enemy within 12 m and bursts on them for 15. |
 | 5 | Grim Feast | 25 | Devour a corpse within 2 m: you're healed by a full bar of health (overhealing up to 150%) and cured of everything. The body is gone afterwards. |
+
+| <img src="images/death_missile.jpg" alt="Poison Missile"><br>**Poison Missile** | <img src="images/death_deathray.jpg" alt="Death Ray"><br>**Death Ray** |
+|---|---|
+| <img src="images/death_skull.jpg" alt="Seeking Skull"><br>**Seeking Skull** | <img src="images/death_grimfeast.jpg" alt="Grim Feast"><br>**Grim Feast** |
 
 **Satchel: Satchel of Decay.** A burst for 10 to 50 that poisons everyone it hits.
 
@@ -338,6 +383,8 @@ Geomancer → [Wally the Wombat](combo_spells.md#wally-the-wombat).
 
 ## Archmage
 
+<img src="images/portrait_archmage.jpg" align="right" width="200" alt="The Archmage">
+
 > *This special character appears only in certain situations.*
 
 The Archmage is the wizard everyone else is fighting over: the hunted on maps such as ww_hunt.
@@ -351,6 +398,9 @@ anywhere else.
 | 1 | Crook Staff | — | Melee swing, 30 damage. |
 | 2 | Magic Missile | 5 | A straight bolt for 15. Hold to keep firing. |
 | 3 | Comet | 45 | Calls a comet onto the nearest enemy you can see in front of you, out to 100 m. It homes in and bursts for 200 within 5 m. |
+
+| <img src="images/archmage_comet.jpg" alt="Comet"><br>**Comet** |  |
+|---|---|
 
 **Satchel: Health Satchel.** It goes off almost the moment you let go, healing you for 60.
 

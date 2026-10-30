@@ -95,6 +95,8 @@ server doesn't take them back. They run until their timer ends or something kill
 
 *Fire + Lightning.* "A powerful burst of lightning will swiftly strike down your foes."
 
+<img src="images/combo_ball_lightning.jpg" alt="Ball Lightning">
+
 Two spells in one. First an instant bolt for **500**, across the whole map, wherever you
 aim. Then a ball of lightning is left standing where the bolt landed. For 30 seconds it drifts
 at the nearest enemy it can see and kills on contact (600). With nobody in view it wanders the
@@ -105,6 +107,8 @@ of everyone within 25 m.
 
 *Fire + Death.* "A destructive spell that will call burning rocks from the sky to crush your
 target."
+
+<img src="images/combo_meteor.jpg" alt="Meteor">
 
 Picks the nearest enemy you can see in front of you, out to 51 m, and calls **three meteors**
 down on them from three directions. The meteors pass through walls and steer the whole way
@@ -118,6 +122,8 @@ spent on the sound of a miss.
 *Ice + Lightning.* "Creates a thundercloud that will shock enemies it meets as it moves away
 from you."
 
+<img src="images/combo_lightning_cloud.jpg" alt="Lightning Cloud">
+
 A slow thundercloud that drifts away from you in a dead straight line, in whatever direction
 you were looking. It never turns and never hunts, so aiming it is the whole of casting it. On
 the way it zaps whichever enemy it can see for **80** every half second. The first wall or
@@ -128,6 +134,8 @@ it down a corridor or across a courtyard and it holds that ground.
 
 *Ice + Nature.* "This plant is carnivorous and will feast on any foes that come near to it."
 
+<img src="images/combo_giant_plant.jpg" alt="Giant Plant">
+
 Grows a lumbering carnivorous plant on the ground 3 m ahead of you. It stalks the nearest enemy
 it can see, and its bite kills outright (600). It has 250 health, regrows 20 every
 5 seconds, and lasts a minute. Nothing but your supply of books limits how many you can have
@@ -136,6 +144,8 @@ out at once.
 ### Spirit Wizard
 
 *Life + Nature.* "Summons a spirit from death to aid you in your battles."
+
+<img src="images/combo_spirit_wiz.jpg" alt="Spirit Wizard">
 
 The ghost of a wizard, wailing, left hanging in the air in front of you. It drifts where you
 left it until it sees someone, then stares them down and flies at them. Its stare is a beam of
@@ -150,6 +160,8 @@ is usually the last thing you want. Lasts 30 seconds.
 
 *Life + Earth.* "He may look funny, but Wally packs a punch and can also heal team-mates."
 
+<img src="images/combo_wombat.jpg" alt="Wally the Wombat">
+
 Thrown underarm, Wally lands running and spends 40 seconds leaping at whoever he can see. An
 enemy he lands on gets bitten for **100**. A teammate he lands on gets healed for **200**,
 which also cures poison and burning. He's the only summon that does anything for your own
@@ -161,6 +173,8 @@ was chasing and goes for whoever hit him.
 
 *Earth + Wind.* "Creates a whirling vortex of air that will rip any enemies off their feet."
 
+<img src="images/combo_tornado.jpg" alt="Tornado">
+
 A whirlwind that drifts out of your hands, turns toward the nearest enemy it can see, and
 grinds along the ground for 30 seconds. Nothing can hurt it, and it moves faster than half a
 wizard's top speed, so the only way out is to outrun it. Anyone it passes over is ground down
@@ -170,6 +184,8 @@ of whatever it kills.
 ### Raise Dead
 
 *Death + Wind.* "Will turn nearby corpses into an army of skeletal warriors."
+
+<img src="images/combo_raise_dead.jpg" alt="Raise Dead">
 
 Goes off where you stand and takes every body within 10 m. Enemy wizards it can see are killed
 outright and dragged back up as skeletons fighting for you. Any corpse already lying there
