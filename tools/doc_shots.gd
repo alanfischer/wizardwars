@@ -53,7 +53,7 @@ const SHOTS := {
 
 	"earth_rollingstone": [E.EARTH, 1, {target_m = 9.0, casts = 2, frames = [0.1, 0.2, 0.3, 0.4, 1.15, 1.25, 1.35]}],
 	"earth_pebbleblast": [E.EARTH, 2, {target_m = 6.0, casts = 2, frames = [0.03, 0.08, 0.15, 1.03, 1.08]}],
-	"earth_falconry": [E.EARTH, 3, {casts = 2, frames = [0.3, 0.6, 0.9, 1.2, 1.8]}],
+	"earth_falconry": [E.EARTH, 3, {target_m = 11.0, cam = "front", frames = [0.02, 0.04, 0.06, 0.08]}],
 	"earth_bear": [E.EARTH, 4, {cam = "close", no_target = true, frames = [0.5, 1.0, 2.0]}],
 
 	"wind_mindmissile": [E.WIND, 1, {casts = 2, frames = [0.04, 0.08, 0.12, 0.16, 0.2, 1.28, 1.32, 1.36]}],
