@@ -16,7 +16,6 @@ const TRAIL_RISE := 0.8
 
 var _effect := EffectBehavior.new()
 var _is_persistent := false
-var _flash: OmniLight3D
 var _center := Vector3.ZERO
 var _angle := 0.0
 var _radius := 0.0
@@ -61,7 +60,7 @@ func _build() -> void:
 		_effect.add_sprite("sprites/fexplo1.spr", BaseMaterial3D.BILLBOARD_ENABLED, HEAD_SCALE,
 				HEAD_FPS, true)
 		# ported from EF_DIMLIGHT
-		_flash = _effect.add_flash(Color(1.0, 0.4, 0.2), 3.0, 3.2, 0.0)
+		_effect.add_flash(Color(1.0, 0.4, 0.2), 3.0, 3.2, 0.0)
 	else:
 		_effect.lifetime = TRAIL_LIFE
 		_effect.add_sprite("sprites/fexplo1.spr", BaseMaterial3D.BILLBOARD_ENABLED, TRAIL_SCALE,
@@ -87,11 +86,6 @@ func _place() -> void:
 
 
 func stop() -> void:
-	if not _is_persistent:
-		return
-	_is_persistent = false
-	if not is_inside_tree():
+	# Gone at once, as CFireSpiral's UTIL_Remove: a head left to fade sits still and pops into view.
+	if _is_persistent:
 		queue_free()
-		return
-	_effect.fade_light(_flash, 0.5)
-	_effect.finish(0.5)
