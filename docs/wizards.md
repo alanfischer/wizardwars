@@ -240,6 +240,7 @@ Cryomancer → [Lightning Cloud](combo_spells.md#lightning-cloud).
 
 | <img src="images/wind_mindmissile.jpg" alt="Mind Missile"><br>**Mind Missile** | <img src="images/wind_updraft.jpg" alt="Updraft"><br>**Updraft** |
 |---|---|
+| <img src="images/wind_clone.jpg" alt="Clone"><br>**Clone** |  |
 
 **Satchel: Cyclone Satchel.** A blast that throws everyone near it, you included, for 10 to
 50. Land one at your own feet for a rocket jump.

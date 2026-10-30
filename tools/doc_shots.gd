@@ -59,7 +59,7 @@ const SHOTS := {
 	"wind_mindmissile": [E.WIND, 1, {casts = 2, frames = [0.04, 0.08, 0.12, 0.16, 0.2, 1.28, 1.32, 1.36]}],
 	"wind_updraft": [E.WIND, 2, {target_m = 6.0, aim = "feet", frames = [0.1, 0.25, 0.4, 0.6, 0.9]}],
 	"wind_levitate": [E.WIND, 3, {hold = 3.0, cam = "wide", no_target = true, frames = [0.3, 0.6, 0.9, 1.3, 1.8, 2.6]}],
-	"wind_clone": [E.WIND, 4, {special = "clone", no_target = true, cam = "wide", frames = [0.65, 0.75, 0.85, 1.0, 1.2, 1.5]}],
+	"wind_clone": [E.WIND, 4, {special = "clone", no_target = true, cam = "wide", frames = [0.65, 0.7, 0.75, 0.8, 0.9]}],
 
 	"nature_missile": [E.NATURE, 1, {target_m = 12.0, casts = 2, frames = [0.03, 0.06, 0.09, 0.12, 0.15, 0.2, 0.25]}],
 	"nature_thornblast": [E.NATURE, 2, {target_m = 6.0, casts = 2, frames = [0.03, 0.08, 0.15, 0.83, 0.88]}],
@@ -385,9 +385,12 @@ func _cast(caster: RemotePlayer, opts: Dictionary, aim_dir: Vector3, id: String)
 	var w: Weapon = caster.weapon_at(caster.current_weapon_idx)
 	var special: String = opts.get("special", "")
 	if special == "clone":
-		_pose(caster, caster.rotation.y, 0.0, 1.0)
+		_pose(caster, caster.rotation.y, 0.0, -1.0)
 		await get_tree().create_timer(0.6).timeout
 		await get_tree().physics_frame
+		# Frame the split, not the start of the run-up.
+		var at := caster.global_position
+		_frame_cam(_frame[0], at, at + (_frame[2] - _frame[1]))
 		w.fire(caster, Vector3.INF, aim_dir, 0.0, false)
 		return
 	var hold: float = opts.get("hold", 0.0)
