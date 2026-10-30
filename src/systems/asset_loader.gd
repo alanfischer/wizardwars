@@ -132,18 +132,35 @@ func _apply_emissive_textures(node: Node, sizes: Array) -> void:
 					tex = mat.get_shader_parameter("albedo_texture")
 				if not tex:
 					continue
+				if _is_emissive_material(mat):
+					continue
 				var sz := Vector2i(tex.get_width(), tex.get_height())
 				if sz in sizes:
-					# Replace with unshaded StandardMaterial3D for emissive glow
-					var glow_mat := StandardMaterial3D.new()
-					glow_mat.albedo_texture = tex
-					glow_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-					glow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-					glow_mat.emission_enabled = true
-					glow_mat.emission = Color(1.0, 0.6, 0.1)
-					glow_mat.emission_energy_multiplier = 2.0
-					mesh.surface_set_material(surf_idx, glow_mat)
+					mesh.surface_set_material(surf_idx, _emissive_material(tex))
 		_apply_emissive_textures(child, sizes)
+
+
+## One glow material per texture, held for the session. The mesh is shared and cached, so a fresh
+## material per load_model() dropped the previous one — and with it the last user of its
+## generated shader, which Godot then frees and recompiles: ~110ms on every weapon switch.
+var _emissive_materials := {}
+
+func _emissive_material(tex: Texture2D) -> StandardMaterial3D:
+	if _emissive_materials.has(tex):
+		return _emissive_materials[tex]
+	var glow_mat := StandardMaterial3D.new()
+	glow_mat.albedo_texture = tex
+	glow_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	glow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow_mat.emission_enabled = true
+	glow_mat.emission = Color(1.0, 0.6, 0.1)
+	glow_mat.emission_energy_multiplier = 2.0
+	_emissive_materials[tex] = glow_mat
+	return glow_mat
+
+
+func _is_emissive_material(mat: Material) -> bool:
+	return mat is StandardMaterial3D and _emissive_materials.get(mat.albedo_texture) == mat
 
 
 ## Light grid for ambient cube textures on MDL models.
@@ -265,7 +282,7 @@ func _apply_mdl_overbright(node: Node, scale: float) -> void:
 				continue
 			for surf_idx in mesh.get_surface_count():
 				var mat := mesh.surface_get_material(surf_idx)
-				if mat is StandardMaterial3D:
+				if mat is StandardMaterial3D and not _is_emissive_material(mat):
 					mesh.surface_set_material(surf_idx, _std_to_acube_material(mat, scale))
 			# Also convert skin override materials stored as metadata
 			for key in child.get_meta_list():
