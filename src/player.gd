@@ -8,6 +8,8 @@ extends CharacterBody3D
 const Movement = preload("res://addons/pmove/movement.gd")
 const SnapshotInterp = preload("res://src/systems/snapshot_interp.gd")
 const RESPAWN_DELAY := 5.0
+const DEATH_HOP_BELOW := 10.0 * GameConsts.SCALE_FACTOR
+const DEATH_HOP_MAX := 300.0 * GameConsts.SCALE_FACTOR
 ## How far under the waterline a swimmer's feet sit at the top of its rise. The swim override only
 ## holds while the WaterDetector sphere still overlaps liquid, and its offset is derived from this,
 ## so this is the highest the swim can lift a body — everything above it is ballistic.
@@ -42,6 +44,8 @@ var lag_comp_shot_time_ms := 0   # shooter's render time (server clock) for hits
 var shot_seq := 0  # the command firing right now, pairing its projectile with a stand-in; 0 = none
 var is_dead := false
 var is_respawning := false
+## The killing blow's shove (Combat.damage_force), held from the blow to the body it leaves.
+var _death_push := Vector3.ZERO
 ## TFC invulnerability powerup (goal invincible_finished) — server-side timestamp
 ## (Time.get_ticks_msec()/1000.0) until which all damage is ignored.
 var invincible_until := 0.0
@@ -455,6 +459,8 @@ func take_damage(amount: float, type: int = GameConsts.DamageType.PHYSICAL, atta
 			return
 		StatusSystem.on_damage_dealt(self, type, attacker)
 		_on_damage_taken_authority(amount, type, attacker)
+		if amount >= health:
+			_death_push = Combat.damage_force(self, amount, attacker)
 		apply_damage_raw(amount, attacker, type)
 	else:
 		# Remote client path: damage is applied via RPC (apply_damage_raw)
@@ -487,6 +493,7 @@ func die(attacker: Node3D = null, type: int = GameConsts.DamageType.PHYSICAL,
 
 	_cleanup_on_death()
 	_on_died(attacker, type, damage)
+	_death_push = Vector3.ZERO
 
 
 func _cleanup_on_death() -> void:
@@ -513,6 +520,15 @@ func _cleanup_on_death() -> void:
 func _on_died(_attacker: Node3D, _type: int = GameConsts.DamageType.PHYSICAL,
 		_damage: float = 0.0) -> void:
 	pass
+
+
+## What the body leaves moving at: the wizard's own velocity plus the killing blow's shove, and
+## then CBasePlayer::Killed's hop — anything not already rising is tossed up 0-300 u/s.
+func corpse_velocity(body_velocity: Vector3) -> Vector3:
+	var v := body_velocity + _death_push
+	if v.y < DEATH_HOP_BELOW:
+		v.y += randf_range(0.0, DEATH_HOP_MAX)
+	return v
 
 
 ## The other half of what a death leaves is GameConsts.damage_gibs, which is not a player's

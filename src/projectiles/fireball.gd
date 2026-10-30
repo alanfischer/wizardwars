@@ -61,13 +61,14 @@ func _explode() -> void:
 	_spawn_explosion(explode_pos)
 
 	var space := get_world_3d().direct_space_state
+	# The caster is pushed too, so a fireball at your own feet launches you. Before the damage,
+	# or the push skips whoever the blast kills and their body never feels it.
+	Combat.apply_aoe_knockback(space, explode_pos, FIREBALL_KNOCKBACK, FIREBALL_RADIUS, owner_node)
 	Combat.apply_aoe_damage(
 		space,
 		explode_pos, FIREBALL_DAMAGE, FIREBALL_RADIUS, {},
 		GameConsts.DamageType.FIRE, owner_node
 	)
-	# The caster is pushed too, so a fireball at your own feet launches you.
-	Combat.apply_aoe_knockback(space, explode_pos, FIREBALL_KNOCKBACK, FIREBALL_RADIUS, owner_node)
 
 	_die()
 

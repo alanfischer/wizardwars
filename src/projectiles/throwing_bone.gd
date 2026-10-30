@@ -54,6 +54,7 @@ func _strike(struck: Object) -> void:
 	if _spent:
 		return
 	_spent = true
-	if Combat.damage_chain(struck, DAMAGE, GameConsts.DamageType.PHYSICAL, owner_node) != null:
+	if Combat.damage_chain(struck, DAMAGE, GameConsts.DamageType.PHYSICAL, owner_node,
+			global_position) != null:
 		SoundSystem.play_3d(HIT_SOUND, global_position)
 	_die()

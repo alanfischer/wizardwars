@@ -54,7 +54,7 @@ func _on_actor_hit(victim) -> void:
 
 func _hit_target(collider) -> void:
 	# DamageType.DEATH triggers poison via StatusSystem.on_damage_dealt
-	Combat.damage_chain(collider, damage, GameConsts.DamageType.DEATH, owner_node)
+	Combat.damage_chain(collider, damage, GameConsts.DamageType.DEATH, owner_node, global_position)
 
 	SoundSystem.play_3d("monster/thornplant/sporehit.wav", global_position)
 	_die()

@@ -47,7 +47,8 @@ func _on_actor_hit(victim) -> void:
 
 
 func _hit_target(collider) -> void:
-	var target := Combat.damage_chain(collider, MISSILE_DAMAGE, GameConsts.DamageType.PHYSICAL, owner_node)
+	var target := Combat.damage_chain(collider, MISSILE_DAMAGE, GameConsts.DamageType.PHYSICAL,
+		owner_node, global_position)
 	# The original punches whatever it touches; sparing allies keeps it from being a
 	# way to rock a teammate's aim in a game that has no friendly fire to answer with.
 	if target != null and not Teams.nodes_friendly(owner_node, target):

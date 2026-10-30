@@ -49,7 +49,8 @@ func _on_expired() -> void:
 
 
 func _on_world_hit(result: Dictionary) -> void:
-	Combat.damage_chain(result.collider, damage, GameConsts.DamageType.ICE, owner_node)
+	Combat.damage_chain(result.collider, damage, GameConsts.DamageType.ICE, owner_node,
+		global_position)
 	_hit()
 
 

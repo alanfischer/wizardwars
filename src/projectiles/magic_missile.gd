@@ -69,7 +69,7 @@ func _on_actor_hit(victim) -> void:
 
 
 func _hit_target(collider) -> void:
-	Combat.damage_chain(collider, MISSILE_DAMAGE, damage_type, owner_node)
+	Combat.damage_chain(collider, MISSILE_DAMAGE, damage_type, owner_node, global_position)
 
 	SoundSystem.play_3d("weapons/xbow_hitbod1.wav", global_position)
 
