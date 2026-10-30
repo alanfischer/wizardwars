@@ -23,7 +23,7 @@ const CASTER_AT := Vector2(0.0, -120.0)
 const TARGET_AT := Vector2(0.0, 280.0)
 
 ## id: [element, slot or combo key, options]. Options: hold (s of held fire), casts (taps),
-## frames (s after the first cast), cam (over | close | wide), target_m (enemy distance),
+## frames (s after the first cast), cam (over | close | wide | front), target_m (enemy distance),
 ## aim (target | ground | feet), charge, extra (enemies placed around the caster), no_target, special,
 ## from / toward / up (GoldSrc xy to stand at and face, and height over the deck, for a spell the deck
 ## cannot hold).
@@ -44,7 +44,7 @@ const SHOTS := {
 	"fire_fissure": [E.FIRE, 4, {target_m = 3.5, cam = "close", frames = [1.0, 1.6, 1.9, 2.0, 2.05, 2.1, 2.2, 2.4]}],
 
 	"ice_mindmissile": [E.ICE, 1, {casts = 2, frames = [0.04, 0.08, 0.12, 0.16, 0.2, 1.28, 1.32, 1.36]}],
-	"ice_icepoke": [E.ICE, 2, {target_m = 6.0, casts = 2, frames = [0.06, 0.12, 0.2, 0.96, 1.05]}],
+	"ice_icepoke": [E.ICE, 2, {target_m = 11.0, frames = [0.03, 0.06, 0.09, 0.12]}],
 	"ice_freezeray": [E.ICE, 3, {hold = 2.0, frames = [0.5, 1.0, 1.5]}],
 	"ice_invisibility": [E.ICE, 4, {hold = 3.0, cam = "close", no_target = true, frames = [0.03, 0.08, 0.13, 0.2, 0.3, 0.45]}],
 
@@ -73,7 +73,7 @@ const SHOTS := {
 
 	"death_missile": [E.DEATH, 1, {target_m = 12.0, casts = 2, frames = [0.03, 0.06, 0.09, 0.12, 0.15, 0.2, 0.25]}],
 	"death_deathray": [E.DEATH, 2, {hold = 2.0, frames = [0.5, 1.0, 1.5]}],
-	"death_skull": [E.DEATH, 3, {casts = 2, frames = [0.3, 0.6, 0.9, 1.3, 1.8]}],
+	"death_skull": [E.DEATH, 3, {target_m = 11.0, cam = "front", frames = [0.02, 0.04, 0.06, 0.08]}],
 	"death_grimfeast": [E.DEATH, 4, {target_m = 1.5, cam = "close", special = "corpse", frames = [-0.3, 0.05, 0.3, 0.8]}],
 
 	"archmage_missile": [E.ARCHMAGE, 1, {target_m = 12.0, casts = 2, frames = [0.03, 0.06, 0.09, 0.12, 0.15, 0.2, 0.25]}],
@@ -91,6 +91,8 @@ const SHOTS := {
 
 var _pvs_cam: Camera3D = null
 var _cam: Camera3D
+## BeamSystem faces its ribbons to the root viewport's camera, so it shadows the shot camera.
+var _root_cam: Camera3D
 var _sub: SubViewport
 var _dir := ""
 ## [bot, yaw, pitch, move_y]: every posed bot gets a command each physics tick.
@@ -120,6 +122,8 @@ func _enter_tree() -> void:
 func _physics_process(delta: float) -> void:
 	if _pvs_cam:
 		VisibilitySystem.set_local_position(_pvs_cam.global_position)
+		if not _root_cam.current:
+			_root_cam.make_current()
 		var world_env := get_tree().root.find_child("WorldEnvironment", true, false) as WorldEnvironment
 		if world_env and world_env.environment:
 			world_env.environment.fog_enabled = false
@@ -200,6 +204,10 @@ func _run() -> void:
 	_cam.far = 400.0
 	_sub.add_child(_cam)
 	_cam.make_current()
+	_root_cam = Camera3D.new()
+	_root_cam.far = _cam.far
+	root.add_child(_root_cam)
+	_root_cam.make_current()
 	_pvs_cam = _cam
 	for id in _ids():
 		await _shoot(id)
@@ -262,6 +270,10 @@ func _frame_cam(kind: String, caster: Vector3, target: Vector3) -> void:
 			_cam.fov = 40.0
 			eye = caster + fwd * 1.8 + side * 3.0 + Vector3(0, 1.5, 0)
 			look = caster + fwd * 0.9 + Vector3(0, 1.0, 0)
+		"front":
+			_cam.fov = 40.0
+			eye = caster + fwd * 6.5 + side * 1.2 + Vector3(0, 1.7, 0)
+			look = caster + fwd * 2.0 + Vector3(0, 1.3, 0)
 		"wide":
 			_cam.fov = 50.0
 			eye = caster - fwd * 3.0 + side * 2.0 + Vector3(0, 2.8, 0)
@@ -272,6 +284,8 @@ func _frame_cam(kind: String, caster: Vector3, target: Vector3) -> void:
 			look = caster.lerp(target, 0.7) + Vector3(0, 0.8, 0)
 	_cam.global_position = eye
 	_cam.look_at(look, Vector3.UP)
+	_root_cam.fov = _cam.fov
+	_root_cam.global_transform = _cam.global_transform
 
 
 func _shoot(id: String) -> void:
