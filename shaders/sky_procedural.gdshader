@@ -44,6 +44,12 @@ uniform float cloud_softness : hint_range(0.01, 0.6) = 0.22;
 uniform float star_amount : hint_range(0.0, 1.0) = 0.0;
 uniform vec3 star_color : source_color = vec3(1.0, 1.0, 1.0);
 
+// Rain: 0 is the sky as measured from its art, 1 a full storm — the deck closes over, its clouds
+// go dark and heavy, the sky behind them greys, and sun, moon and stars are lost. Everything
+// is relative to the sky's own colours, so a storm at night stays a night sky.
+uniform float storm : hint_range(0.0, 1.0) = 0.0;
+const vec3 LUMA = vec3(0.299, 0.587, 0.114);
+
 // A flash lighting the sky from within, brightest toward flash_dir (world space): what lights
 // up the clouds behind a lightning strike. Black is no flash.
 uniform vec3 flash_color = vec3(0.0);
@@ -94,6 +100,10 @@ void fragment() {
 	vec3 above = mix(horizon_color, zenith_color, pow(clamp(up, 0.0, 1.0), horizon_falloff));
 	vec3 below = mix(horizon_color, ground_color, pow(clamp(-up, 0.0, 1.0), horizon_falloff));
 	vec3 col = mix(below, above, step(0.0, up));
+	// What a storm cloud is measured against: the sky it covers, not the cloud colour the art
+	// suggested, which on a moonlit sky is pale and would light the deck up at night.
+	float sky_lum = dot(col, LUMA);
+	col = mix(col, vec3(sky_lum) * 0.55, storm);
 
 	// Stars before clouds and sun, so both occlude them.
 	if (star_amount > 0.0) {
@@ -104,40 +114,53 @@ void fragment() {
 		float lit = step(1.0 - star_amount * 0.035, h);
 		float d = length(fract(sp) - 0.5);
 		float twinkle = 0.65 + 0.35 * sin(TIME * 1.7 + h * 217.0);
-		col += star_color * smoothstep(0.42, 0.0, d) * lit * twinkle;
+		col += star_color * smoothstep(0.42, 0.0, d) * lit * twinkle * (1.0 - storm);
 	}
 
 	// Clouds live on a plane overhead, projected along the view ray. The +0.12 keeps the
 	// division finite at the horizon and is what stretches the cells into the distance there.
-	if (cloud_amount > 0.0) {
+	float amount = mix(cloud_amount, 0.97, storm);
+	float storm_cover = 0.0;   // where storm cloud sits, for the lightning below to light it
+	float storm_body = 0.0;
+	if (amount > 0.0) {
 		vec2 cp = eye_dir.xz / (max(up, 0.0) + 0.12);
 		cp = cp * cloud_scale + TIME * cloud_speed * vec2(1.0, 0.35);
 		float n = fbm(cp);
 		// cloud_amount drives coverage, not opacity: at 0 the threshold sits above anything fbm
 		// returns, so no cloud is drawn at all rather than a transparent one.
-		float edge = mix(1.05, 0.28, cloud_amount);
+		float edge = mix(1.05, 0.28, amount);
 		float cover = smoothstep(edge - cloud_softness, edge + cloud_softness, n);
 		cover *= smoothstep(0.0, 0.10, up);   // fade into the horizon haze, never below it
 		// Lit side toward the sun. Cheap stand-in for scattering through the cloud body, but it
 		// is the cue that reads as depth, so it earns the fbm sample it costs.
 		float toward = clamp(dot(eye_dir, sun) * 0.5 + 0.5, 0.0, 1.0);
 		vec3 lit = mix(cloud_shadow_color, cloud_color, toward * toward);
+		// Storm cloud: grey, darker than the sky it closes over, and mottled by the same noise
+		// that shaped it so a full deck still has bodies to it rather than one flat lid.
+		storm_body = 0.55 + 0.7 * n;
+		vec3 heavy = vec3(sky_lum) * mix(0.6, 1.1, toward * toward) * storm_body;
+		lit = mix(lit, heavy, storm);
+		storm_cover = cover * storm;
 		col = mix(col, lit, cover);
 	}
 
 	// Sun last: it burns through cloud, which is what selling a bright sky depends on.
 	float sd = dot(eye_dir, sun);
 	float disc = smoothstep(cos(sun_size * 2.5), cos(sun_size), sd);
-	col += sun_color * disc * sun_energy;
-	col += sun_color * pow(max(sd, 0.0), sun_glow_exp) * sun_glow_energy;
+	float sun_through = 1.0 - 0.95 * storm;
+	col += sun_color * disc * sun_energy * sun_through;
+	col += sun_color * pow(max(sd, 0.0), sun_glow_exp) * sun_glow_energy * sun_through;
 
 	if (cubemap_blend > 0.0) {
 		vec3 art = texture(sky_cubemap, vec3(-eye_dir.x, eye_dir.y, eye_dir.z)).rgb;
+		art = mix(art, vec3(dot(art, LUMA)) * 0.5, storm);
 		col = mix(col, art, cubemap_blend);
 	}
-	// Lightning, as goldsrc_bsp.cpp's stock sky shader draws it.
+	// Lightning, as goldsrc_bsp.cpp's stock sky shader draws it, plus the storm deck lit from
+	// inside: dark cloud has nothing for the multiply to lift, so its shape is added outright.
 	float toward = max(dot(eye_dir, normalize(flash_dir)), 0.0);
 	col *= vec3(1.0) + flash_color * (1.0 + 3.0 * pow(toward, 3.0));
 	col += flash_color * (0.3 + 0.9 * pow(toward, 4.0));
+	col += flash_color * storm_cover * storm_body * (0.25 + 0.9 * pow(toward, 2.0));
 	ALBEDO = col;
 }

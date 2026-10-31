@@ -21,6 +21,8 @@ var _sky_surfaces: Array[MeshInstance3D] = []
 var _cubemap: Cubemap
 var _params: Dictionary = {}
 var _enhanced_material: ShaderMaterial
+## How far the procedural sky has closed over for rain, 0 to 1. See set_storm.
+var storm := 0.0
 
 
 ## `sun_ent` is the map's light_environment entity dict, used to point the procedural sun the way
@@ -142,6 +144,14 @@ func set_flash(color: Color, dir: Vector3) -> void:
 		_enhanced_material.set_shader_parameter("flash_dir", dir)
 
 
+## Rain on the procedural sky (the "high" quality level): 0 clear, 1 a dark overcast deck. The stock
+## cubemap has no clouds of its own to thicken, so this leaves it alone.
+func set_storm(amount: float) -> void:
+	storm = amount
+	if _enhanced_material:
+		_enhanced_material.set_shader_parameter("storm", amount)
+
+
 func _get_enhanced_material() -> ShaderMaterial:
 	if _enhanced_material:
 		return _enhanced_material
@@ -153,6 +163,7 @@ func _get_enhanced_material() -> ShaderMaterial:
 	_enhanced_material.set_shader_parameter("sky_cubemap", _cubemap)
 	for key in _params:
 		_enhanced_material.set_shader_parameter(key, _params[key])
+	_enhanced_material.set_shader_parameter("storm", storm)
 	return _enhanced_material
 
 

@@ -16,6 +16,10 @@ const FLASH_LENGTH := 0.6
 ## Seconds between strikes at the lightest rain and the heaviest.
 const STRIKE_GAP_LIGHT := Vector2(25.0, 45.0)
 const STRIKE_GAP_HEAVY := Vector2(4.0, 10.0)
+## How overcast the procedural sky goes at the lightest rain (it reaches 1 at the heaviest), and how
+## fast it closes over or clears, per second.
+const STORM_LIGHT := 0.55
+const STORM_RATE := 0.2
 const BOLT_SEGMENTS := 16
 const SOUND_SPEED := 340.0
 
@@ -31,6 +35,7 @@ var _next_strike := 0.0
 var _flash_t := -1.0
 var _flash_dir := Vector3.UP
 var _map_bounds := AABB()
+var _storm := 0.0
 
 
 func setup() -> void:
@@ -167,6 +172,12 @@ func _process(delta: float) -> void:
 
 	# The host times the strikes so every peer sees the same one; each draws it from the seed.
 	var intensity := rain_intensity()
+	var storm_target := 0.0 if intensity <= 0 else lerpf(STORM_LIGHT, 1.0, (intensity - 1) / 8.0)
+	_storm = move_toward(_storm, storm_target, STORM_RATE * delta)
+	# Compared every frame rather than pushed on change: night rebuilds the skybox, and a new one
+	# starts clear.
+	if Game.skybox and Game.skybox.storm != _storm:
+		Game.skybox.set_storm(_storm)
 	if intensity > 0 and bool(ServerVars.get_value("lightning", true)) and \
 			(not NetworkManager.is_online() or NetworkManager.is_host()):
 		_next_strike -= delta
