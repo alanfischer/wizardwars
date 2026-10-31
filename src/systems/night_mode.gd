@@ -1,60 +1,95 @@
 class_name NightMode
 extends Object
-## Night: the sky's light turned down to moonlight, the map's own lights left as they are.
+## How much of the sky's light reaches the map: the `night` server var (0 day … 1 full night) and
+## any lightstyle a map plays on its light_environment, the map's own lights left as they are.
 ##
 ## How much of each lightmap luxel the sky put there is baked at conversion (GoldSrcBSP's
 ## compute_sun_fractions: lm_sun on world materials, sun_slices in the light grid for models).
-## This only says how far to turn that share down, and swaps the sky. A map with no
-## light_environment has no share to turn, so night leaves it exactly as it was.
+## Everything here comes down to one linear-light multiplier on that share, `sky_light`. A map
+## with no light_environment has no share to turn, so it is left exactly as it was.
 
-## Moonlight, as a multiplier on the sky's share of the (linear) light.
+## Moonlight, as the multiplier at full night.
 const TINT := Color(0.12, 0.14, 0.24)
-## Unlit liquid has no lightmap to read, so it dims by a flat amount.
-const LIQUID_DIM := Color(0.3, 0.33, 0.42)
-## Skies that already read as night stay; any other gives way to this one.
+## Any night at all swaps the map's sky for this one, unless the map's own already reads as night.
 const SKY := "fullmoon"
 const NIGHT_SKIES := ["fullmoon", "night", "space", "space2"]
+## hlrad writes pow(light, gamma); a lightstyle scales that stored value, so its linear twin is
+## brightness^(1/gamma). Matches goldsrc_bsp.cpp's LIGHTMAP_GAMMA and the shaders' 0.55.
+const LIGHTMAP_GAMMA := 0.55
+
+static var _root: Node
+## The light_environment's lightstyle, as a brightness (1.0 = 'm').
+static var _sun_style := 1.0
+## Whether the sun was compiled onto a style of its own (ww_chasm), which the lightstyle texture
+## already fades on the world — so only models take _sun_style from here.
+static var _sun_has_layer := false
 
 
-static func enabled() -> bool:
-	return bool(ServerVars.get_value("night", false))
+## "on"/"off" or a number, as /night, --night and the pause slider give it; "" if neither.
+static func parse(text: String) -> String:
+	var t := text.strip_edges().to_lower()
+	if t == "on":
+		return "1"
+	if t == "off":
+		return "0"
+	return str(clampf(float(t), 0.0, 1.0)) if t.is_valid_float() else ""
+
+
+static func amount() -> float:
+	return clampf(float(ServerVars.get_value("night", 0.0)), 0.0, 1.0)
 
 
 static func sky_for(sky_name: String) -> String:
-	if sky_name.is_empty() or not enabled() or sky_name in NIGHT_SKIES:
+	if sky_name.is_empty() or amount() <= 0.0 or sky_name in NIGHT_SKIES:
 		return sky_name
 	return SKY
 
 
-## Push the current setting onto a loaded map and every model the light grid lights. Safe to
-## call again on a live map, which is how a mid-match /night takes hold.
+## A map load starts back at the sun as compiled.
+static func reset() -> void:
+	_root = null
+	_sun_style = 1.0
+	_sun_has_layer = false
+
+
+## LightEnvironment's lightstyle, e.g. ww_chasm's PotatoC dusk (SetLightStyle('sky', ...)).
+static func set_sun_style(brightness: float, has_layer: bool) -> void:
+	_sun_style = brightness
+	_sun_has_layer = has_layer
+	if is_instance_valid(_root):
+		apply(_root)
+
+
+## Push the current sky light onto a loaded map and every model the light grid lights. Safe to
+## call again on a live map, which is how the slider, /night and a lightstyle take hold.
 static func apply(map_root: Node) -> void:
-	var amount := 1.0 if enabled() else 0.0
-	var tint := Vector3(TINT.r, TINT.g, TINT.b)
-	var dim := LIQUID_DIM if enabled() else Color.WHITE
+	_root = map_root
+	var t := amount()
+	var night := Vector3(lerpf(1.0, TINT.r, t), lerpf(1.0, TINT.g, t), lerpf(1.0, TINT.b, t))
+	var style := pow(maxf(_sun_style, 0.0), 1.0 / LIGHTMAP_GAMMA)
+	var world := night if _sun_has_layer else night * style
 	if map_root:
-		_apply_recursive(map_root, amount, tint, Vector3(dim.r, dim.g, dim.b))
-	LightGrid.set_night(amount, tint)
+		_apply_recursive(map_root, world, night)
+	LightGrid.set_sky_light(night * style)
 
 
 ## Descends into MeshInstance3Ds too: a BSP nests submodel meshes under their parent mesh.
-static func _apply_recursive(node: Node, amount: float, tint: Vector3, dim: Vector3) -> void:
+static func _apply_recursive(node: Node, world: Vector3, liquid: Vector3) -> void:
 	for child in node.get_children():
 		if child is MeshInstance3D:
 			var mi := child as MeshInstance3D
 			if mi.mesh:
 				for i in mi.mesh.get_surface_count():
-					_set_material(mi.mesh.surface_get_material(i), amount, tint, dim)
-					_set_material(mi.get_surface_override_material(i), amount, tint, dim)
-		_apply_recursive(child, amount, tint, dim)
+					_set_material(mi.mesh.surface_get_material(i), world, liquid)
+					_set_material(mi.get_surface_override_material(i), world, liquid)
+		_apply_recursive(child, world, liquid)
 
 
-static func _set_material(mat: Material, amount: float, tint: Vector3, dim: Vector3) -> void:
+static func _set_material(mat: Material, world: Vector3, liquid: Vector3) -> void:
 	if not mat is ShaderMaterial:
 		return
 	var smat := mat as ShaderMaterial
 	if smat.get_shader_parameter("lm_sun") != null:
-		smat.set_shader_parameter("night", amount)
-		smat.set_shader_parameter("night_tint", tint)
+		smat.set_shader_parameter("sky_light", world)
 	elif smat.get_shader_parameter("liquid_type") != null:
-		smat.set_shader_parameter("night_dim", dim)
+		smat.set_shader_parameter("sky_light", liquid)

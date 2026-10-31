@@ -133,7 +133,7 @@ func _register_builtins() -> void:
 	_register("golem_interp", _cmd_golem_interp, Perm.ADMIN, "/golem_interp [on|off]", "Toggle client-side golem limb reconstruction (off = old per-limb interp).")
 	_register("bsp_hulls", _cmd_bsp_hulls, Perm.ADMIN, "/bsp_hulls [on|off]", "Toggle GoldSrc BSP hull collision (off = trimesh/convex colliders).")
 	_register("combo_chaos", _cmd_combo_chaos, Perm.ADMIN, "/combo_chaos [auto|on|off]", "Trade a map's weapon/ammo pickups and resupply grenades for random combo spellbooks (auto = whatever the map asks for).")
-	_register("night", _cmd_night, Perm.ADMIN, "/night [on|off]", "Moonlight instead of the sun on sky-lit maps. The map's own lights stay lit.")
+	_register("night", _cmd_night, Perm.ADMIN, "/night [on|off|0-1]", "Moonlight instead of the sun on sky-lit maps (0 day, 1 full night). The map's own lights stay lit.")
 	_register("allow_combos", _cmd_allow_combos, Perm.ADMIN, "/allow_combos [on|off]", "Whether two allied wizards can clash staves to earn a combo spell.")
 	_register("siege", _cmd_siege, Perm.ADMIN, "/siege [on|off]", "Co-op: waves of monsters against an altar everyone defends together. Works on any map.")
 	_register("siege_wave", _cmd_siege_wave, Perm.ADMIN, "/siege_wave [count]", "Send a wave at the altar now. Waves run themselves later; this is the hand crank.")
@@ -738,10 +738,14 @@ func _cmd_allow_combos(sender_id: int, args: String) -> void:
 
 
 func _cmd_night(sender_id: int, args: String) -> void:
-	var value = _set_bool_var(sender_id, "night", args, "/night [on|off]")
-	if value == null:
+	if args.strip_edges().is_empty():  # no arg → flip between day and full night
+		args = "off" if NightMode.amount() > 0.0 else "on"
+	var value := NightMode.parse(args)
+	if value.is_empty():
+		_reply_err(sender_id, "Usage: /night [on|off|0-1]")
 		return
-	_reply_ok(sender_id, "night: %s" % ("on" if value else "off"))
+	ServerVars.set_from_string("night", value)
+	_reply_ok(sender_id, "night: %d%%" % roundi(NightMode.amount() * 100.0))
 
 
 ## Turning it on stands the arena up on whatever map is loaded — SiegeSystem works out where the

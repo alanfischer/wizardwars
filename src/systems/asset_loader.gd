@@ -245,8 +245,7 @@ func _apply_model_look_to(node: Node, alpha: float, glow_color: Color, glow_stre
 				# We only need to preserve the common parameters between acube/acube_fade
 				for p in ["albedo_texture", "overbright", "grid_origin", "grid_size",
 						"acube_pos_x", "acube_neg_x", "acube_pos_y", "acube_neg_y",
-						"acube_pos_z", "acube_neg_z", "lightstyle_brightness", "linear_output",
-						"acube_sun", "night", "night_tint"]:
+						"acube_pos_z", "acube_neg_z", "linear_output", "acube_sun", "sky_light"]:
 					params[p] = smat.get_shader_parameter(p)
 
 				smat.shader = want_shader

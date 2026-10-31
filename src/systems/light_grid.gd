@@ -25,9 +25,8 @@ var _grid_size: Vector3  # world-space extent
 var _sun_images: Array
 var _sun_texture: ImageTexture3D
 
-## Where NightMode last set the night, applied to every material the grid binds from then on.
-static var _night := 0.0
-static var _night_tint := Vector3.ONE
+## NightMode's multiplier on the sky's share, applied to every material the grid binds from then on.
+static var _sky_light := Vector3.ONE
 
 
 static func from_meta(root: Node3D) -> LightGrid:
@@ -102,11 +101,11 @@ func sample(world_pos: Vector3) -> Color:
 	r = r / 6.0 * OVERBRIGHT
 	g = g / 6.0 * OVERBRIGHT
 	b = b / 6.0 * OVERBRIGHT
-	if _night > 0.0 and not _sun_images.is_empty():
-		var f: float = _sun_images[gy].get_pixel(gx, gz).r * _night
-		r *= pow(lerpf(1.0, _night_tint.x, f), 0.55)
-		g *= pow(lerpf(1.0, _night_tint.y, f), 0.55)
-		b *= pow(lerpf(1.0, _night_tint.z, f), 0.55)
+	if _sky_light != Vector3.ONE and not _sun_images.is_empty():
+		var f: float = _sun_images[gy].get_pixel(gx, gz).r
+		r *= pow(lerpf(1.0, _sky_light.x, f), 0.55)
+		g *= pow(lerpf(1.0, _sky_light.y, f), 0.55)
+		b *= pow(lerpf(1.0, _sky_light.z, f), 0.55)
 	return Color(minf(r, 1.0), minf(g, 1.0), minf(b, 1.0))
 
 
@@ -115,26 +114,14 @@ func sample(world_pos: Vector3) -> Color:
 static var _all_acube_materials: Array = []  # Array[WeakRef]
 
 
-static func set_lightstyle_brightness(brightness: float) -> void:
+## A linear multiplier on the sky's share of model lighting. See NightMode.
+static func set_sky_light(sky_light: Vector3) -> void:
+	_sky_light = sky_light
 	var alive: Array = []
 	for wr: WeakRef in _all_acube_materials:
 		var mat: ShaderMaterial = wr.get_ref() as ShaderMaterial
 		if mat:
-			mat.set_shader_parameter("lightstyle_brightness", brightness)
-			alive.append(wr)
-	_all_acube_materials = alive
-
-
-## How far the sky's share of model lighting is turned toward `tint`. See NightMode.
-static func set_night(amount: float, tint: Vector3) -> void:
-	_night = amount
-	_night_tint = tint
-	var alive: Array = []
-	for wr: WeakRef in _all_acube_materials:
-		var mat: ShaderMaterial = wr.get_ref() as ShaderMaterial
-		if mat:
-			mat.set_shader_parameter("night", amount)
-			mat.set_shader_parameter("night_tint", tint)
+			mat.set_shader_parameter("sky_light", sky_light)
 			alive.append(wr)
 	_all_acube_materials = alive
 
@@ -164,8 +151,7 @@ func _set_grid_on_material(mat: ShaderMaterial) -> void:
 	mat.set_shader_parameter("grid_size", _grid_size)
 	if _sun_texture:
 		mat.set_shader_parameter("acube_sun", _sun_texture)
-	mat.set_shader_parameter("night", _night)
-	mat.set_shader_parameter("night_tint", _night_tint)
+	mat.set_shader_parameter("sky_light", _sky_light)
 	LightGrid._track_material(mat)
 
 

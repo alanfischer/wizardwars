@@ -88,6 +88,7 @@ var _blender_map_converter: Node
 var _light_grid: LightGrid
 var _world_env: WorldEnvironment
 var _skybox: Skybox
+var _built_sky := ""  # the skyname _skybox was built from: the map's own, or NightMode's
 var _xr_rig: Node3D
 var _xr_rig_camera: Camera3D
 var _vr_lobby_panel: VRLobbyPanel
@@ -116,7 +117,7 @@ var _auto_team := 0  # --team <1-4>: auto-join team on game start
 var _auto_class := 0  # --class <name>: auto-pick class on game start
 var _auto_name := ""  # --name <name>: set player name from command line
 var _auto_bots := 0  # --bots <n>: dedicated server fills with this many AI bots on startup
-## --timelimit/--scorelimit/--fraglimit <n> and --night on|off, applied to the matching server var
+## --timelimit/--scorelimit/--fraglimit <n> and --night <on|off|0-1>, applied to the matching server var
 ## in _ready. A dedicated server has no console, so these have to be reachable as flags.
 var _limit_args: Dictionary = {}  # server var name -> unparsed value
 ## Carried across a map change, since _unload_map wipes them: the bots that were in play (so a
@@ -221,7 +222,7 @@ func _flag_handlers() -> Dictionary:
 		"--timelimit": func(v: String) -> void: _limit_args["timelimit"] = v.strip_edges(),
 		"--scorelimit": func(v: String) -> void: _limit_args["scorelimit"] = v.strip_edges(),
 		"--fraglimit": func(v: String) -> void: _limit_args["fraglimit"] = v.strip_edges(),
-		"--night": func(v: String) -> void: _limit_args["night"] = v.strip_edges(),
+		"--night": func(v: String) -> void: _limit_args["night"] = NightMode.parse(v),
 		"--http-downloads-dir": func(v: String) -> void: MapTransfer.http_downloads_dir = v,
 		"--http-base-url": func(v: String) -> void:
 			MapTransfer.http_base_url_override = v
@@ -476,27 +477,32 @@ func _on_server_var_changed(key: String, _value: Variant) -> void:
 	if key == "bsp_hulls":
 		_apply_bsp_hulls()
 	elif key == "night" and _map_root:
-		_build_skybox(_map_root)
-		apply_vr_passthrough(XRManager.vr_passthrough)
+		if NightMode.sky_for(_map_sky_name(_map_root)) != _built_sky:
+			_build_skybox(_map_root)
+			apply_vr_passthrough(XRManager.vr_passthrough)
 		NightMode.apply(_map_root)
 
 
-## From the worldspawn skyname, or the night sky standing in for it. Rebuilt whole on a live
-## /night: the procedural sky and the Environment are both measured off the cubemap.
+func _map_sky_name(map_root: Node3D) -> String:
+	var worldspawn := map_root.get_node_or_null("worldspawn")
+	if worldspawn and worldspawn.has_meta("entity"):
+		return worldspawn.get_meta("entity").get("skyname", "")
+	return ""
+
+
+## From the worldspawn skyname, or the night sky standing in for it. Rebuilt whole when night
+## swaps one for the other: the procedural sky and the Environment are measured off the cubemap.
 func _build_skybox(map_root: Node3D) -> void:
 	if _skybox:
 		remove_child(_skybox)
 		_skybox.queue_free()
-	var sky_name := ""
-	var worldspawn := map_root.get_node_or_null("worldspawn")
-	if worldspawn and worldspawn.has_meta("entity"):
-		sky_name = worldspawn.get_meta("entity").get("skyname", "")
+	_built_sky = NightMode.sky_for(_map_sky_name(map_root))
 	_skybox = Skybox.new()
 	_skybox.name = "Skybox"
 	add_child(_skybox)
 	# Read straight off the map rather than waiting for LightEnvironment._ready: entity _ready
 	# order follows the BSP lump order, and the sky is built here, before any of them run.
-	_skybox.setup(NightMode.sky_for(sky_name), map_root, _find_entity(map_root, "light_environment"))
+	_skybox.setup(_built_sky, map_root, _find_entity(map_root, "light_environment"))
 	_world_env = _skybox.get_node_or_null("WorldEnvironment") as WorldEnvironment
 	# Skybox builds a fresh Environment per map, so the quality level has to be stamped onto this
 	# one — before precache_resources reuses the resource to warm the model shaders.
@@ -716,6 +722,7 @@ func _load_map(map_name: String) -> void:
 	if map_root == null:
 		push_warning("Failed to load map: %s (no cache, export, or BSP plugin)" % map_name)
 		return
+	NightMode.reset()
 
 	# Initialize light grid before spawning entities so item models get lit
 	_light_grid = LightGrid.from_meta(map_root)

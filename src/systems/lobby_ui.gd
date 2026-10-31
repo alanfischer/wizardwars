@@ -79,6 +79,10 @@ var _in_game := false  # set when a match starts, cleared when the menu comes ba
 var _bg: ColorRect
 var _pause_row: HBoxContainer  # the Resume button, shown only over a match
 var _lobby_only: Array[Control] = []  # what the pause panel sets aside: the logo, the join rows
+var _pause_only: Array[Control] = []  # and what it adds: settings of the match being played
+var _night_slider: HSlider
+var _night_value: Label
+var _night_dragging := false
 var _mouse_before := Input.MOUSE_MODE_VISIBLE
 
 func _ready() -> void:
@@ -142,6 +146,7 @@ func _ready() -> void:
 	_build_audio_rows(vbox)
 	_build_input_rows(vbox)
 	_build_vr_rows(vbox)
+	_build_match_rows(vbox)
 
 	vbox.add_child(HSeparator.new())
 
@@ -250,6 +255,54 @@ func _add_volume_slider(row: HBoxContainer, caption: String, value: int, max_val
 		readout.text = "%d%%" % int(v)
 		on_changed.call(int(v)))
 	return slider
+
+
+## The match's own settings, on the pause panel only. They are server vars, so moving one sends the
+## command an admin would type; anyone else gets the refusal in chat and the slider goes back.
+func _build_match_rows(vbox: VBoxContainer) -> void:
+	var row := _add_row(vbox, "Map")
+	row.visible = false
+	_pause_only.append(row)
+	row.add_child(_caption("Day"))
+	_night_slider = HSlider.new()
+	_night_slider.min_value = 0
+	_night_slider.max_value = 100
+	_night_slider.step = 5
+	_night_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_night_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_night_slider.tooltip_text = "Moonlight instead of the sun. The map's own lights stay lit. (/night)"
+	row.add_child(_night_slider)
+	row.add_child(_caption("Night"))
+	_night_value = Label.new()
+	_night_value.custom_minimum_size.x = 40
+	_night_value.add_theme_color_override("font_color", TEXT_COLOR)
+	_night_value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(_night_value)
+	_sync_match_rows()
+	_night_slider.value_changed.connect(func(v: float) -> void:
+		_night_value.text = "%d%%" % int(v)
+		NetworkManager.send_request_command("night %.2f" % (v / 100.0)))
+	_night_slider.drag_started.connect(func() -> void: _night_dragging = true)
+	_night_slider.drag_ended.connect(func(_changed: bool) -> void:
+		_night_dragging = false
+		get_tree().create_timer(0.5).timeout.connect(_sync_match_rows))
+	ServerVars.value_changed.connect(func(key: String, _v: Variant) -> void:
+		if key == "night" and not _night_dragging:
+			_sync_match_rows())
+
+
+func _caption(text: String) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_color_override("font_color", TEXT_COLOR)
+	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return label
+
+
+func _sync_match_rows() -> void:
+	var v := roundf(NightMode.amount() * 100.0)
+	_night_slider.set_value_no_signal(v)
+	_night_value.text = "%d%%" % int(v)
 
 
 ## One row, and a screen behind it. Mouse feel and every key live in the Controls panel rather
@@ -490,6 +543,10 @@ func _reset_pause() -> void:
 func _set_pause_layout(paused: bool) -> void:
 	for node in _lobby_only:
 		node.visible = not paused
+	for node in _pause_only:
+		node.visible = paused
+	if paused:
+		_sync_match_rows()
 	_pause_row.visible = paused
 	_bg.color = PAUSE_TINT if paused else BG_COLOR
 

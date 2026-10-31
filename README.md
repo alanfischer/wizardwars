@@ -214,19 +214,23 @@ changes nothing. An admin who names the map with `/nextmap` takes the ballot dow
 
 ## Night
 
-The `night` server var swaps the sun for moonlight and leaves the map's own lights burning. It
-replicates, takes effect live, and is off by default:
+The `night` server var turns the sun down toward moonlight, from `0` (day) to `1` (full night),
+and leaves the map's own lights burning. It replicates, takes effect live, and is off by default.
+Any amount above zero swaps the sky for `fullmoon`, unless the map's own sky already reads as night.
+It is also the **Map** slider on the pause panel (Escape), which sends the same admin command:
 
 ```
-/night on
-./run.sh --map ww_2fort --night on
+/night on            # or off, or any amount: /night 0.4
+./run.sh --map ww_2fort --night 0.5
 ```
 
 GoldSrc bakes the sun and a map's lights into the same lightmap, so map conversion works out how
 much of each luxel the sky put there (`compute_sun_fractions` in goldsrc-godot) and night turns only
 that share down. A map with no `light_environment` has nothing to turn down and is left as it was.
-The sky becomes `fullmoon` unless the map's own sky already reads as night. The moonlight colour
-and the sky are in `src/systems/night_mode.gd`.
+The same share is what a lightstyle on the `light_environment` fades — ww_chasm's PotatoC dusk
+(`SetLightStyle('sky', ...)`) — so a map that names its `light_environment` can fade its sun that
+way whether or not it was compiled onto a style of its own. The moonlight colour and the sky are in
+`src/systems/night_mode.gd`.
 
 ## BSP hull collision
 
