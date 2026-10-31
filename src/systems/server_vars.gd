@@ -53,6 +53,11 @@ func _register_defaults() -> void:
 	# 0 day … 1 full night: moonlight instead of the sun on maps lit by a light_environment, the
 	# map's own lights left lit. Replicated: it is what every client draws. See NightMode.
 	register("night", 0.0, Type.FLOAT)
+	# Rain 1 (light) … 9 (downpour) on any map; 0 leaves the weather to the map (ww_chasm's
+	# PotatoC). Lightning strikes while it rains unless turned off. Both replicated: they are what
+	# every client sees, and the host times the strikes. See WeatherSystem.
+	register("rain", 0, Type.INT)
+	register("lightning", true, Type.BOOL)
 
 
 func register(key: String, default_value, type: int, replicate: bool = true) -> void:

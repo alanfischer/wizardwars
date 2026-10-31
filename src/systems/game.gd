@@ -14,6 +14,7 @@ var hud: HUD = null
 var local_player: LocalPlayer = null
 var decal_system: DecalSystem = null
 var weather_system: WeatherSystem = null
+var skybox: Skybox = null
 
 ## True once a map is up and gameplay is running; false in the lobby and during a map change.
 var game_active := false
@@ -27,6 +28,7 @@ func clear_world() -> void:
 	local_player = null
 	decal_system = null
 	weather_system = null
+	skybox = null
 
 
 ## Rattle this peer's own view, for something it already spawned for itself (a comet's impact)

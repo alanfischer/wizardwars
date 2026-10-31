@@ -18,6 +18,10 @@ const NIGHT_SKIES := ["fullmoon", "night", "space", "space2"]
 const LIGHTMAP_GAMMA := 0.55
 
 static var _root: Node
+static var _world_mats: Array[ShaderMaterial] = []
+static var _liquid_mats: Array[ShaderMaterial] = []
+## A lightning flash on top of everything else, as linear light added to the sky's share.
+static var _flash := Vector3.ZERO
 ## The light_environment's lightstyle, as a brightness (1.0 = 'm').
 static var _sun_style := 1.0
 ## Whether the sun was compiled onto a style of its own (ww_chasm), which the lightstyle texture
@@ -53,6 +57,9 @@ static func sky_for(sky_name: String, map_root: Node) -> String:
 ## A map load starts back at the sun as compiled.
 static func reset() -> void:
 	_root = null
+	_world_mats.clear()
+	_liquid_mats.clear()
+	_flash = Vector3.ZERO
 	_sun_style = 1.0
 	_sun_has_layer = false
 
@@ -69,33 +76,54 @@ static func set_sun_style(brightness: float, has_layer: bool) -> void:
 ## call again on a live map, which is how the slider, /night and a lightstyle take hold.
 static func apply(map_root: Node) -> void:
 	_root = map_root
+	_world_mats.clear()
+	_liquid_mats.clear()
+	if map_root:
+		_collect(map_root)
+	_push()
+
+
+## Lightning: `flash` is linear light added to the sky's share for as long as it is non-zero, so
+## the open map lights up and a torch-lit room does not. Called every frame of a strike, which is
+## why it sets the materials apply() found rather than walking the map again.
+static func set_flash(flash: Vector3) -> void:
+	_flash = flash
+	_push()
+
+
+static func _push() -> void:
 	var t := amount()
 	var night := Vector3(lerpf(1.0, TINT.r, t), lerpf(1.0, TINT.g, t), lerpf(1.0, TINT.b, t))
 	var style := pow(maxf(_sun_style, 0.0), 1.0 / LIGHTMAP_GAMMA)
-	var world := night if _sun_has_layer else night * style
-	if map_root:
-		# A sunless map's liquid has no night to match: leave the whole map as it was.
-		_apply_recursive(map_root, world, night if has_sun(map_root) else Vector3.ONE)
-	LightGrid.set_sky_light(night * style)
+	var world := (night if _sun_has_layer else night * style) + _flash
+	# A sunless map's liquid has no night to match: leave the whole map as it was.
+	var liquid := night + _flash if has_sun(_root) else Vector3.ONE
+	for mat in _world_mats:
+		mat.set_shader_parameter("sky_light", world)
+	for mat in _liquid_mats:
+		mat.set_shader_parameter("sky_light", liquid)
+	LightGrid.set_sky_light(night * style + _flash)
 
 
 ## Descends into MeshInstance3Ds too: a BSP nests submodel meshes under their parent mesh.
-static func _apply_recursive(node: Node, world: Vector3, liquid: Vector3) -> void:
+static func _collect(node: Node) -> void:
 	for child in node.get_children():
 		if child is MeshInstance3D:
 			var mi := child as MeshInstance3D
 			if mi.mesh:
 				for i in mi.mesh.get_surface_count():
-					_set_material(mi.mesh.surface_get_material(i), world, liquid)
-					_set_material(mi.get_surface_override_material(i), world, liquid)
-		_apply_recursive(child, world, liquid)
+					_sort(mi.mesh.surface_get_material(i))
+					_sort(mi.get_surface_override_material(i))
+		_collect(child)
 
 
-static func _set_material(mat: Material, world: Vector3, liquid: Vector3) -> void:
+static func _sort(mat: Material) -> void:
 	if not mat is ShaderMaterial:
 		return
 	var smat := mat as ShaderMaterial
 	if smat.get_shader_parameter("lm_sun") != null:
-		smat.set_shader_parameter("sky_light", world)
+		if not smat in _world_mats:
+			_world_mats.append(smat)
 	elif smat.get_shader_parameter("liquid_type") != null:
-		smat.set_shader_parameter("sky_light", liquid)
+		if not smat in _liquid_mats:
+			_liquid_mats.append(smat)

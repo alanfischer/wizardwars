@@ -123,6 +123,25 @@ func apply_enhanced(enabled: bool) -> void:
 		Log.info("Procedural sky off: drawing the shipped cubemap")
 
 
+## Light the sky from within, brightest toward `dir` (world space); black puts it out. Lightning.
+## Both materials take it — the map's own and the procedural override — so a quality change
+## mid-flash cannot leave one lit.
+func set_flash(color: Color, dir: Vector3) -> void:
+	var c := Vector3(color.r, color.g, color.b)
+	var seen := {}
+	for surf in _sky_surfaces:
+		if not is_instance_valid(surf) or surf.mesh == null:
+			continue
+		var mat := surf.mesh.surface_get_material(0) as ShaderMaterial
+		if mat and not seen.has(mat):
+			seen[mat] = true
+			mat.set_shader_parameter("flash_color", c)
+			mat.set_shader_parameter("flash_dir", dir)
+	if _enhanced_material:
+		_enhanced_material.set_shader_parameter("flash_color", c)
+		_enhanced_material.set_shader_parameter("flash_dir", dir)
+
+
 func _get_enhanced_material() -> ShaderMaterial:
 	if _enhanced_material:
 		return _enhanced_material

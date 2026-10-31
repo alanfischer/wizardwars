@@ -44,6 +44,11 @@ uniform float cloud_softness : hint_range(0.01, 0.6) = 0.22;
 uniform float star_amount : hint_range(0.0, 1.0) = 0.0;
 uniform vec3 star_color : source_color = vec3(1.0, 1.0, 1.0);
 
+// A flash lighting the sky from within, brightest toward flash_dir (world space): what lights
+// up the clouds behind a lightning strike. Black is no flash.
+uniform vec3 flash_color = vec3(0.0);
+uniform vec3 flash_dir = vec3(0.0, 1.0, 0.0);
+
 
 float hash12(vec2 p) {
 	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -130,5 +135,9 @@ void fragment() {
 		vec3 art = texture(sky_cubemap, vec3(-eye_dir.x, eye_dir.y, eye_dir.z)).rgb;
 		col = mix(col, art, cubemap_blend);
 	}
+	// Lightning, as goldsrc_bsp.cpp's stock sky shader draws it.
+	float toward = max(dot(eye_dir, normalize(flash_dir)), 0.0);
+	col *= vec3(1.0) + flash_color * (1.0 + 3.0 * pow(toward, 3.0));
+	col += flash_color * (0.3 + 0.9 * pow(toward, 4.0));
 	ALBEDO = col;
 }

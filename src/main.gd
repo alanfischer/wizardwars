@@ -117,7 +117,8 @@ var _auto_team := 0  # --team <1-4>: auto-join team on game start
 var _auto_class := 0  # --class <name>: auto-pick class on game start
 var _auto_name := ""  # --name <name>: set player name from command line
 var _auto_bots := 0  # --bots <n>: dedicated server fills with this many AI bots on startup
-## --timelimit/--scorelimit/--fraglimit <n> and --night <on|off|0-1>, applied to the matching server var
+## --timelimit/--scorelimit/--fraglimit <n>, --night <on|off|0-1>, --rain <0-9> and
+## --lightning <on|off>, applied to the matching server var
 ## in _ready. A dedicated server has no console, so these have to be reachable as flags.
 var _limit_args: Dictionary = {}  # server var name -> unparsed value
 ## Carried across a map change, since _unload_map wipes them: the bots that were in play (so a
@@ -223,6 +224,8 @@ func _flag_handlers() -> Dictionary:
 		"--scorelimit": func(v: String) -> void: _limit_args["scorelimit"] = v.strip_edges(),
 		"--fraglimit": func(v: String) -> void: _limit_args["fraglimit"] = v.strip_edges(),
 		"--night": func(v: String) -> void: _limit_args["night"] = NightMode.parse(v),
+		"--rain": func(v: String) -> void: _limit_args["rain"] = v.strip_edges(),
+		"--lightning": func(v: String) -> void: _limit_args["lightning"] = v.strip_edges(),
 		"--http-downloads-dir": func(v: String) -> void: MapTransfer.http_downloads_dir = v,
 		"--http-base-url": func(v: String) -> void:
 			MapTransfer.http_base_url_override = v
@@ -500,6 +503,7 @@ func _build_skybox(map_root: Node3D) -> void:
 	_skybox = Skybox.new()
 	_skybox.name = "Skybox"
 	add_child(_skybox)
+	Game.skybox = _skybox
 	# Read straight off the map rather than waiting for LightEnvironment._ready: entity _ready
 	# order follows the BSP lump order, and the sky is built here, before any of them run.
 	_skybox.setup(_built_sky, map_root, _find_entity(map_root, "light_environment"))

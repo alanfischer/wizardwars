@@ -232,6 +232,24 @@ The same share is what a lightstyle on the `light_environment` fades — ww_chas
 way whether or not it was compiled onto a style of its own. The moonlight colour and the sky are in
 `src/systems/night_mode.gd`.
 
+## Weather
+
+Rain is the `rain` server var, 1 (light) to 9 (a downpour), on any map; `0` leaves the weather to
+the map, which is how ww_chasm's PotatoC rains as its points fall (`SetWeather`). Lightning strikes
+while it rains, more often the harder it rains, unless `lightning` is off. Both replicate, take
+effect live, and sit on the pause panel's **Weather** row next to the night slider:
+
+```
+/rain 6
+/lightning off
+./run.sh --map ww_2fort --rain 6 --night 1
+```
+
+The host times each strike and sends a seed, so every player sees the same bolt. The bolt is drawn
+above the map, past its sky brushes, so it shows wherever the sky does. Its flash lights the sky
+around it and the sky's share of the world's light (the same baked share night turns down), so the
+open map flashes and a torch-lit room does not. Thunder follows at the speed of sound.
+
 ## BSP hull collision
 
 World collision traces the map's GoldSrc BSP clip hulls (exact plane normals, real

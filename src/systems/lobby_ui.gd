@@ -83,6 +83,9 @@ var _pause_only: Array[Control] = []  # and what it adds: settings of the match 
 var _night_slider: HSlider
 var _night_value: Label
 var _night_dragging := false
+var _rain_slider: HSlider
+var _rain_value: Label
+var _lightning_check: CheckBox
 var _mouse_before := Input.MOUSE_MODE_VISIBLE
 
 func _ready() -> void:
@@ -278,7 +281,35 @@ func _build_match_rows(vbox: VBoxContainer) -> void:
 	_night_value.add_theme_color_override("font_color", TEXT_COLOR)
 	_night_value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(_night_value)
+
+	var weather := _add_row(vbox, "Weather")
+	weather.visible = false
+	_pause_only.append(weather)
+	weather.add_child(_caption("Rain"))
+	_rain_slider = HSlider.new()
+	_rain_slider.min_value = 0
+	_rain_slider.max_value = 9
+	_rain_slider.step = 1
+	_rain_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_rain_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_rain_slider.tooltip_text = "1 light to 9 a downpour. All the way left leaves it to the map. (/rain)"
+	weather.add_child(_rain_slider)
+	_rain_value = Label.new()
+	_rain_value.custom_minimum_size.x = 40
+	_rain_value.add_theme_color_override("font_color", TEXT_COLOR)
+	_rain_value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	weather.add_child(_rain_value)
+	_lightning_check = _make_check("Lightning", true, func(on: bool) -> void:
+		NetworkManager.send_request_command("lightning %s" % ("on" if on else "off")))
+	_lightning_check.tooltip_text = "Lightning strikes while it rains. (/lightning)"
+	weather.add_child(_lightning_check)
+
 	_sync_match_rows()
+	_rain_slider.value_changed.connect(func(v: float) -> void:
+		_rain_value.text = _rain_text(int(v))
+		NetworkManager.send_request_command("rain %d" % int(v)))
+	_rain_slider.drag_ended.connect(func(_changed: bool) -> void:
+		get_tree().create_timer(0.5).timeout.connect(_sync_match_rows))
 	_night_slider.value_changed.connect(func(v: float) -> void:
 		_night_value.text = "%d%%" % int(v)
 		NetworkManager.send_request_command("night %.2f" % (v / 100.0)))
@@ -287,7 +318,7 @@ func _build_match_rows(vbox: VBoxContainer) -> void:
 		_night_dragging = false
 		get_tree().create_timer(0.5).timeout.connect(_sync_match_rows))
 	ServerVars.value_changed.connect(func(key: String, _v: Variant) -> void:
-		if key == "night" and not _night_dragging:
+		if key in ["night", "rain", "lightning"] and not _night_dragging:
 			_sync_match_rows())
 
 
@@ -303,6 +334,14 @@ func _sync_match_rows() -> void:
 	var v := roundf(NightMode.amount() * 100.0)
 	_night_slider.set_value_no_signal(v)
 	_night_value.text = "%d%%" % int(v)
+	var rain := int(ServerVars.get_value("rain", 0))
+	_rain_slider.set_value_no_signal(rain)
+	_rain_value.text = _rain_text(rain)
+	_lightning_check.set_pressed_no_signal(bool(ServerVars.get_value("lightning", true)))
+
+
+func _rain_text(v: int) -> String:
+	return "Map" if v == 0 else str(v)
 
 
 ## One row, and a screen behind it. Mouse feel and every key live in the Controls panel rather
