@@ -477,7 +477,7 @@ func _on_server_var_changed(key: String, _value: Variant) -> void:
 	if key == "bsp_hulls":
 		_apply_bsp_hulls()
 	elif key == "night" and _map_root:
-		if NightMode.sky_for(_map_sky_name(_map_root)) != _built_sky:
+		if NightMode.sky_for(_map_sky_name(_map_root), _map_root) != _built_sky:
 			_build_skybox(_map_root)
 			apply_vr_passthrough(XRManager.vr_passthrough)
 		NightMode.apply(_map_root)
@@ -496,7 +496,7 @@ func _build_skybox(map_root: Node3D) -> void:
 	if _skybox:
 		remove_child(_skybox)
 		_skybox.queue_free()
-	_built_sky = NightMode.sky_for(_map_sky_name(map_root))
+	_built_sky = NightMode.sky_for(_map_sky_name(map_root), map_root)
 	_skybox = Skybox.new()
 	_skybox.name = "Skybox"
 	add_child(_skybox)

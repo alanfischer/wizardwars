@@ -39,8 +39,13 @@ static func amount() -> float:
 	return clampf(float(ServerVars.get_value("night", 0.0)), 0.0, 1.0)
 
 
-static func sky_for(sky_name: String) -> String:
-	if sky_name.is_empty() or amount() <= 0.0 or sky_name in NIGHT_SKIES:
+## Whether conversion found a sky share to turn down: no light_environment, no night.
+static func has_sun(map_root: Node) -> bool:
+	return map_root != null and (map_root.get_meta("light_grid", {}) as Dictionary).has("sun_slices")
+
+
+static func sky_for(sky_name: String, map_root: Node) -> String:
+	if sky_name.is_empty() or amount() <= 0.0 or sky_name in NIGHT_SKIES or not has_sun(map_root):
 		return sky_name
 	return SKY
 
@@ -69,7 +74,8 @@ static func apply(map_root: Node) -> void:
 	var style := pow(maxf(_sun_style, 0.0), 1.0 / LIGHTMAP_GAMMA)
 	var world := night if _sun_has_layer else night * style
 	if map_root:
-		_apply_recursive(map_root, world, night)
+		# A sunless map's liquid has no night to match: leave the whole map as it was.
+		_apply_recursive(map_root, world, night if has_sun(map_root) else Vector3.ONE)
 	LightGrid.set_sky_light(night * style)
 
 
