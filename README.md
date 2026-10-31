@@ -212,6 +212,22 @@ one each and changeable while the intermission lasts. Most votes wins; a tie goe
 option, which is the map the rotation was going to play anyway, so an intermission nobody votes in
 changes nothing. An admin who names the map with `/nextmap` takes the ballot down.
 
+## Night
+
+The `night` server var swaps the sun for moonlight and leaves the map's own lights burning. It
+replicates, takes effect live, and is off by default:
+
+```
+/night on
+./run.sh --map ww_2fort --night on
+```
+
+GoldSrc bakes the sun and a map's lights into the same lightmap, so map conversion works out how
+much of each luxel the sky put there (`compute_sun_fractions` in goldsrc-godot) and night turns only
+that share down. A map with no `light_environment` has nothing to turn down and is left as it was.
+The sky becomes `fullmoon` unless the map's own sky already reads as night. The moonlight colour
+and the sky are in `src/systems/night_mode.gd`.
+
 ## BSP hull collision
 
 World collision traces the map's GoldSrc BSP clip hulls (exact plane normals, real

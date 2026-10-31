@@ -50,6 +50,9 @@ func _register_defaults() -> void:
 	register("timelimit", 20, Type.INT)  # minutes
 	register("scorelimit", 0, Type.INT)  # team points
 	register("fraglimit", 0, Type.INT)  # one player's frags (kills + objective points)
+	# Moonlight instead of the sun on maps lit by a light_environment; the map's own lights stay
+	# lit. Replicated: it is what every client draws. See NightMode.
+	register("night", false, Type.BOOL)
 
 
 func register(key: String, default_value, type: int, replicate: bool = true) -> void:

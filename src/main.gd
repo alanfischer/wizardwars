@@ -116,8 +116,8 @@ var _auto_team := 0  # --team <1-4>: auto-join team on game start
 var _auto_class := 0  # --class <name>: auto-pick class on game start
 var _auto_name := ""  # --name <name>: set player name from command line
 var _auto_bots := 0  # --bots <n>: dedicated server fills with this many AI bots on startup
-## --timelimit/--scorelimit/--fraglimit <n>, applied to the matching server var in _ready. A
-## dedicated server has no console, so the match limits have to be reachable as flags.
+## --timelimit/--scorelimit/--fraglimit <n> and --night on|off, applied to the matching server var
+## in _ready. A dedicated server has no console, so these have to be reachable as flags.
 var _limit_args: Dictionary = {}  # server var name -> unparsed value
 ## Carried across a map change, since _unload_map wipes them: the bots that were in play (so a
 ## rotation doesn't empty a bot server). The local player's role is deliberately NOT carried — a
@@ -221,6 +221,7 @@ func _flag_handlers() -> Dictionary:
 		"--timelimit": func(v: String) -> void: _limit_args["timelimit"] = v.strip_edges(),
 		"--scorelimit": func(v: String) -> void: _limit_args["scorelimit"] = v.strip_edges(),
 		"--fraglimit": func(v: String) -> void: _limit_args["fraglimit"] = v.strip_edges(),
+		"--night": func(v: String) -> void: _limit_args["night"] = v.strip_edges(),
 		"--http-downloads-dir": func(v: String) -> void: MapTransfer.http_downloads_dir = v,
 		"--http-base-url": func(v: String) -> void:
 			MapTransfer.http_base_url_override = v
@@ -359,7 +360,7 @@ func _ready() -> void:
 	for limit_key in _limit_args:
 		var lr: Dictionary = ServerVars.set_from_string(limit_key, _limit_args[limit_key])
 		if not lr["ok"]:
-			push_error("--%s expects a number, got '%s'" % [limit_key, _limit_args[limit_key]])
+			push_error("--%s: %s" % [limit_key, lr["error"]])
 	_apply_bsp_hulls()
 	if _use_goldnet:
 		_install_goldnet()
@@ -474,6 +475,32 @@ func _ready() -> void:
 func _on_server_var_changed(key: String, _value: Variant) -> void:
 	if key == "bsp_hulls":
 		_apply_bsp_hulls()
+	elif key == "night" and _map_root:
+		_build_skybox(_map_root)
+		apply_vr_passthrough(XRManager.vr_passthrough)
+		NightMode.apply(_map_root)
+
+
+## From the worldspawn skyname, or the night sky standing in for it. Rebuilt whole on a live
+## /night: the procedural sky and the Environment are both measured off the cubemap.
+func _build_skybox(map_root: Node3D) -> void:
+	if _skybox:
+		remove_child(_skybox)
+		_skybox.queue_free()
+	var sky_name := ""
+	var worldspawn := map_root.get_node_or_null("worldspawn")
+	if worldspawn and worldspawn.has_meta("entity"):
+		sky_name = worldspawn.get_meta("entity").get("skyname", "")
+	_skybox = Skybox.new()
+	_skybox.name = "Skybox"
+	add_child(_skybox)
+	# Read straight off the map rather than waiting for LightEnvironment._ready: entity _ready
+	# order follows the BSP lump order, and the sky is built here, before any of them run.
+	_skybox.setup(NightMode.sky_for(sky_name), map_root, _find_entity(map_root, "light_environment"))
+	_world_env = _skybox.get_node_or_null("WorldEnvironment") as WorldEnvironment
+	# Skybox builds a fresh Environment per map, so the quality level has to be stamped onto this
+	# one — before precache_resources reuses the resource to warm the model shaders.
+	RenderQuality.apply(RenderQuality.load_level(), get_viewport(), _current_environment())
 
 
 ## Runs on host and client alike, because movement prediction has to run against the same geometry
@@ -713,21 +740,7 @@ func _load_map(map_name: String) -> void:
 	weather_system.setup()
 	add_child(weather_system)
 
-	# Set up skybox from worldspawn skyname property
-	var sky_name := ""
-	var worldspawn := map_root.get_node_or_null("worldspawn")
-	if worldspawn and worldspawn.has_meta("entity"):
-		sky_name = worldspawn.get_meta("entity").get("skyname", "")
-	_skybox = Skybox.new()
-	_skybox.name = "Skybox"
-	add_child(_skybox)
-	# Read straight off the map rather than waiting for LightEnvironment._ready: entity _ready
-	# order follows the BSP lump order, and the sky is built here, before any of them run.
-	_skybox.setup(sky_name, map_root, _find_entity(map_root, "light_environment"))
-	_world_env = _skybox.get_node_or_null("WorldEnvironment") as WorldEnvironment
-	# Skybox builds a fresh Environment per map, so the quality level has to be stamped onto this
-	# one — before precache_resources below reuses the resource to warm the model shaders.
-	RenderQuality.apply(RenderQuality.load_level(), get_viewport(), _current_environment())
+	_build_skybox(map_root)
 	# Detail needs the map itself, and the map's own sky/water surfaces are flagged by now.
 	var detailed := WorldMaterials.apply(map_root, RenderQuality.detail_enabled())
 	if detailed > 0:
@@ -739,6 +752,7 @@ func _load_map(map_name: String) -> void:
 	_sky_surfaces.clear()
 	_collect_sky_surfaces(map_root)
 	apply_vr_passthrough(XRManager.vr_passthrough)
+	NightMode.apply(map_root)
 
 	# Precache weapon models, sounds, sprites so first shot has no hitch
 	AssetLoader.precache_resources(self)
