@@ -234,15 +234,16 @@ way whether or not it was compiled onto a style of its own. The moonlight colour
 
 ## Weather
 
-Rain is the `rain` server var, 1 (light) to 9 (a downpour), on any map; `0` leaves the weather to
-the map, which is how ww_chasm's PotatoC rains as its points fall (`SetWeather`). Lightning strikes
-while it rains, more often the harder it rains, unless `lightning` is off. Both replicate, take
-effect live, and sit on the pause panel's **Weather** row next to the night slider:
+Rain is the `rain` server var, from 0.01 (light) to 1 (a downpour) on any map, and denser rain past
+that; `0` leaves the weather to the map, which is how ww_chasm's PotatoC rains as its points fall
+(`SetWeather`). Lightning strikes while it rains, more often the harder it rains, unless
+`lightning` is off. Both replicate, take effect live, and sit on the pause panel's **Weather** row
+next to the night slider:
 
 ```
-/rain 6
+/rain 0.6
 /lightning off
-./run.sh --map ww_2fort --rain 6 --night 1
+./run.sh --map ww_2fort --rain 0.6 --night 1
 ```
 
 The host times each strike and sends a seed, so every player sees the same bolt. The bolt is drawn

@@ -91,10 +91,11 @@ static func set_flash(flash: Vector3) -> void:
 	_push()
 
 
-## The night's linear-light multiplier on the sky's light: ones by day, TINT at full night.
+## The night's linear-light multiplier on the sky's light: ones by day, TINT at full night. Past 1
+## it keeps darkening down to black, never below: a negative light is NaN under the gamma pow.
 static func night_light() -> Vector3:
 	var t := amount()
-	return Vector3(lerpf(1.0, TINT.r, t), lerpf(1.0, TINT.g, t), lerpf(1.0, TINT.b, t))
+	return Vector3(lerpf(1.0, TINT.r, t), lerpf(1.0, TINT.g, t), lerpf(1.0, TINT.b, t)).max(Vector3.ZERO)
 
 
 static func _push() -> void:

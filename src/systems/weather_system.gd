@@ -138,7 +138,6 @@ func setup() -> void:
 	_rain_filter = SoundSystem.rain_filter()
 
 	ServerVars.value_changed.connect(_on_server_var_changed)
-	_refresh()
 
 
 ## The map's rain floor (MapConverter, GoldSrcBSP.bake_rain_floor), so no drop is drawn under a
@@ -147,6 +146,7 @@ func _ready() -> void:
 	_map_root = get_tree().current_scene.get("_map_root") if get_tree().current_scene else null
 	var data: Dictionary = _map_root.get_meta("rain_floor", {}) if _map_root else {}
 	if data.is_empty():
+		_refresh()
 		return
 	_floor = data["image"]
 	_floor_origin = data["origin"]
@@ -302,9 +302,9 @@ func _refresh() -> void:
 		_haze_material.set_shader_parameter("streak_length", streak_length)
 		_haze_material.set_shader_parameter("streak_width", streak_width)
 
-	# Rain audio: volume scales with intensity (-20 dB at 1, -5 dB at 9), and with how much of it
-	# is in reach (_update_rain_sound)
-	_rain_db = lerpf(-20.0, -5.0, t)
+	# Rain audio: volume scales with intensity (-20 dB light, -5 dB a downpour), and with how much
+	# of it is in reach (_update_rain_sound)
+	_rain_db = lerpf(-20.0, -5.0, heavy)
 	_apply_rain_volume()
 	if not _rain_audio.playing and _rain_audio.stream:
 		_rain_audio.play()
@@ -328,7 +328,7 @@ func send_state_to(peer_id: int) -> void:
 
 
 func _on_rain_finished() -> void:
-	if _drops.visible:
+	if _shown_intensity > 0:
 		_rain_audio.play()
 
 
@@ -452,7 +452,7 @@ func _drop_light() -> Color:
 
 
 func _strike_gap(intensity: float) -> float:
-	var t := _rain_t(intensity)
+	var t := _heaviness(intensity)
 	return randf_range(lerpf(STRIKE_GAP_LIGHT.x, STRIKE_GAP_HEAVY.x, t),
 		lerpf(STRIKE_GAP_LIGHT.y, STRIKE_GAP_HEAVY.y, t))
 
@@ -466,7 +466,7 @@ func _process(delta: float) -> void:
 		_update_rain_sound(delta)
 
 	# The host times the strikes so every peer sees the same one; each draws it from the seed.
-	var storm_target := 0.0 if intensity <= 0 else lerpf(STORM_LIGHT, 1.0, _rain_t(intensity))
+	var storm_target := 0.0 if intensity <= 0 else lerpf(STORM_LIGHT, 1.0, _heaviness(intensity))
 	_storm = move_toward(_storm, storm_target, STORM_RATE * delta)
 	# Compared every frame rather than pushed on change: night rebuilds the skybox, and a new one
 	# starts clear.

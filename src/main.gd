@@ -117,7 +117,7 @@ var _auto_team := 0  # --team <1-4>: auto-join team on game start
 var _auto_class := 0  # --class <name>: auto-pick class on game start
 var _auto_name := ""  # --name <name>: set player name from command line
 var _auto_bots := 0  # --bots <n>: dedicated server fills with this many AI bots on startup
-## --timelimit/--scorelimit/--fraglimit <n>, --night <on|off|0-1>, --rain <0-9> and
+## --timelimit/--scorelimit/--fraglimit <n>, --night <on|off|0-1>, --rain <0-1> and
 ## --lightning <on|off>, applied to the matching server var
 ## in _ready. A dedicated server has no console, so these have to be reachable as flags.
 var _limit_args: Dictionary = {}  # server var name -> unparsed value

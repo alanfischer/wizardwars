@@ -15,6 +15,8 @@ const TEXT_COLOR := Color(0.9, 0.9, 0.95)
 const PANEL_COLOR := Color(0.12, 0.12, 0.18)
 const BUTTON_COLOR := Color(0.2, 0.3, 0.5)
 const BUTTON_HOVER := Color(0.25, 0.38, 0.6)
+## A dragged match slider sends at most this often; where it is let go always goes.
+const MATCH_SEND_MS := 250
 
 const InputSettings = preload("res://src/systems/input_settings.gd")
 const KeyBindings = preload("res://src/systems/key_bindings.gd")
@@ -82,7 +84,9 @@ var _lobby_only: Array[Control] = []  # what the pause panel sets aside: the log
 var _pause_only: Array[Control] = []  # and what it adds: settings of the match being played
 var _night_slider: HSlider
 var _night_value: Label
-var _night_dragging := false
+var _match_dragging := false
+var _match_pending := ""  # a dragged slider's command not sent yet
+var _match_sent_at := 0
 var _rain_slider: HSlider
 var _rain_value: Label
 var _lightning_check: CheckBox
@@ -307,19 +311,36 @@ func _build_match_rows(vbox: VBoxContainer) -> void:
 	_sync_match_rows()
 	_rain_slider.value_changed.connect(func(v: float) -> void:
 		_rain_value.text = _rain_text(v)
-		NetworkManager.send_request_command("rain %.2f" % v))
-	_rain_slider.drag_ended.connect(func(_changed: bool) -> void:
-		get_tree().create_timer(0.5).timeout.connect(_sync_match_rows))
+		_send_match_command("rain %.2f" % v))
 	_night_slider.value_changed.connect(func(v: float) -> void:
 		_night_value.text = "%d%%" % int(v)
-		NetworkManager.send_request_command("night %.2f" % (v / 100.0)))
-	_night_slider.drag_started.connect(func() -> void: _night_dragging = true)
-	_night_slider.drag_ended.connect(func(_changed: bool) -> void:
-		_night_dragging = false
-		get_tree().create_timer(0.5).timeout.connect(_sync_match_rows))
+		_send_match_command("night %.2f" % (v / 100.0)))
+	# While one is held, the echoes of what it sent are behind the handle: leave both alone.
+	for slider: HSlider in [_rain_slider, _night_slider]:
+		slider.drag_started.connect(func() -> void: _match_dragging = true)
+		slider.drag_ended.connect(func(_changed: bool) -> void:
+			_match_dragging = false
+			_flush_match_command()
+			get_tree().create_timer(0.5).timeout.connect(_sync_match_rows))
 	ServerVars.value_changed.connect(func(key: String, _v: Variant) -> void:
-		if key in ["night", "rain", "lightning"] and not _night_dragging:
+		if key in ["night", "rain", "lightning"] and not _match_dragging:
 			_sync_match_rows())
+
+
+## Each send is a command, a chat reply and a server var on every peer, so a drag sends a few a
+## second rather than one per step.
+func _send_match_command(command: String) -> void:
+	_match_pending = command
+	if not _match_dragging or Time.get_ticks_msec() - _match_sent_at >= MATCH_SEND_MS:
+		_flush_match_command()
+
+
+func _flush_match_command() -> void:
+	if _match_pending.is_empty():
+		return
+	NetworkManager.send_request_command(_match_pending)
+	_match_pending = ""
+	_match_sent_at = Time.get_ticks_msec()
 
 
 func _caption(text: String) -> Label:
