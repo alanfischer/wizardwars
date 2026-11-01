@@ -91,9 +91,14 @@ static func set_flash(flash: Vector3) -> void:
 	_push()
 
 
-static func _push() -> void:
+## The night's linear-light multiplier on the sky's light: ones by day, TINT at full night.
+static func night_light() -> Vector3:
 	var t := amount()
-	var night := Vector3(lerpf(1.0, TINT.r, t), lerpf(1.0, TINT.g, t), lerpf(1.0, TINT.b, t))
+	return Vector3(lerpf(1.0, TINT.r, t), lerpf(1.0, TINT.g, t), lerpf(1.0, TINT.b, t))
+
+
+static func _push() -> void:
+	var night := night_light()
 	var style := pow(maxf(_sun_style, 0.0), 1.0 / LIGHTMAP_GAMMA)
 	var world := (night if _sun_has_layer else night * style) + _flash
 	# A sunless map's liquid has no night to match: leave the whole map as it was.

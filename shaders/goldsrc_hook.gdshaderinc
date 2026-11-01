@@ -10,17 +10,18 @@
 uniform vec3 sky_light = vec3(1.0);
 
 // WeatherSystem: how wet the world is (0 dry, 1 soaked) and how far flat ground has pooled into
-// puddles; where rain reaches, as the map's rain floor (MapConverter, GoldSrcBSP.bake_rain_floor),
-// whose max-X/min-Z corner sits at rain_floor_origin; and the linear sky colour wet surfaces reflect.
+// puddles; where rain reaches (the rain floor); and the sky colour wet surfaces reflect, sRGB.
 uniform float wetness = 0.0;
 uniform float puddles = 0.0;
 uniform float puddle_scale = 1.0;  // how readily this surface pools: earth does, planks drain
-uniform sampler2D rain_floor : filter_nearest;
-uniform vec3 rain_floor_origin;
-uniform vec2 rain_floor_size = vec2(1.0);
 uniform vec3 rain_sky = vec3(0.0);
+#include "res://shaders/rain_floor.gdshaderinc"
+#include "res://shaders/noise.gdshaderinc"
 
 vec3 goldsrc_lightmap(vec3 lm, float sun_share) {
+	if (sky_light == vec3(1.0)) {
+		return lm;  // the sun as compiled
+	}
 	// Lightmaps hold pow(light, 0.55), so the share is scaled before that curve, not after.
 	return lm * pow(max(mix(vec3(1.0), sky_light, sun_share), vec3(0.0)), vec3(0.55));
 }
@@ -28,8 +29,8 @@ vec3 goldsrc_lightmap(vec3 lm, float sun_share) {
 // 1 where rain reaches world point p, 0 under cover. The floor's cells are 16 units across, so
 // the four around p are blended: a roof's shadow on the ground is not drawn as a staircase.
 float rain_reaches(vec3 p) {
-	vec2 uv = vec2((rain_floor_origin.x - p.x) / rain_floor_size.x, (p.z - rain_floor_origin.z) / rain_floor_size.y);
-	if (uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) {
+	vec2 uv = rain_floor_uv(p);
+	if (!rain_floor_covers(uv)) {
 		return 0.0;
 	}
 	ivec2 res = textureSize(rain_floor, 0);
@@ -43,20 +44,6 @@ float rain_reaches(vec3 p) {
 		reach[i] = clamp((p.y - texelFetch(rain_floor, c, 0).r) * 4.0 + 1.0, 0.0, 1.0);
 	}
 	return mix(mix(reach.x, reach.y, f.x), mix(reach.z, reach.w, f.x), f.y);
-}
-
-float rain_hash(vec2 p) {
-	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-	p3 += dot(p3, p3.yzx + 33.33);
-	return fract((p3.x + p3.y) * p3.z);
-}
-
-float rain_noise(vec2 p) {
-	vec2 i = floor(p);
-	vec2 f = fract(p);
-	f = f * f * (3.0 - 2.0 * f);
-	return mix(mix(rain_hash(i), rain_hash(i + vec2(1.0, 0.0)), f.x),
-		mix(rain_hash(i + vec2(0.0, 1.0)), rain_hash(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 
 // Wet is darker, and reflects the sky: a damp surface at grazing angles only (water's Fresnel,
@@ -75,18 +62,16 @@ void goldsrc_surface(inout vec3 lit_srgb, inout vec3 albedo, vec3 world_pos, vec
 	}
 	float pool = 0.0;
 	if (world_normal.y > 0.95) {
-		float n = rain_noise(world_pos.xz * 0.55) * 0.7 + rain_noise(world_pos.xz * 2.3) * 0.3;
+		float n = vnoise(world_pos.xz * 0.55) * 0.7 + vnoise(world_pos.xz * 2.3) * 0.3;
 		float edge = mix(1.05, 0.55, puddles * puddle_scale);
 		pool = smoothstep(edge, edge + 0.05, n) * reach;
 	}
 	float fresnel = 0.02 + 0.98 * pow(1.0 - clamp(dot(normal_view, view), 0.0, 1.0), 5.0);
-	vec3 sky = mix(rain_sky * 12.92, 1.055 * pow(max(rain_sky, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055,
-		step(0.0031308, rain_sky));
 	// A puddle shows the floor under it darker and the sky over it brighter than its Fresnel alone
 	// would: the sky it reflects is far brighter than anything the lightmaps put on the ground.
 	float dark = mix(1.0, 0.6, wet) * mix(1.0, 0.6, pool);
 	float mirror = mix(wet * 0.5 * fresnel, max(fresnel * 2.0, 0.1), pool);
-	lit_srgb = min(lit_srgb * dark + sky * mirror, vec3(1.0));
+	lit_srgb = min(lit_srgb * dark + rain_sky * mirror, vec3(1.0));
 	albedo *= dark;
 }
 #endif
@@ -96,7 +81,10 @@ void goldsrc_surface(inout vec3 lit_srgb, inout vec3 albedo, vec3 world_pos, vec
 uniform vec3 sky_light = vec3(1.0);
 
 vec3 goldsrc_liquid(vec3 albedo, int liquid_type) {
-	return liquid_type == 2 ? albedo : albedo * pow(max(sky_light, vec3(0.0)), vec3(0.55));  // lava keeps its glow
+	if (liquid_type == 2 || sky_light == vec3(1.0)) {
+		return albedo;  // lava keeps its glow
+	}
+	return albedo * pow(max(sky_light, vec3(0.0)), vec3(0.55));
 }
 #endif
 
@@ -107,6 +95,9 @@ uniform vec3 flash_color = vec3(0.0);
 uniform vec3 flash_dir = vec3(0.0, 1.0, 0.0);
 
 vec3 goldsrc_sky(vec3 col, vec3 eye_dir) {
+	if (flash_color == vec3(0.0)) {
+		return col;
+	}
 	// Clouds have something to light and open sky only a glow, so it multiplies and then adds.
 	float toward = max(dot(eye_dir, normalize(flash_dir)), 0.0);
 	col *= vec3(1.0) + flash_color * (1.0 + 3.0 * pow(toward, 3.0));

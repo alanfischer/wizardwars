@@ -50,30 +50,15 @@ uniform vec3 star_color : source_color = vec3(1.0, 1.0, 1.0);
 uniform float storm : hint_range(0.0, 1.0) = 0.0;
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 
-// A flash lighting the sky from within, brightest toward flash_dir (world space): what lights
-// up the clouds behind a lightning strike. Black is no flash.
-uniform vec3 flash_color = vec3(0.0);
-uniform vec3 flash_dir = vec3(0.0, 1.0, 0.0);
-
-
-float hash12(vec2 p) {
-	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-	p3 += dot(p3, p3.yzx + 33.33);
-	return fract((p3.x + p3.y) * p3.z);
-}
+// Lightning: flash_color/flash_dir and goldsrc_sky(), the same flash the stock sky draws.
+#define GOLDSRC_HOOK_SKY
+#include "res://shaders/goldsrc_hook.gdshaderinc"
+#include "res://shaders/noise.gdshaderinc"
 
 float hash13(vec3 p) {
 	p = fract(p * 0.1031);
 	p += dot(p, p.yzx + 33.33);
 	return fract((p.x + p.y) * p.z);
-}
-
-float vnoise(vec2 p) {
-	vec2 i = floor(p);
-	vec2 f = fract(p);
-	f = f * f * (3.0 - 2.0 * f);
-	return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), f.x),
-	           mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 
 float fbm(vec2 p) {
@@ -156,11 +141,12 @@ void fragment() {
 		art = mix(art, vec3(dot(art, LUMA)) * 0.5, storm);
 		col = mix(col, art, cubemap_blend);
 	}
-	// Lightning, as goldsrc_hook.gdshaderinc draws it on the stock sky, plus the storm deck lit from
-	// inside: dark cloud has nothing for the multiply to lift, so its shape is added outright.
-	float toward = max(dot(eye_dir, normalize(flash_dir)), 0.0);
-	col *= vec3(1.0) + flash_color * (1.0 + 3.0 * pow(toward, 3.0));
-	col += flash_color * (0.3 + 0.9 * pow(toward, 4.0));
-	col += flash_color * storm_cover * storm_body * (0.25 + 0.9 * pow(toward, 2.0));
+	// Lightning, plus the storm deck lit from inside: dark cloud has nothing for the flash's
+	// multiply to lift, so its shape is added outright.
+	col = goldsrc_sky(col, eye_dir);
+	if (flash_color != vec3(0.0)) {
+		float toward = max(dot(eye_dir, normalize(flash_dir)), 0.0);
+		col += flash_color * storm_cover * storm_body * (0.25 + 0.9 * pow(toward, 2.0));
+	}
 	ALBEDO = col;
 }

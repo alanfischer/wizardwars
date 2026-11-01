@@ -13,9 +13,7 @@ render_mode unshaded, blend_mix, depth_test_disabled, depth_draw_never, cull_dis
 uniform sampler2D depth_tex : hint_depth_texture, filter_nearest;
 // DecalSystem.depth_remap(): OpenGL's NDC z is -1..1, Vulkan/Metal's 0..1.
 uniform vec2 depth_remap = vec2(1.0, 0.0);
-uniform sampler2D rain_floor : filter_nearest;
-uniform vec3 floor_origin;  // max-X/min-Z corner, as the light grid's
-uniform vec2 floor_size;
+#include "res://shaders/rain_floor.gdshaderinc"
 uniform float rain_top;     // where rain falls from; none above it
 uniform float density = 0.0;  // per metre of rain-filled air
 // Rain comes through in curtains: the density swings by gust_amount either way over a noise that
@@ -34,11 +32,7 @@ uniform float flash = 0.0;
 // Colours are linear. The RD renderers encode on output; gl_compatibility writes ALBEDO as it is,
 // so there it is encoded here (EntityRender.renderer_is_linear).
 uniform bool linear_output = true;
-
-vec3 to_output(vec3 c) {
-	return linear_output ? c
-		: mix(c * 12.92, 1.055 * pow(max(c, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
-}
+#include "res://shaders/color_space.gdshaderinc"
 
 const float GUST_CELL = 80.0;  // metres to the noise texture's width, as WeatherSystem.GUST_CELL
 const int STEPS = 16;
@@ -57,11 +51,8 @@ void vertex() {
 }
 
 bool raining_at(vec3 p) {
-	vec2 uv = vec2((floor_origin.x - p.x) / floor_size.x, (p.z - floor_origin.z) / floor_size.y);
-	if (p.y >= rain_top || uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) {
-		return false;
-	}
-	return p.y > textureLod(rain_floor, uv, 0.0).r;
+	vec2 uv = rain_floor_uv(p);
+	return p.y < rain_top && rain_floor_covers(uv) && p.y > textureLod(rain_floor, uv, 0.0).r;
 }
 
 // pcg3d. The inputs are whole numbers in the thousands, which a float hash smears together.
@@ -156,7 +147,8 @@ void fragment() {
 	}
 	// The streaks over the haze behind them.
 	float alpha = streak + (1.0 - streak) * haze;
-	ALBEDO = to_output((streak_color * streak + haze_color * (1.0 - streak) * haze) / max(alpha, 1e-4));
+	vec3 color = (streak_color * streak + haze_color * (1.0 - streak) * haze) / max(alpha, 1e-4);
+	ALBEDO = linear_output ? color : gs_to_srgb(color);
 	ALPHA = alpha;
 	// gl_compatibility also blends in gamma space, where a light haze covers a darker scene less
 	// than the RD renderers' linear blend does. Matching it exactly needs the scene's colour; this

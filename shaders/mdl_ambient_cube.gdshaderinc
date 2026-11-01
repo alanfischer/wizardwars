@@ -14,13 +14,7 @@ uniform float overbright = 2.0;
 // and convert once at the end. See goldsrc_bsp.cpp's lightstyle shaders for the world twin.
 uniform bool linear_output = false;
 
-vec3 gs_to_srgb(vec3 c) {
-	return mix(c * 12.92, 1.055 * pow(max(c, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
-}
-
-vec3 gs_to_linear(vec3 c) {
-	return mix(c / 12.92, pow((max(c, vec3(0.0)) + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
-}
+#include "res://shaders/color_space.gdshaderinc"
 
 
 #ifdef MDL_FADE

@@ -103,9 +103,9 @@ func sample(world_pos: Vector3) -> Color:
 	b = b / 6.0 * OVERBRIGHT
 	if _sky_light != Vector3.ONE and not _sun_images.is_empty():
 		var f: float = _sun_images[gy].get_pixel(gx, gz).r
-		r *= pow(lerpf(1.0, _sky_light.x, f), 0.55)
-		g *= pow(lerpf(1.0, _sky_light.y, f), 0.55)
-		b *= pow(lerpf(1.0, _sky_light.z, f), 0.55)
+		r *= pow(lerpf(1.0, _sky_light.x, f), NightMode.LIGHTMAP_GAMMA)
+		g *= pow(lerpf(1.0, _sky_light.y, f), NightMode.LIGHTMAP_GAMMA)
+		b *= pow(lerpf(1.0, _sky_light.z, f), NightMode.LIGHTMAP_GAMMA)
 	return Color(minf(r, 1.0), minf(g, 1.0), minf(b, 1.0))
 
 

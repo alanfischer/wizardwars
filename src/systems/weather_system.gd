@@ -67,6 +67,7 @@ const PUDDLE_DRY := 1.0 / 240.0
 const PUDDLE_BY_CLASS := {"ground": 1.0, "mineral": 0.6, "wood": 0.0}
 const PUDDLE_DEFAULT := 0.5
 const BOLT_SEGMENTS := 16
+const TopDownFrame = preload("res://src/systems/top_down_frame.gd")
 const SOUND_SPEED := 340.0
 
 var _player: Node3D
@@ -83,6 +84,10 @@ var _flash_dir := Vector3.UP
 var _map_bounds := AABB()
 var _drop_material: ShaderMaterial
 var _floor: Image
+var _floor_tex: ImageTexture
+var _map_root: Node
+var _linear_output := true
+var _rain_filter: AudioEffectLowPassFilter
 var _floor_origin := Vector3.ZERO
 var _floor_size := Vector2.ONE
 var _rain_db := 0.0
@@ -92,18 +97,11 @@ var _sample_in := 0.0
 var _haze: MeshInstance3D
 var _haze_material: ShaderMaterial
 var _flash_k := 0.0
-var _fall_speed := 9.0
-var _streak_length := 0.4
-var _streak_width := 0.006
-var _far_presence := 1.0
-var _far_opacity := 0.0
 var _gust_offset := Vector3.ZERO
 var _wet_mats: Array[ShaderMaterial] = []
 var _wetness := 0.0
 var _puddles := 0.0
-## A map loaded into rain that is already falling starts soaked rather than drying out to it.
-var _wet_settled := false
-var _wet_pushed := Vector4(-1, -1, -1, -1)  # wetness, puddles, sky luma, flash: what the materials hold
+var _wet_pushed := Vector4(-1, -1, -1, -1)  # wetness, puddles, sky luma, flash, as last pushed
 var _storm := 0.0
 
 
@@ -112,9 +110,8 @@ func setup() -> void:
 	_drop_material = ShaderMaterial.new()
 	_drop_material.shader = preload("res://shaders/rain.gdshader")
 	_drop_material.set_shader_parameter("box", DROP_BOX)
-	_drop_material.set_shader_parameter("color", Vector3(DROP_COLOR.r, DROP_COLOR.g, DROP_COLOR.b))
 	_drop_material.render_priority = Material.RENDER_PRIORITY_MAX
-	_drop_material.set_shader_parameter("linear_output", EntityRender.renderer_is_linear())
+	_linear_output = EntityRender.renderer_is_linear()
 	var quad := QuadMesh.new()
 	quad.size = Vector2.ONE
 	quad.material = _drop_material
@@ -138,6 +135,7 @@ func setup() -> void:
 	_rain_audio.finished.connect(_on_rain_finished)
 	add_child(_rain_audio)
 	_thunder = load("sounds/ambience/thunder.wav") as AudioStream
+	_rain_filter = SoundSystem.rain_filter()
 
 	ServerVars.value_changed.connect(_on_server_var_changed)
 	_refresh()
@@ -146,39 +144,50 @@ func setup() -> void:
 ## The map's rain floor (MapConverter, GoldSrcBSP.bake_rain_floor), so no drop is drawn under a
 ## roof. A map converted before it existed has none, and rains everywhere as it always did.
 func _ready() -> void:
-	var root: Node = get_tree().current_scene.get("_map_root") if get_tree().current_scene else null
-	var data: Dictionary = root.get_meta("rain_floor", {}) if root else {}
+	_map_root = get_tree().current_scene.get("_map_root") if get_tree().current_scene else null
+	var data: Dictionary = _map_root.get_meta("rain_floor", {}) if _map_root else {}
 	if data.is_empty():
 		return
 	_floor = data["image"]
 	_floor_origin = data["origin"]
 	_floor_size = data["size"]
-	_drop_material.set_shader_parameter("rain_floor", ImageTexture.create_from_image(_floor))
-	_drop_material.set_shader_parameter("floor_origin", _floor_origin)
-	_drop_material.set_shader_parameter("floor_size", _floor_size)
+	_floor_tex = ImageTexture.create_from_image(_floor)
+	_set_floor(_drop_material)
 	_drop_material.set_shader_parameter("has_floor", true)
-	if DisplayServer.get_name() != "headless":
-		_build_haze(data)
-		_collect_wet(root, ImageTexture.create_from_image(_floor), {})
+	_refresh()
+	# A map loaded into rain that is already falling starts soaked rather than drying out to it.
+	if _shown_intensity > 0:
+		_wetness = 1.0
+		_puddles = _heaviness(_shown_intensity)
+
+
+func _set_floor(mat: ShaderMaterial) -> void:
+	mat.set_shader_parameter("rain_floor", _floor_tex)
+	mat.set_shader_parameter("rain_floor_origin", _floor_origin)
+	mat.set_shader_parameter("rain_floor_size", _floor_size)
+
+
+## The haze and wet ground, the first time it rains: a map that stays dry never builds them.
+func _ensure_rain_visuals() -> void:
+	if _haze or _floor_tex == null or DisplayServer.get_name() == "headless":
+		return
+	_build_haze()
+	_collect_wet()
 
 
 ## Every map material the shader hook gave rain to, handed the rain floor once.
-func _collect_wet(node: Node, floor_tex: Texture2D, seen: Dictionary) -> void:
-	for child in node.get_children():
-		if child is MeshInstance3D:
-			var mi := child as MeshInstance3D
-			# The loader names each world mesh after its texture.
-			var pools: float = PUDDLE_BY_CLASS.get(WorldMaterials.classify(String(mi.name)), PUDDLE_DEFAULT)
-			for i in (mi.mesh.get_surface_count() if mi.mesh else 0):
-				for mat in [mi.mesh.surface_get_material(i), mi.get_surface_override_material(i)]:
-					if mat is ShaderMaterial and not seen.has(mat) and _takes_rain(mat.shader):
-						seen[mat] = true
-						mat.set_shader_parameter("rain_floor", floor_tex)
-						mat.set_shader_parameter("rain_floor_origin", _floor_origin)
-						mat.set_shader_parameter("rain_floor_size", _floor_size)
-						mat.set_shader_parameter("puddle_scale", pools)
-						_wet_mats.append(mat)
-		_collect_wet(child, floor_tex, seen)
+func _collect_wet() -> void:
+	var seen := {}
+	for mi in WorldMaterials._collect(_map_root, []):
+		# The loader names each world mesh after its texture.
+		var pools: float = PUDDLE_BY_CLASS.get(WorldMaterials.classify(String(mi.name)), PUDDLE_DEFAULT)
+		for i in (mi.mesh.get_surface_count() if mi.mesh else 0):
+			for mat in [mi.mesh.surface_get_material(i), mi.get_surface_override_material(i)]:
+				if mat is ShaderMaterial and not seen.has(mat) and _takes_rain(mat.shader):
+					seen[mat] = true
+					_set_floor(mat)
+					mat.set_shader_parameter("puddle_scale", pools)
+					_wet_mats.append(mat)
 
 
 static var _rain_shaders := {}
@@ -193,16 +202,14 @@ static func _takes_rain(shader: Shader) -> bool:
 	return _rain_shaders[shader]
 
 
-func _build_haze(data: Dictionary) -> void:
+func _build_haze() -> void:
 	_haze_material = ShaderMaterial.new()
 	_haze_material.shader = preload("res://shaders/rain_haze.gdshader")
 	_haze_material.render_priority = Material.RENDER_PRIORITY_MAX - 1  # over all it hazes, under the drops
 	_haze_material.set_shader_parameter("depth_remap", DecalSystem.depth_remap())
-	_haze_material.set_shader_parameter("linear_output", EntityRender.renderer_is_linear())
-	_haze_material.set_shader_parameter("rain_floor", ImageTexture.create_from_image(_floor))
-	_haze_material.set_shader_parameter("floor_origin", _floor_origin)
-	_haze_material.set_shader_parameter("floor_size", _floor_size)
-	_haze_material.set_shader_parameter("rain_top", float(data.get("top", INF)))
+	_haze_material.set_shader_parameter("linear_output", _linear_output)
+	_set_floor(_haze_material)
+	_haze_material.set_shader_parameter("rain_top", float(_map_root.get_meta("rain_floor")["top"]))
 	var noise := FastNoiseLite.new()
 	noise.frequency = 1.0 / 16.0
 	noise.fractal_octaves = 3
@@ -265,38 +272,52 @@ func _refresh() -> void:
 		_shown_intensity = intensity
 		_next_strike = _strike_gap(intensity) * 0.5
 	if intensity <= 0:
-		_drops.visible = false
+		if _haze_material:
+			_haze_material.set_shader_parameter("streak_opacity", 0.0)
 		if _rain_audio.playing:
 			_rain_audio.stop()
 		return
+	_ensure_rain_visuals()
 
-	var t := (intensity - 1) / 8.0  # 0.0 at intensity 1, 1.0 at intensity 9
-
-	# Rain falls at its terminal speed, a few m/s for drizzle and ~9 for a downpour's big drops.
+	var t := _rain_t(intensity)
+	var heavy := _heaviness(intensity)
 	var count := int(lerpf(DROPS_LIGHT, DROPS_HEAVY, t))
 	var multimesh := _drops.multimesh
 	if multimesh.instance_count < count:
-		multimesh.instance_count = count
+		multimesh.instance_count = maxi(count, int(DROPS_HEAVY))
 	multimesh.visible_instance_count = count
-	var heavy := minf(t, 1.0)
-	_fall_speed = lerpf(6.0, 9.5, heavy)
-	_streak_length = lerpf(0.3, 0.55, heavy)
-	_streak_width = lerpf(0.004, 0.007, heavy)
-	_drop_material.set_shader_parameter("velocity", Vector3(0.0, -_fall_speed, 0.0))
-	_drop_material.set_shader_parameter("streak_length", _streak_length)
-	_drop_material.set_shader_parameter("width", _streak_width)
+	# Rain falls at its terminal speed, a few m/s for drizzle and ~9 for a downpour's big drops.
+	var fall_speed := lerpf(6.0, 9.5, heavy)
+	var streak_length := lerpf(0.3, 0.55, heavy)
+	var streak_width := lerpf(0.004, 0.007, heavy)
+	_drop_material.set_shader_parameter("velocity", Vector3(0.0, -fall_speed, 0.0))
+	_drop_material.set_shader_parameter("streak_length", streak_length)
+	_drop_material.set_shader_parameter("width", streak_width)
 	_drop_material.set_shader_parameter("opacity", lerpf(0.3, 0.45, heavy))
-	# The far curtains thin out with the rain, and past a downpour fill in as the box does.
-	_far_presence = clampf(count / DROPS_HEAVY, 0.15, 1.0)
-	_far_opacity = FAR_OPACITY * maxf(count / DROPS_HEAVY, 1.0)
-	_drops.visible = true
+	if _haze_material:
+		# The far rain thins out with the rain, and past a downpour fills in as the box does.
+		_haze_material.set_shader_parameter("presence", clampf(count / DROPS_HEAVY, 0.15, 1.0))
+		_haze_material.set_shader_parameter("streak_opacity", FAR_OPACITY * maxf(count / DROPS_HEAVY, 1.0))
+		_haze_material.set_shader_parameter("fall_speed", fall_speed)
+		_haze_material.set_shader_parameter("streak_length", streak_length)
+		_haze_material.set_shader_parameter("streak_width", streak_width)
 
 	# Rain audio: volume scales with intensity (-20 dB at 1, -5 dB at 9), and with how much of it
 	# is in reach (_update_rain_sound)
 	_rain_db = lerpf(-20.0, -5.0, t)
-	_rain_audio.volume_db = _rain_db + linear_to_db(lerpf(RAIN_INDOOR_GAIN, 1.0, _exposure))
+	_apply_rain_volume()
 	if not _rain_audio.playing and _rain_audio.stream:
 		_rain_audio.play()
+
+
+## 0 at the lightest rain, 1 at a downpour, and beyond it as the `rain` var goes past 1.
+static func _rain_t(intensity: float) -> float:
+	return (intensity - 1.0) / 8.0
+
+
+## _rain_t held to 0..1, and 0 when dry: what looks and sounds heavier stops at a downpour.
+static func _heaviness(intensity: float) -> float:
+	return clampf(_rain_t(intensity), 0.0, 1.0) if intensity > 0 else 0.0
 
 
 ## Join snapshot. Default weather is "none", which every peer already starts at, so a dry map
@@ -347,36 +368,32 @@ func _update_rain_sound(delta: float) -> void:
 	if _sample_in <= 0.0:
 		_sample_in = RAIN_SAMPLE_EVERY
 		_exposure_target = _rain_exposure()
-	_exposure = move_toward(_exposure, _exposure_target, RAIN_EASE * delta)
+	if _exposure != _exposure_target:
+		_exposure = move_toward(_exposure, _exposure_target, RAIN_EASE * delta)
+		_apply_rain_volume()
+
+
+func _apply_rain_volume() -> void:
 	_rain_audio.volume_db = _rain_db + linear_to_db(lerpf(RAIN_INDOOR_GAIN, 1.0, _exposure))
-	var low_pass := SoundSystem.rain_filter()
-	if low_pass:
-		low_pass.cutoff_hz = RAIN_INDOOR_CUTOFF * pow(RAIN_OPEN_CUTOFF / RAIN_INDOOR_CUTOFF, _exposure)
+	if _rain_filter:
+		_rain_filter.cutoff_hz = RAIN_INDOOR_CUTOFF * pow(RAIN_OPEN_CUTOFF / RAIN_INDOOR_CUTOFF, _exposure)
 
 
-func _update_haze(delta: float) -> void:
+func _update_haze(delta: float, underwater: bool, sky: Color, drop_light: Color) -> void:
 	if _haze == null:
+		return
+	var density := HAZE_DENSITY * _storm * _storm
+	_haze.visible = (density > 0.0005 or _shown_intensity > 0) and not underwater
+	if not _haze.visible:
 		return
 	# Kept in [0, 1) rather than driven off TIME, which loses precision as it grows.
 	_gust_offset = (_gust_offset + GUST_DRIFT * delta / GUST_CELL).posmod(1.0)
 	_haze_material.set_shader_parameter("gust_offset", _gust_offset)
-	var density := HAZE_DENSITY * _storm * _storm
-	var underwater: bool = _player != null and _player.has_method("head_underwater") and _player.head_underwater()
-	var raining := rain_intensity() > 0
-	_haze.visible = (density > 0.0005 or raining) and not underwater
-	if not _haze.visible:
-		return
-	var color := _haze_base() + SKY_FLASH * _flash_k * HAZE_FLASH
 	_haze_material.set_shader_parameter("density", density)
 	_drop_material.set_shader_parameter("haze_density", density)
-	_haze_material.set_shader_parameter("haze_color", Vector3(color.r, color.g, color.b))
-	var streak := DROP_COLOR * _drop_light()
+	_haze_material.set_shader_parameter("haze_color", Vector3(sky.r, sky.g, sky.b))
+	var streak := DROP_COLOR * drop_light
 	_haze_material.set_shader_parameter("streak_color", Vector3(streak.r, streak.g, streak.b))
-	_haze_material.set_shader_parameter("streak_opacity", _far_opacity if raining else 0.0)
-	_haze_material.set_shader_parameter("presence", _far_presence)
-	_haze_material.set_shader_parameter("fall_speed", _fall_speed)
-	_haze_material.set_shader_parameter("streak_length", _streak_length)
-	_haze_material.set_shader_parameter("streak_width", _streak_width)
 	_haze_material.set_shader_parameter("flash", _flash_k * DROP_FLASH_OPACITY)
 
 
@@ -390,46 +407,43 @@ func _haze_base() -> Color:
 
 
 ## Soaks and dries the map, and hands its wet surfaces the sky they reflect, lightning included.
-func _update_wet(delta: float) -> void:
+## Pushed only when the state moves by a step the screen can show.
+func _update_wet(delta: float, sky: Color) -> void:
 	if _wet_mats.is_empty():
 		return
-	var intensity := rain_intensity()
-	var heavy := clampf((intensity - 1.0) / 8.0, 0.0, 1.0) if intensity > 0 else 0.0
-	var wet_target := 1.0 if intensity > 0 else 0.0
-	var puddle_target := heavy
-	if not _wet_settled:
-		_wet_settled = true
-		_wetness = wet_target
-		_puddles = puddle_target
+	var wet_target := 1.0 if _shown_intensity > 0 else 0.0
+	var puddle_target := _heaviness(_shown_intensity)
 	_wetness = move_toward(_wetness, wet_target,
-		(WET_RISE * lerpf(0.35, 1.0, heavy) if wet_target > _wetness else WET_DRY) * delta)
+		(WET_RISE * lerpf(0.35, 1.0, puddle_target) if wet_target > _wetness else WET_DRY) * delta)
 	_puddles = move_toward(_puddles, puddle_target,
 		(PUDDLE_RISE if puddle_target > _puddles else PUDDLE_DRY) * delta)
-	var sky := _haze_base() + SKY_FLASH * _flash_k * HAZE_FLASH
-	var state := Vector4(_wetness, _puddles, sky.get_luminance(), _flash_k)
-	if state.is_equal_approx(_wet_pushed):
+	var state := Vector4(_wetness, _puddles, sky.get_luminance(), _flash_k).snapped(Vector4.ONE / 255.0)
+	if state == _wet_pushed:
 		return
 	_wet_pushed = state
+	var reflected := sky.linear_to_srgb()  # the hook composites in sRGB
 	for mat in _wet_mats:
 		mat.set_shader_parameter("wetness", _wetness)
 		mat.set_shader_parameter("puddles", _puddles)
-		mat.set_shader_parameter("rain_sky", Vector3(sky.r, sky.g, sky.b))
+		mat.set_shader_parameter("rain_sky", Vector3(reflected.r, reflected.g, reflected.b))
 
 
 ## The sky's light on the rain: full by day, darkened at night the way the sky's light is (NightMode).
 func _sky_light() -> Color:
-	var t := NightMode.amount()
-	return Color(pow(lerpf(1.0, NightMode.TINT.r, t), 0.55), pow(lerpf(1.0, NightMode.TINT.g, t), 0.55),
-		pow(lerpf(1.0, NightMode.TINT.b, t), 0.55))
+	var n := NightMode.night_light()
+	var g := NightMode.LIGHTMAP_GAMMA
+	return Color(pow(n.x, g), pow(n.y, g), pow(n.z, g))
 
 
 ## Drops are only seen by the light on them: dim under a storm sky, dimmer at night, and lit up all
-## at once by lightning.
-func _update_drops() -> void:
+## at once by lightning. Their colour goes to the shader in its output space.
+func _update_drops(light: Color) -> void:
 	if not _drops.visible:
 		return
-	var light := _drop_light()
-	_drop_material.set_shader_parameter("light", Vector3(light.r, light.g, light.b))
+	var color := DROP_COLOR * light
+	if not _linear_output:
+		color = color.linear_to_srgb()
+	_drop_material.set_shader_parameter("color", Vector3(color.r, color.g, color.b))
 	_drop_material.set_shader_parameter("flash", _flash_k * DROP_FLASH_OPACITY)
 
 
@@ -438,21 +452,21 @@ func _drop_light() -> Color:
 
 
 func _strike_gap(intensity: float) -> float:
-	var t := (intensity - 1) / 8.0
+	var t := _rain_t(intensity)
 	return randf_range(lerpf(STRIKE_GAP_LIGHT.x, STRIKE_GAP_HEAVY.x, t),
 		lerpf(STRIKE_GAP_LIGHT.y, STRIKE_GAP_HEAVY.y, t))
 
 
 func _process(delta: float) -> void:
+	var intensity := _shown_intensity
 	# GoldSrc drew no rain with the view underwater (v_waterlevel 3); the sound carries on.
-	_drops.visible = rain_intensity() > 0 and \
-		not (_player and _player.has_method("head_underwater") and _player.head_underwater())
+	var underwater: bool = _player != null and _player.has_method("head_underwater") and _player.head_underwater()
+	_drops.visible = intensity > 0 and not underwater
 	if _rain_audio.playing:
 		_update_rain_sound(delta)
 
 	# The host times the strikes so every peer sees the same one; each draws it from the seed.
-	var intensity := rain_intensity()
-	var storm_target := 0.0 if intensity <= 0 else lerpf(STORM_LIGHT, 1.0, (intensity - 1) / 8.0)
+	var storm_target := 0.0 if intensity <= 0 else lerpf(STORM_LIGHT, 1.0, _rain_t(intensity))
 	_storm = move_toward(_storm, storm_target, STORM_RATE * delta)
 	# Compared every frame rather than pushed on change: night rebuilds the skybox, and a new one
 	# starts clear.
@@ -479,9 +493,12 @@ func _process(delta: float) -> void:
 		if Game.skybox:
 			var sky_k := k * lerpf(SKY_FLASH_DAY, 1.0, NightMode.amount())
 			Game.skybox.set_flash(SKY_FLASH * sky_k, _flash_dir)
-	_update_haze(delta)
-	_update_drops()
-	_update_wet(delta)
+	var drop_light := _drop_light()
+	_update_drops(drop_light)
+	if _haze:
+		var sky := _haze_base() + SKY_FLASH * _flash_k * HAZE_FLASH
+		_update_haze(delta, underwater, sky, drop_light)
+		_update_wet(delta, sky)
 
 
 ## One lightning strike, in the sky over the map: above its sky brushes, which draw no depth, so
@@ -561,11 +578,6 @@ func _bounds() -> AABB:
 	if _map_bounds.size != Vector3.ZERO:
 		return _map_bounds
 	var root: Node = get_tree().current_scene.get("_map_root")
-	var box := AABB()
-	var first := true
-	for mi in (EntityRender.find_mesh_instances(root) if root else []):
-		var b: AABB = mi.global_transform * mi.get_aabb()
-		box = b if first else box.merge(b)
-		first = false
-	_map_bounds = box if not first else AABB(Vector3(-100, -20, -100), Vector3(200, 60, 200))
+	var box := TopDownFrame.world_aabb(root) if root else AABB()
+	_map_bounds = box if box.size != Vector3.ZERO else AABB(Vector3(-100, -20, -100), Vector3(200, 60, 200))
 	return _map_bounds
