@@ -44,10 +44,13 @@ func _enter_tree() -> void:
 ## main.gd points the BSP PVS at the host's eye every physics frame; running after it, this
 ## re-points it at the free camera so the world around the shot is not culled.
 ## The host's own view also drives the underwater fog, and a spectator parked in the ravine water
-## would fog every frame.
+## would fog every frame and hide the rain.
 func _physics_process(_delta: float) -> void:
 	if _pvs_cam:
 		VisibilitySystem.set_local_position(_pvs_cam.global_position)
+		var weather: WeatherSystem = get_tree().current_scene.get("weather_system")
+		if weather:
+			weather.attach_player(_pvs_cam)
 		var world_env := get_tree().root.find_child("WorldEnvironment", true, false) as WorldEnvironment
 		if world_env and world_env.environment:
 			world_env.environment.fog_enabled = false

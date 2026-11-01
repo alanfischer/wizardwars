@@ -12,6 +12,8 @@ the teams. It runs on macOS, Windows, Linux and Meta Quest (VR).
   <img src="docs/screenshots/bridge_blue_fort.jpg" width="49%" alt="Wizards pushing toward the blue fort">
 </p>
 
+![The same bridge at night in heavy rain, a lightning spell arcing across it](docs/screenshots/bridge_night_rain.jpg)
+
 ## How to play
 
 - [The Wizards](docs/wizards.md): every class, its spells, satchel and tips.
