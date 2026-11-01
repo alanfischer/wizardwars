@@ -30,7 +30,7 @@ const PIPELINE_META := &"pipeline_id"
 const PIPELINE_PROPERTY := "metadata/pipeline_id"
 # Bump whenever the conversion pipeline's output changes, to force cached .scn maps to
 # reconvert — the cache keys off this constant, not the BSP's contents.
-const CACHE_VERSION := 2
+const CACHE_VERSION := 3
 
 
 func convert(bsp_name: String) -> bool:
@@ -76,6 +76,8 @@ func convert(bsp_name: String) -> bool:
 	var bsp = ClassDB.instantiate(&"GoldSrcBSP")
 	bsp.set_scale_factor(GameConsts.SCALE_FACTOR)
 	bsp.shader_lightstyles = true
+	# Night, lightning and rain on the map's own shaders: ours, not the extension's.
+	bsp.shader_hook = "res://shaders/goldsrc_hook.gdshaderinc"
 	bsp.load_bsp(bsp_path)
 
 	for wad in _load_wads(bsp):

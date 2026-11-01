@@ -56,6 +56,16 @@ const DROP_FLASH_OPACITY := 2.5
 const DROP_COLOR := Color(0.75, 0.8, 0.9)
 ## Opacity of the far rain's streaks (shaders/rain_haze.gdshader) at a downpour.
 const FAR_OPACITY := 0.6
+## Wet ground (shaders/goldsrc_hook.gdshaderinc): per second, how fast the map soaks at a downpour
+## (slower in light rain) and dries once it stops, and the same for puddles, which only a downpour
+## fills completely.
+const WET_RISE := 1.0 / 20.0
+const WET_DRY := 1.0 / 120.0
+const PUDDLE_RISE := 1.0 / 90.0
+const PUDDLE_DRY := 1.0 / 240.0
+## How readily each WorldMaterials class pools; anything it leaves unclassified takes the default.
+const PUDDLE_BY_CLASS := {"ground": 1.0, "mineral": 0.6, "wood": 0.0}
+const PUDDLE_DEFAULT := 0.5
 const BOLT_SEGMENTS := 16
 const SOUND_SPEED := 340.0
 
@@ -88,6 +98,12 @@ var _streak_width := 0.006
 var _far_presence := 1.0
 var _far_opacity := 0.0
 var _gust_offset := Vector3.ZERO
+var _wet_mats: Array[ShaderMaterial] = []
+var _wetness := 0.0
+var _puddles := 0.0
+## A map loaded into rain that is already falling starts soaked rather than drying out to it.
+var _wet_settled := false
+var _wet_pushed := Vector4(-1, -1, -1, -1)  # wetness, puddles, sky luma, flash: what the materials hold
 var _storm := 0.0
 
 
@@ -143,6 +159,38 @@ func _ready() -> void:
 	_drop_material.set_shader_parameter("has_floor", true)
 	if DisplayServer.get_name() != "headless":
 		_build_haze(data)
+		_collect_wet(root, ImageTexture.create_from_image(_floor), {})
+
+
+## Every map material the shader hook gave rain to, handed the rain floor once.
+func _collect_wet(node: Node, floor_tex: Texture2D, seen: Dictionary) -> void:
+	for child in node.get_children():
+		if child is MeshInstance3D:
+			var mi := child as MeshInstance3D
+			# The loader names each world mesh after its texture.
+			var pools: float = PUDDLE_BY_CLASS.get(WorldMaterials.classify(String(mi.name)), PUDDLE_DEFAULT)
+			for i in (mi.mesh.get_surface_count() if mi.mesh else 0):
+				for mat in [mi.mesh.surface_get_material(i), mi.get_surface_override_material(i)]:
+					if mat is ShaderMaterial and not seen.has(mat) and _takes_rain(mat.shader):
+						seen[mat] = true
+						mat.set_shader_parameter("rain_floor", floor_tex)
+						mat.set_shader_parameter("rain_floor_origin", _floor_origin)
+						mat.set_shader_parameter("rain_floor_size", _floor_size)
+						mat.set_shader_parameter("puddle_scale", pools)
+						_wet_mats.append(mat)
+		_collect_wet(child, floor_tex, seen)
+
+
+static var _rain_shaders := {}
+
+
+static func _takes_rain(shader: Shader) -> bool:
+	if shader == null:
+		return false
+	if not _rain_shaders.has(shader):
+		_rain_shaders[shader] = shader.get_shader_uniform_list().any(
+			func(u: Dictionary) -> bool: return u["name"] == "wetness")
+	return _rain_shaders[shader]
 
 
 func _build_haze(data: Dictionary) -> void:
@@ -341,6 +389,33 @@ func _haze_base() -> Color:
 		Color(maxf(sky.r, floor.r), maxf(sky.g, floor.g), maxf(sky.b, floor.b))
 
 
+## Soaks and dries the map, and hands its wet surfaces the sky they reflect, lightning included.
+func _update_wet(delta: float) -> void:
+	if _wet_mats.is_empty():
+		return
+	var intensity := rain_intensity()
+	var heavy := clampf((intensity - 1.0) / 8.0, 0.0, 1.0) if intensity > 0 else 0.0
+	var wet_target := 1.0 if intensity > 0 else 0.0
+	var puddle_target := heavy
+	if not _wet_settled:
+		_wet_settled = true
+		_wetness = wet_target
+		_puddles = puddle_target
+	_wetness = move_toward(_wetness, wet_target,
+		(WET_RISE * lerpf(0.35, 1.0, heavy) if wet_target > _wetness else WET_DRY) * delta)
+	_puddles = move_toward(_puddles, puddle_target,
+		(PUDDLE_RISE if puddle_target > _puddles else PUDDLE_DRY) * delta)
+	var sky := _haze_base() + SKY_FLASH * _flash_k * HAZE_FLASH
+	var state := Vector4(_wetness, _puddles, sky.get_luminance(), _flash_k)
+	if state.is_equal_approx(_wet_pushed):
+		return
+	_wet_pushed = state
+	for mat in _wet_mats:
+		mat.set_shader_parameter("wetness", _wetness)
+		mat.set_shader_parameter("puddles", _puddles)
+		mat.set_shader_parameter("rain_sky", Vector3(sky.r, sky.g, sky.b))
+
+
 ## The sky's light on the rain: full by day, darkened at night the way the sky's light is (NightMode).
 func _sky_light() -> Color:
 	var t := NightMode.amount()
@@ -406,6 +481,7 @@ func _process(delta: float) -> void:
 			Game.skybox.set_flash(SKY_FLASH * sky_k, _flash_dir)
 	_update_haze(delta)
 	_update_drops()
+	_update_wet(delta)
 
 
 ## One lightning strike, in the sky over the map: above its sky brushes, which draw no depth, so

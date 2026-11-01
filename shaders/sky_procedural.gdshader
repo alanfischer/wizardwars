@@ -156,7 +156,7 @@ void fragment() {
 		art = mix(art, vec3(dot(art, LUMA)) * 0.5, storm);
 		col = mix(col, art, cubemap_blend);
 	}
-	// Lightning, as goldsrc_bsp.cpp's stock sky shader draws it, plus the storm deck lit from
+	// Lightning, as goldsrc_hook.gdshaderinc draws it on the stock sky, plus the storm deck lit from
 	// inside: dark cloud has nothing for the multiply to lift, so its shape is added outright.
 	float toward = max(dot(eye_dir, normalize(flash_dir)), 0.0);
 	col *= vec3(1.0) + flash_color * (1.0 + 3.0 * pow(toward, 3.0));
