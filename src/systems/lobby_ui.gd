@@ -15,6 +15,8 @@ const TEXT_COLOR := Color(0.9, 0.9, 0.95)
 const PANEL_COLOR := Color(0.12, 0.12, 0.18)
 const BUTTON_COLOR := Color(0.2, 0.3, 0.5)
 const BUTTON_HOVER := Color(0.25, 0.38, 0.6)
+## A dragged match slider sends at most this often; where it is let go always goes.
+const MATCH_SEND_MS := 250
 
 const InputSettings = preload("res://src/systems/input_settings.gd")
 const KeyBindings = preload("res://src/systems/key_bindings.gd")
@@ -79,6 +81,15 @@ var _in_game := false  # set when a match starts, cleared when the menu comes ba
 var _bg: ColorRect
 var _pause_row: HBoxContainer  # the Resume button, shown only over a match
 var _lobby_only: Array[Control] = []  # what the pause panel sets aside: the logo, the join rows
+var _pause_only: Array[Control] = []  # and what it adds: settings of the match being played
+var _night_slider: HSlider
+var _night_value: Label
+var _match_dragging := false
+var _match_pending := ""  # a dragged slider's command not sent yet
+var _match_sent_at := 0
+var _rain_slider: HSlider
+var _rain_value: Label
+var _lightning_check: CheckBox
 var _mouse_before := Input.MOUSE_MODE_VISIBLE
 
 func _ready() -> void:
@@ -142,6 +153,7 @@ func _ready() -> void:
 	_build_audio_rows(vbox)
 	_build_input_rows(vbox)
 	_build_vr_rows(vbox)
+	_build_match_rows(vbox)
 
 	vbox.add_child(HSeparator.new())
 
@@ -250,6 +262,107 @@ func _add_volume_slider(row: HBoxContainer, caption: String, value: int, max_val
 		readout.text = "%d%%" % int(v)
 		on_changed.call(int(v)))
 	return slider
+
+
+## The match's own settings, on the pause panel only. They are server vars, so moving one sends the
+## command an admin would type; anyone else gets the refusal in chat and the slider goes back.
+func _build_match_rows(vbox: VBoxContainer) -> void:
+	var row := _add_row(vbox, "Map")
+	row.visible = false
+	_pause_only.append(row)
+	row.add_child(_caption("Day"))
+	_night_slider = HSlider.new()
+	_night_slider.min_value = 0
+	_night_slider.max_value = 100
+	_night_slider.step = 5
+	_night_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_night_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_night_slider.tooltip_text = "Moonlight instead of the sun. The map's own lights stay lit. (/night)"
+	row.add_child(_night_slider)
+	row.add_child(_caption("Night"))
+	_night_value = Label.new()
+	_night_value.custom_minimum_size.x = 40
+	_night_value.add_theme_color_override("font_color", TEXT_COLOR)
+	_night_value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(_night_value)
+
+	var weather := _add_row(vbox, "Weather")
+	weather.visible = false
+	_pause_only.append(weather)
+	weather.add_child(_caption("Rain"))
+	_rain_slider = HSlider.new()
+	_rain_slider.min_value = 0
+	_rain_slider.max_value = 1.0
+	_rain_slider.step = 0.01
+	_rain_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_rain_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_rain_slider.tooltip_text = "0.01 light to 1 a downpour. All the way left leaves it to the map. (/rain)"
+	weather.add_child(_rain_slider)
+	_rain_value = Label.new()
+	_rain_value.custom_minimum_size.x = 40
+	_rain_value.add_theme_color_override("font_color", TEXT_COLOR)
+	_rain_value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	weather.add_child(_rain_value)
+	_lightning_check = _make_check("Lightning", true, func(on: bool) -> void:
+		NetworkManager.send_request_command("lightning %s" % ("on" if on else "off")))
+	_lightning_check.tooltip_text = "Lightning strikes while it rains. (/lightning)"
+	weather.add_child(_lightning_check)
+
+	_sync_match_rows()
+	_rain_slider.value_changed.connect(func(v: float) -> void:
+		_rain_value.text = _rain_text(v)
+		_send_match_command("rain %.2f" % v))
+	_night_slider.value_changed.connect(func(v: float) -> void:
+		_night_value.text = "%d%%" % int(v)
+		_send_match_command("night %.2f" % (v / 100.0)))
+	# While one is held, the echoes of what it sent are behind the handle: leave both alone.
+	for slider: HSlider in [_rain_slider, _night_slider]:
+		slider.drag_started.connect(func() -> void: _match_dragging = true)
+		slider.drag_ended.connect(func(_changed: bool) -> void:
+			_match_dragging = false
+			_flush_match_command()
+			get_tree().create_timer(0.5).timeout.connect(_sync_match_rows))
+	ServerVars.value_changed.connect(func(key: String, _v: Variant) -> void:
+		if key in ["night", "rain", "lightning"] and not _match_dragging:
+			_sync_match_rows())
+
+
+## Each send is a command, a chat reply and a server var on every peer, so a drag sends a few a
+## second rather than one per step.
+func _send_match_command(command: String) -> void:
+	_match_pending = command
+	if not _match_dragging or Time.get_ticks_msec() - _match_sent_at >= MATCH_SEND_MS:
+		_flush_match_command()
+
+
+func _flush_match_command() -> void:
+	if _match_pending.is_empty():
+		return
+	NetworkManager.send_request_command(_match_pending)
+	_match_pending = ""
+	_match_sent_at = Time.get_ticks_msec()
+
+
+func _caption(text: String) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_color_override("font_color", TEXT_COLOR)
+	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return label
+
+
+func _sync_match_rows() -> void:
+	var v := roundf(NightMode.amount() * 100.0)
+	_night_slider.set_value_no_signal(v)
+	_night_value.text = "%d%%" % int(v)
+	var rain := float(ServerVars.get_value("rain", 0.0))
+	_rain_slider.set_value_no_signal(rain)
+	_rain_value.text = _rain_text(rain)
+	_lightning_check.set_pressed_no_signal(bool(ServerVars.get_value("lightning", true)))
+
+
+func _rain_text(v: float) -> String:
+	return "Map" if is_zero_approx(v) else "%.2f" % v
 
 
 ## One row, and a screen behind it. Mouse feel and every key live in the Controls panel rather
@@ -490,6 +603,10 @@ func _reset_pause() -> void:
 func _set_pause_layout(paused: bool) -> void:
 	for node in _lobby_only:
 		node.visible = not paused
+	for node in _pause_only:
+		node.visible = paused
+	if paused:
+		_sync_match_rows()
 	_pause_row.visible = paused
 	_bg.color = PAUSE_TINT if paused else BG_COLOR
 

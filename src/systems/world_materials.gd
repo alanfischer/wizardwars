@@ -32,7 +32,7 @@ const CLASS_PARAMS := {
 const OVERRIDES := {
 	# Wood the keywords would call stone, mostly because it is a roof or a wall made of it.
 	"ww_rooftile1": "wood", "ww_roof3": "wood", "m_ceiling4": "wood", "hwall3_4": "wood",
-	"crossover03": "wood", "fifties_dr1": "wood",
+	"crossover03": "wood", "fifties_dr1": "wood", "out_wd": "wood",
 	# Masonry under names that say nothing at all.
 	"rtex336": "mineral", "rtex033": "mineral", "ext004__3arena_": "mineral",
 	"wiz_cross2": "mineral", "wiz_cross3": "mineral", "out_w5": "mineral",

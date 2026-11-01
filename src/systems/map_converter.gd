@@ -30,7 +30,7 @@ const PIPELINE_META := &"pipeline_id"
 const PIPELINE_PROPERTY := "metadata/pipeline_id"
 # Bump whenever the conversion pipeline's output changes, to force cached .scn maps to
 # reconvert — the cache keys off this constant, not the BSP's contents.
-const CACHE_VERSION := 1
+const CACHE_VERSION := 3
 
 
 func convert(bsp_name: String) -> bool:
@@ -76,6 +76,8 @@ func convert(bsp_name: String) -> bool:
 	var bsp = ClassDB.instantiate(&"GoldSrcBSP")
 	bsp.set_scale_factor(GameConsts.SCALE_FACTOR)
 	bsp.shader_lightstyles = true
+	# Night, lightning and rain on the map's own shaders: ours, not the extension's.
+	bsp.shader_hook = "res://shaders/goldsrc_hook.gdshaderinc"
 	bsp.load_bsp(bsp_path)
 
 	for wad in _load_wads(bsp):
@@ -99,6 +101,11 @@ func convert(bsp_name: String) -> bool:
 		var light_grid: Dictionary = bsp.bake_light_grid(32.0)
 		if not light_grid.is_empty():
 			root.set_meta("light_grid", light_grid)
+
+	if bsp.has_method("bake_rain_floor"):
+		var rain_floor: Dictionary = bsp.bake_rain_floor(16.0)
+		if not rain_floor.is_empty():
+			root.set_meta("rain_floor", rain_floor)
 
 	# Bake the stripped BSP (PLANES/NODES/CLIPNODES/LEAFS/VISIBILITY/MODELS) so
 	# both VisibilityManager (PVS) and hop's hull collision can run from the .scn

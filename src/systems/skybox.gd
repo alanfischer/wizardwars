@@ -21,6 +21,9 @@ var _sky_surfaces: Array[MeshInstance3D] = []
 var _cubemap: Cubemap
 var _params: Dictionary = {}
 var _enhanced_material: ShaderMaterial
+var _enhanced_on := false
+## How far the procedural sky has closed over for rain, 0 to 1. See set_storm.
+var storm := 0.0
 
 
 ## `sun_ent` is the map's light_environment entity dict, used to point the procedural sun the way
@@ -111,6 +114,7 @@ func apply_enhanced(enabled: bool) -> void:
 	if enabled and _params.is_empty():
 		return  # no sky art loaded, so nothing was measured to stand in for it
 	var mat := _get_enhanced_material() if enabled else null
+	_enhanced_on = enabled
 	for surf in _sky_surfaces:
 		if is_instance_valid(surf):
 			surf.material_override = mat
@@ -121,6 +125,57 @@ func apply_enhanced(enabled: bool) -> void:
 			_params["sun_dir"], _params["cloud_amount"], _params["star_amount"]])
 	else:
 		Log.info("Procedural sky off: drawing the shipped cubemap")
+
+
+## Light the sky from within, brightest toward `dir` (world space); black puts it out. Lightning.
+## Both materials take it — the map's own and the procedural override — so a quality change
+## mid-flash cannot leave one lit.
+func set_flash(color: Color, dir: Vector3) -> void:
+	var c := Vector3(color.r, color.g, color.b)
+	var seen := {}
+	for surf in _sky_surfaces:
+		if not is_instance_valid(surf) or surf.mesh == null:
+			continue
+		var mat := surf.mesh.surface_get_material(0) as ShaderMaterial
+		if mat and not seen.has(mat):
+			seen[mat] = true
+			mat.set_shader_parameter("flash_color", c)
+			mat.set_shader_parameter("flash_dir", dir)
+	if _enhanced_material:
+		_enhanced_material.set_shader_parameter("flash_color", c)
+		_enhanced_material.set_shader_parameter("flash_dir", dir)
+
+
+## Rain on the procedural sky (the "high" quality level): 0 clear, 1 a dark overcast deck. The stock
+## cubemap has no clouds of its own to thicken, so this leaves it alone.
+func set_storm(amount: float) -> void:
+	storm = amount
+	if _enhanced_material:
+		_enhanced_material.set_shader_parameter("storm", amount)
+
+
+## The colour the sky draws at the horizon right now, linear, flash aside: what haze over open ground
+## fades into (WeatherSystem). Black with no sky art measured. Follows sky_procedural.gdshader's
+## storm greying, in the space that shader works in on this renderer (EntityRender.renderer_is_linear).
+func horizon_color() -> Color:
+	if _params.is_empty():
+		return Color.BLACK
+	var art: Color = _params["horizon_color"]  # sRGB, measured off the cubemap
+	if not _enhanced_on:
+		return art.srgb_to_linear()
+	var linear := EntityRender.renderer_is_linear()
+	var h := art.srgb_to_linear() if linear else art
+	var grey := _luma(h) * 0.55
+	var col := h.lerp(Color(grey, grey, grey), storm)
+	var blend: float = _params.get("cubemap_blend", 0.0)
+	if blend > 0.0:
+		var a := _luma(h) * 0.5
+		col = col.lerp(h.lerp(Color(a, a, a), storm), blend)
+	return col if linear else col.srgb_to_linear()
+
+
+static func _luma(c: Color) -> float:
+	return c.r * 0.299 + c.g * 0.587 + c.b * 0.114
 
 
 func _get_enhanced_material() -> ShaderMaterial:
@@ -134,6 +189,7 @@ func _get_enhanced_material() -> ShaderMaterial:
 	_enhanced_material.set_shader_parameter("sky_cubemap", _cubemap)
 	for key in _params:
 		_enhanced_material.set_shader_parameter(key, _params[key])
+	_enhanced_material.set_shader_parameter("storm", storm)
 	return _enhanced_material
 
 

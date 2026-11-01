@@ -14,13 +14,7 @@ uniform float overbright = 2.0;
 // and convert once at the end. See goldsrc_bsp.cpp's lightstyle shaders for the world twin.
 uniform bool linear_output = false;
 
-vec3 gs_to_srgb(vec3 c) {
-	return mix(c * 12.92, 1.055 * pow(max(c, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
-}
-
-vec3 gs_to_linear(vec3 c) {
-	return mix(c / 12.92, pow((max(c, vec3(0.0)) + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
-}
+#include "res://shaders/color_space.gdshaderinc"
 
 
 #ifdef MDL_FADE
@@ -45,8 +39,11 @@ uniform vec3 grid_size = vec3(1.0);  // world-space extent (cell_size * dims), d
 const float RIM_POWER = 3.0;
 const float RIM_STRENGTH = 0.5;
 
-// Global brightness multiplier for lightstyle animation (e.g. ww_chasm)
-uniform float lightstyle_brightness = 1.0;
+// The sky's share of each grid cell's light, and a linear multiplier on that share: night, and
+// a lightstyle on the map's light_environment (ww_chasm's dusk). See NightMode; the world's
+// lightmap shader does the same with lm_sun.
+uniform sampler3D acube_sun : filter_linear, hint_default_black;
+uniform vec3 sky_light = vec3(1.0);
 
 // GoldSrc drew kRenderFxGlowShell as a second copy of the model, scaled up and flat-shaded.
 // A second skinned pass per glowing player is the wrong trade here — gl_compatibility charges
@@ -89,7 +86,8 @@ void fragment() {
 	vec3 ambient = wn2.x * (wn.x >= 0.0 ? texture(acube_pos_x, uvw).rgb : texture(acube_neg_x, uvw).rgb)
 	             + wn2.y * (wn.y >= 0.0 ? texture(acube_pos_y, uvw).rgb : texture(acube_neg_y, uvw).rgb)
 	             + wn2.z * (wn.z >= 0.0 ? texture(acube_pos_z, uvw).rgb : texture(acube_neg_z, uvw).rgb);
-	ambient = max(ambient * lightstyle_brightness, vec3(0.05));
+	ambient *= pow(max(mix(vec3(1.0), sky_light, texture(acube_sun, uvw).r), vec3(0.0)), vec3(0.55));
+	ambient = max(ambient, vec3(0.05));
 	// 1.5x compensates for GoldSrc half-intensity lightmaps without fully doubling.
 	vec3 base_srgb = linear_output ? gs_to_srgb(albedo.rgb) : albedo.rgb;
 	vec3 lit_srgb = base_srgb * ambient * 1.5;

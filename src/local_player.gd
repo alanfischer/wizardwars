@@ -1334,6 +1334,11 @@ func teleport_to(pos: Vector3, yaw: float) -> void:
 	reset_movement()
 
 
+## The camera is under the surface of a liquid (GoldSrc waterlevel 3).
+func head_underwater() -> bool:
+	return _head_liquid != GameConsts.Liquid.NONE
+
+
 func is_in_water() -> bool:
 	return _in_water
 

@@ -21,6 +21,13 @@ var _textures_3d: Array[ImageTexture3D]  # 6 ImageTexture3D
 # Grid transform for shader
 var _grid_size: Vector3  # world-space extent
 
+# The sky's share of each cell's light (NightMode); null on maps without a sun
+var _sun_images: Array
+var _sun_texture: ImageTexture3D
+
+## NightMode's multiplier on the sky's share, applied to every material the grid binds from then on.
+static var _sky_light := Vector3.ONE
+
 
 static func from_meta(root: Node3D) -> LightGrid:
 	var grid := LightGrid.new()
@@ -51,6 +58,12 @@ static func from_meta(root: Node3D) -> LightGrid:
 		grid._textures_3d.append(tex)
 
 	grid._valid = grid._textures_3d.size() == 6
+
+	var sun_slices: Array = data.get("sun_slices", [])
+	if sun_slices.size() == grid._dims.y:
+		grid._sun_images = sun_slices
+		grid._sun_texture = ImageTexture3D.new()
+		grid._sun_texture.create(Image.FORMAT_L8, grid._dims.x, grid._dims.z, grid._dims.y, false, sun_slices)
 	return grid
 
 
@@ -88,6 +101,11 @@ func sample(world_pos: Vector3) -> Color:
 	r = r / 6.0 * OVERBRIGHT
 	g = g / 6.0 * OVERBRIGHT
 	b = b / 6.0 * OVERBRIGHT
+	if _sky_light != Vector3.ONE and not _sun_images.is_empty():
+		var f: float = _sun_images[gy].get_pixel(gx, gz).r
+		r *= pow(lerpf(1.0, _sky_light.x, f), NightMode.LIGHTMAP_GAMMA)
+		g *= pow(lerpf(1.0, _sky_light.y, f), NightMode.LIGHTMAP_GAMMA)
+		b *= pow(lerpf(1.0, _sky_light.z, f), NightMode.LIGHTMAP_GAMMA)
 	return Color(minf(r, 1.0), minf(g, 1.0), minf(b, 1.0))
 
 
@@ -96,12 +114,14 @@ func sample(world_pos: Vector3) -> Color:
 static var _all_acube_materials: Array = []  # Array[WeakRef]
 
 
-static func set_lightstyle_brightness(brightness: float) -> void:
+## A linear multiplier on the sky's share of model lighting. See NightMode.
+static func set_sky_light(sky_light: Vector3) -> void:
+	_sky_light = sky_light
 	var alive: Array = []
 	for wr: WeakRef in _all_acube_materials:
 		var mat: ShaderMaterial = wr.get_ref() as ShaderMaterial
 		if mat:
-			mat.set_shader_parameter("lightstyle_brightness", brightness)
+			mat.set_shader_parameter("sky_light", sky_light)
 			alive.append(wr)
 	_all_acube_materials = alive
 
@@ -129,6 +149,9 @@ func _set_grid_on_material(mat: ShaderMaterial) -> void:
 		mat.set_shader_parameter(_ACUBE_PARAMS[i], _textures_3d[i])
 	mat.set_shader_parameter("grid_origin", _origin)
 	mat.set_shader_parameter("grid_size", _grid_size)
+	if _sun_texture:
+		mat.set_shader_parameter("acube_sun", _sun_texture)
+	mat.set_shader_parameter("sky_light", _sky_light)
 	LightGrid._track_material(mat)
 
 

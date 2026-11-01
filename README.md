@@ -212,6 +212,52 @@ one each and changeable while the intermission lasts. Most votes wins; a tie goe
 option, which is the map the rotation was going to play anyway, so an intermission nobody votes in
 changes nothing. An admin who names the map with `/nextmap` takes the ballot down.
 
+## Night
+
+The `night` server var turns the sun down toward moonlight, from `0` (day) to `1` (full night),
+and leaves the map's own lights burning. It replicates, takes effect live, and is off by default.
+Any amount above zero swaps the sky for `fullmoon`, unless the map's own sky already reads as night.
+It is also the **Map** slider on the pause panel (Escape), which sends the same admin command:
+
+```
+/night on            # or off, or any amount: /night 0.4
+./run.sh --map ww_2fort --night 0.5
+```
+
+GoldSrc bakes the sun and a map's lights into the same lightmap, so map conversion works out how
+much of each luxel the sky put there (`compute_sun_fractions` in goldsrc-godot) and night turns only
+that share down. A map with no `light_environment` has nothing to turn down and is left as it was.
+The same share is what a lightstyle on the `light_environment` fades — ww_chasm's PotatoC dusk
+(`SetLightStyle('sky', ...)`) — so a map that names its `light_environment` can fade its sun that
+way whether or not it was compiled onto a style of its own. The moonlight colour and the sky are in
+`src/systems/night_mode.gd`.
+
+## Weather
+
+Rain is the `rain` server var, from 0.01 (light) to 1 (a downpour) on any map, and denser rain past
+that; `0` leaves the weather to the map, which is how ww_chasm's PotatoC rains as its points fall
+(`SetWeather`). Lightning strikes while it rains, more often the harder it rains, unless
+`lightning` is off. Both replicate, take effect live, and sit on the pause panel's **Weather** row
+next to the night slider:
+
+```
+/rain 0.6
+/lightning off
+./run.sh --map ww_2fort --rain 0.6 --night 1
+```
+
+The host times each strike and sends a seed, so every player sees the same bolt. The bolt is drawn
+above the map, past its sky brushes, so it shows wherever the sky does. Its flash lights the sky
+around it and the sky's share of the world's light (the same baked share night turns down), so the
+open map flashes and a torch-lit room does not. Thunder follows at the speed of sound. Rain stops
+at the first surface under the sky, so it does not fall indoors (GoldSrc traced up from each drop;
+conversion bakes that trace per column, `bake_rain_floor`). The same floor says how much rain is
+around you, which sets how loud and how muffled the rain sounds, and how much rain-filled air each
+view ray crosses, which hazes the distance out in a downpour (`shaders/rain_haze.gdshader`) while a
+room under a roof stays clear. On the
+High quality level the procedural sky closes over as the rain sets in — a grey overcast in light
+rain, a dark storm deck in a downpour, black at night until the lightning lights it from inside.
+
 ## BSP hull collision
 
 World collision traces the map's GoldSrc BSP clip hulls (exact plane normals, real

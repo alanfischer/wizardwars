@@ -50,6 +50,15 @@ func _register_defaults() -> void:
 	register("timelimit", 20, Type.INT)  # minutes
 	register("scorelimit", 0, Type.INT)  # team points
 	register("fraglimit", 0, Type.INT)  # one player's frags (kills + objective points)
+	# 0 day … 1 full night: moonlight instead of the sun on maps lit by a light_environment, the
+	# map's own lights left lit. Replicated: it is what every client draws. See NightMode.
+	register("night", 0.0, Type.FLOAT)
+	# Rain 0.01 (light) … 1 (downpour) on any map; values above 1 increase drop density proportionally.
+	# 0 leaves the weather to the map (ww_chasm's
+	# PotatoC). Lightning strikes while it rains unless turned off. Both replicated: they are what
+	# every client sees, and the host times the strikes. See WeatherSystem.
+	register("rain", 0.0, Type.FLOAT)
+	register("lightning", true, Type.BOOL)
 
 
 func register(key: String, default_value, type: int, replicate: bool = true) -> void:

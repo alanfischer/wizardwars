@@ -46,8 +46,9 @@ func set_light_style(style_char: String) -> void:
 			_ls_texture.update(_ls_image)
 		elif _bsp:
 			_bsp.set_lightstyle(_style, intensity)
-	# Modulate ambient cube on all MDL models regardless of style index
-	LightGrid.set_lightstyle_brightness(intensity)
+	# A sun in style 0 shares its layer with the map's lights; the baked sun fraction is what
+	# fades only the sun's part of it. Models take it from there either way.
+	NightMode.set_sun_style(intensity, _style > 0)
 
 
 func _apply_sync_state(state: Dictionary) -> void:
