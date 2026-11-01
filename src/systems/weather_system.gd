@@ -401,9 +401,9 @@ func _update_haze(delta: float, underwater: bool, sky: Color, drop_light: Color)
 func _haze_base() -> Color:
 	var sky := Game.skybox.horizon_color() if Game.skybox else Color.BLACK
 	var lit := HAZE_COLOR * _sky_light()
-	var floor := lit * HAZE_FLOOR
+	var least := lit * HAZE_FLOOR
 	return lit if sky == Color.BLACK else \
-		Color(maxf(sky.r, floor.r), maxf(sky.g, floor.g), maxf(sky.b, floor.b))
+		Color(maxf(sky.r, least.r), maxf(sky.g, least.g), maxf(sky.b, least.b))
 
 
 ## Soaks and dries the map, and hands its wet surfaces the sky they reflect, lightning included.
@@ -503,15 +503,15 @@ func _process(delta: float) -> void:
 
 ## One lightning strike, in the sky over the map: above its sky brushes, which draw no depth, so
 ## the bolt shows wherever the sky does — overhead from the bottom of a canyon, too.
-## Everything about it comes from `seed`, so the bolt, its flash and its thunder agree everywhere.
+## Everything about it comes from the seed, so the bolt, its flash and its thunder agree everywhere.
 @rpc("authority", "call_remote", "reliable")
-func strike(seed: int) -> void:
+func strike(strike_seed: int) -> void:
 	if NetworkManager.is_online() and NetworkManager.is_host():
-		strike.rpc(seed)
+		strike.rpc(strike_seed)
 	if DisplayServer.get_name() == "headless":
 		return
 	var rng := RandomNumberGenerator.new()
-	rng.seed = seed
+	rng.seed = strike_seed
 	var bounds := _bounds()
 	var centre := bounds.get_center()
 	var radius := maxf(bounds.size.x, bounds.size.z) * 0.5
