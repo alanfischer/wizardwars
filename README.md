@@ -248,7 +248,12 @@ effect live, and sit on the pause panel's **Weather** row next to the night slid
 The host times each strike and sends a seed, so every player sees the same bolt. The bolt is drawn
 above the map, past its sky brushes, so it shows wherever the sky does. Its flash lights the sky
 around it and the sky's share of the world's light (the same baked share night turns down), so the
-open map flashes and a torch-lit room does not. Thunder follows at the speed of sound. On the
+open map flashes and a torch-lit room does not. Thunder follows at the speed of sound. Rain stops
+at the first surface under the sky, so it does not fall indoors (GoldSrc traced up from each drop;
+conversion bakes that trace per column, `bake_rain_floor`). The same floor says how much rain is
+around you, which sets how loud and how muffled the rain sounds, and how much rain-filled air each
+view ray crosses, which hazes the distance out in a downpour (`shaders/rain_haze.gdshader`) while a
+room under a roof stays clear. On the
 High quality level the procedural sky closes over as the rain sets in — a grey overcast in light
 rain, a dark storm deck in a downpour, black at night until the lightning lights it from inside.
 

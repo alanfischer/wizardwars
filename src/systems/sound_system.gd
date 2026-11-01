@@ -18,6 +18,9 @@ const DEFAULT_MAX_DIST := 8.0
 ## reverb them without also washing out the announcer and UI, which go straight to Effects.
 const EFFECTS_BUS := &"Effects"
 const WORLD_BUS := &"World"
+## Rain's own bus, into Effects, with a low-pass WeatherSystem closes as the rain moves out of
+## reach — rain heard from indoors is dull, not just quiet — without dulling anything else.
+const RAIN_BUS := &"Rain"
 
 ## GoldSrc roomtype -> [room_size, damping, wet]. Roomtypes run in families of
 ## three (small/medium/large), so each entry below is the medium of its family
@@ -45,6 +48,7 @@ var _effects := AudioSettings.DEFAULT_EFFECTS
 func _ready() -> void:
 	_ensure_effects_bus()
 	_ensure_world_bus()
+	_ensure_rain_bus()
 	set_effects_volume(AudioSettings.load_effects(), false)
 	ClientCommandSystem.register("volume", _cmd_volume, "/volume [0-100]",
 			"Sound effects volume. Voice chat has its own, on /voice.")
@@ -73,6 +77,26 @@ func _ensure_world_bus() -> void:
 	reverb.wet = 0.0
 	reverb.dry = 1.0
 	AudioServer.add_bus_effect(idx, reverb)
+
+
+func _ensure_rain_bus() -> void:
+	if AudioServer.get_bus_index(RAIN_BUS) != -1:
+		return
+	var idx := AudioServer.bus_count
+	AudioServer.add_bus(idx)
+	AudioServer.set_bus_name(idx, RAIN_BUS)
+	AudioServer.set_bus_send(idx, EFFECTS_BUS)
+	var low_pass := AudioEffectLowPassFilter.new()
+	low_pass.cutoff_hz = 20000.0
+	AudioServer.add_bus_effect(idx, low_pass)
+
+
+## The rain bus's low-pass, or null if the bus is missing.
+func rain_filter() -> AudioEffectLowPassFilter:
+	var idx := AudioServer.get_bus_index(RAIN_BUS)
+	if idx == -1 or AudioServer.get_bus_effect_count(idx) == 0:
+		return null
+	return AudioServer.get_bus_effect(idx, 0) as AudioEffectLowPassFilter
 
 
 func effects_volume() -> int:

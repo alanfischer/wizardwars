@@ -133,8 +133,8 @@ func _register_builtins() -> void:
 	_register("golem_interp", _cmd_golem_interp, Perm.ADMIN, "/golem_interp [on|off]", "Toggle client-side golem limb reconstruction (off = old per-limb interp).")
 	_register("bsp_hulls", _cmd_bsp_hulls, Perm.ADMIN, "/bsp_hulls [on|off]", "Toggle GoldSrc BSP hull collision (off = trimesh/convex colliders).")
 	_register("combo_chaos", _cmd_combo_chaos, Perm.ADMIN, "/combo_chaos [auto|on|off]", "Trade a map's weapon/ammo pickups and resupply grenades for random combo spellbooks (auto = whatever the map asks for).")
-	_register("night", _cmd_night, Perm.ADMIN, "/night [on|off|0-1]", "Moonlight instead of the sun on sky-lit maps (0 day, 1 full night). The map's own lights stay lit.")
-	_register("rain", _cmd_rain, Perm.ADMIN, "/rain [0-9]", "Rain on any map, 1 light to 9 a downpour. 0 leaves the weather to the map.")
+	_register("night", _cmd_night, Perm.ADMIN, "/night [on|off|amount]", "Moonlight instead of the sun on sky-lit maps (0 day, 1 full night; values above 1 extrapolate). The map's own lights stay lit.")
+	_register("rain", _cmd_rain, Perm.ADMIN, "/rain [amount]", "Rain on any map, 0.01 light to 1 a downpour; values above 1 add drop density. 0 leaves the weather to the map.")
 	_register("lightning", _cmd_lightning, Perm.ADMIN, "/lightning [on|off]", "Lightning strikes while it rains.")
 	_register("allow_combos", _cmd_allow_combos, Perm.ADMIN, "/allow_combos [on|off]", "Whether two allied wizards can clash staves to earn a combo spell.")
 	_register("siege", _cmd_siege, Perm.ADMIN, "/siege [on|off]", "Co-op: waves of monsters against an altar everyone defends together. Works on any map.")
@@ -744,7 +744,7 @@ func _cmd_night(sender_id: int, args: String) -> void:
 		args = "off" if NightMode.amount() > 0.0 else "on"
 	var value := NightMode.parse(args)
 	if value.is_empty():
-		_reply_err(sender_id, "Usage: /night [on|off|0-1]")
+		_reply_err(sender_id, "Usage: /night [on|off|amount]")
 		return
 	ServerVars.set_from_string("night", value)
 	_reply_ok(sender_id, "night: %d%%" % roundi(NightMode.amount() * 100.0))
@@ -755,16 +755,16 @@ func _cmd_rain(sender_id: int, args: String) -> void:
 	if arg.is_empty():
 		_reply_ok(sender_id, "rain: %s" % _rain_text())
 		return
-	if not arg.is_valid_int() or int(arg) < 0 or int(arg) > 9:
-		_reply_err(sender_id, "Usage: /rain [0-9]")
+	if not arg.is_valid_float() or float(arg) < 0.0:
+		_reply_err(sender_id, "Usage: /rain [amount]")
 		return
 	ServerVars.set_from_string("rain", arg)
 	_reply_ok(sender_id, "rain: %s" % _rain_text())
 
 
 func _rain_text() -> String:
-	var v := int(ServerVars.get_value("rain", 0))
-	return "the map's own" if v == 0 else str(v)
+	var v := float(ServerVars.get_value("rain", 0.0))
+	return "the map's own" if is_zero_approx(v) else ("%.2f (%.1fx drops)" % [v, v] if v > 1.0 else "%.2f" % v)
 
 
 func _cmd_lightning(sender_id: int, args: String) -> void:

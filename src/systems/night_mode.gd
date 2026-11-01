@@ -36,11 +36,11 @@ static func parse(text: String) -> String:
 		return "1"
 	if t == "off":
 		return "0"
-	return str(clampf(float(t), 0.0, 1.0)) if t.is_valid_float() else ""
+	return str(float(t)) if t.is_valid_float() else ""
 
 
 static func amount() -> float:
-	return clampf(float(ServerVars.get_value("night", 0.0)), 0.0, 1.0)
+	return float(ServerVars.get_value("night", 0.0))
 
 
 ## Whether conversion found a sky share to turn down: no light_environment, no night.

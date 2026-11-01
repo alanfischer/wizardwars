@@ -288,11 +288,11 @@ func _build_match_rows(vbox: VBoxContainer) -> void:
 	weather.add_child(_caption("Rain"))
 	_rain_slider = HSlider.new()
 	_rain_slider.min_value = 0
-	_rain_slider.max_value = 9
-	_rain_slider.step = 1
+	_rain_slider.max_value = 1.0
+	_rain_slider.step = 0.01
 	_rain_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_rain_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_rain_slider.tooltip_text = "1 light to 9 a downpour. All the way left leaves it to the map. (/rain)"
+	_rain_slider.tooltip_text = "0.01 light to 1 a downpour. All the way left leaves it to the map. (/rain)"
 	weather.add_child(_rain_slider)
 	_rain_value = Label.new()
 	_rain_value.custom_minimum_size.x = 40
@@ -306,8 +306,8 @@ func _build_match_rows(vbox: VBoxContainer) -> void:
 
 	_sync_match_rows()
 	_rain_slider.value_changed.connect(func(v: float) -> void:
-		_rain_value.text = _rain_text(int(v))
-		NetworkManager.send_request_command("rain %d" % int(v)))
+		_rain_value.text = _rain_text(v)
+		NetworkManager.send_request_command("rain %.2f" % v))
 	_rain_slider.drag_ended.connect(func(_changed: bool) -> void:
 		get_tree().create_timer(0.5).timeout.connect(_sync_match_rows))
 	_night_slider.value_changed.connect(func(v: float) -> void:
@@ -334,14 +334,14 @@ func _sync_match_rows() -> void:
 	var v := roundf(NightMode.amount() * 100.0)
 	_night_slider.set_value_no_signal(v)
 	_night_value.text = "%d%%" % int(v)
-	var rain := int(ServerVars.get_value("rain", 0))
+	var rain := float(ServerVars.get_value("rain", 0.0))
 	_rain_slider.set_value_no_signal(rain)
 	_rain_value.text = _rain_text(rain)
 	_lightning_check.set_pressed_no_signal(bool(ServerVars.get_value("lightning", true)))
 
 
-func _rain_text(v: int) -> String:
-	return "Map" if v == 0 else str(v)
+func _rain_text(v: float) -> String:
+	return "Map" if is_zero_approx(v) else "%.2f" % v
 
 
 ## One row, and a screen behind it. Mouse feel and every key live in the Controls panel rather

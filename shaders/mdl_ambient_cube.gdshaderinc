@@ -92,7 +92,7 @@ void fragment() {
 	vec3 ambient = wn2.x * (wn.x >= 0.0 ? texture(acube_pos_x, uvw).rgb : texture(acube_neg_x, uvw).rgb)
 	             + wn2.y * (wn.y >= 0.0 ? texture(acube_pos_y, uvw).rgb : texture(acube_neg_y, uvw).rgb)
 	             + wn2.z * (wn.z >= 0.0 ? texture(acube_pos_z, uvw).rgb : texture(acube_neg_z, uvw).rgb);
-	ambient *= pow(mix(vec3(1.0), sky_light, texture(acube_sun, uvw).r), vec3(0.55));
+	ambient *= pow(max(mix(vec3(1.0), sky_light, texture(acube_sun, uvw).r), vec3(0.0)), vec3(0.55));
 	ambient = max(ambient, vec3(0.05));
 	// 1.5x compensates for GoldSrc half-intensity lightmaps without fully doubling.
 	vec3 base_srgb = linear_output ? gs_to_srgb(albedo.rgb) : albedo.rgb;
