@@ -6,7 +6,8 @@
 
   --seq NAME|INDEX    sequence to pose from (default: idle if the model has one, else rest)
   --frame N           frame of that sequence (default 0)
-  --blend N           blend of a two-blend aim sequence (0 looks down, 1 up; default 0)
+  --pitch DEG         where an aim sequence looks, blended between its two poses as the game
+                      does: 0 is level, +45 fully up, -45 fully down (default 0)
   --rest              the bind pose, ignoring --seq
   --body PART=SUB     submodel to use per bodypart, by index (default 0 for every part)
   --skin N            skin family; on the player models 0 is the plain skin, then blue, red,
@@ -21,7 +22,7 @@ The format follows the output's extension (default MODEL.stl). An OBJ comes with
 one PNG per skin texture beside it, each material also carrying the texture's average colour
 as Kd for slicers that read colours but not textures.
 
-The model is set down on z=0 and centred in x/y, Z up. GoldSrc winds faces against their
+The model is set down on z=0 with its feet centred on the origin, Z up. GoldSrc winds faces against their
 normal, so every triangle is flipped; the signed volume is checked afterwards and the whole
 mesh flipped back if it came out inside-out. Open edges are counted and reported: game meshes
 are often not closed, and slicers repair small holes but not missing surfaces.
@@ -57,11 +58,61 @@ def pose(m, args):
             sys.exit("no sequence %r in %s (see --list)" % (args.seq, m.path))
     if seq["seqgroup"] != 0:
         sys.exit("sequence %s lives in an external seqgroup file; not supported" % seq["label"])
-    blend = min(args.blend, seq["numblends"] - 1)
-    seq = dict(seq, animindex=seq["animindex"] + blend * m.numbones * 12)
     frame = min(args.frame, seq["numframes"] - 1)
     pos, rot = m.frames(seq)
-    return m.bone_world(pos[frame], rot[frame]), "%s frame %d blend %d" % (seq["label"], frame, blend)
+    pos, rot = pos[frame], rot[frame]
+    what = "%s frame %d" % (seq["label"], frame)
+    if seq["numblends"] > 1:
+        o = m.seqindex + seq["index"] * 176
+        start, end = struct.unpack_from("<f", m.data, o + 136)[0], struct.unpack_from("<f", m.data, o + 144)[0]
+        t = min(1.0, max(0.0, (args.pitch - start) / (end - start)))
+        pos1, rot1 = m.frames(dict(seq, animindex=seq["animindex"] + m.numbones * 12))
+        pos = [[a + (b - a) * t for a, b in zip(p0, p1)] for p0, p1 in zip(pos, pos1[frame])]
+        rot = [slerp(quat(*r0), quat(*r1), t) for r0, r1 in zip(rot, rot1[frame])]
+        what += " pitch %g" % args.pitch
+        return quat_world(m, pos, rot), what
+    return m.bone_world(pos, rot), what
+
+
+def quat(x, y, z):
+    """GoldSrc XYZ euler -> (x, y, z, w), the HL SDK's AngleQuaternion."""
+    cx, sx = math.cos(x * 0.5), math.sin(x * 0.5)
+    cy, sy = math.cos(y * 0.5), math.sin(y * 0.5)
+    cz, sz = math.cos(z * 0.5), math.sin(z * 0.5)
+    return (sx * cy * cz - cx * sy * sz, cx * sy * cz + sx * cy * sz,
+            cx * cy * sz - sx * sy * cz, cx * cy * cz + sx * sy * sz)
+
+
+def slerp(p, q, t):
+    """The HL SDK's QuaternionSlerp: shortest arc, linear when nearly aligned."""
+    dot = sum(a * b for a, b in zip(p, q))
+    if dot < 0:
+        q, dot = tuple(-c for c in q), -dot
+    if dot > 0.999999:
+        out = tuple(a + (b - a) * t for a, b in zip(p, q))
+    else:
+        omega = math.acos(dot)
+        sa, sb = math.sin((1 - t) * omega), math.sin(t * omega)
+        out = tuple((a * sa + b * sb) / math.sin(omega) for a, b in zip(p, q))
+    n = math.sqrt(sum(c * c for c in out))
+    return tuple(c / n for c in out)
+
+
+def quat_world(m, pos, rot):
+    world = [None] * m.numbones
+    for b in m.bones:
+        x, y, z, w = rot[b["index"]]
+        local = ((
+            (1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)),
+            (2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)),
+            (2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)),
+        ), tuple(pos[b["index"]]))
+        if b["parent"] < 0:
+            world[b["index"]] = local
+        else:
+            p = world[b["parent"]]
+            world[b["index"]] = (mdl.mat_mul(p[0], local[0]), mdl.xform(p, local[1]))
+    return world
 
 
 def merged_world(att, host, host_world):
@@ -233,7 +284,7 @@ def main():
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--seq")
     ap.add_argument("--frame", type=int, default=0)
-    ap.add_argument("--blend", type=int, default=0)
+    ap.add_argument("--pitch", type=float, default=0.0)
     ap.add_argument("--rest", action="store_true")
     ap.add_argument("--body", action="append", default=[])
     ap.add_argument("--skin", type=int, default=0)
@@ -271,7 +322,9 @@ def main():
         sys.exit("%s has no geometry in that body selection" % args.model)
 
     lo, hi = bounds(tris)
-    cx, cy = (lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2
+    feet = [p for t, _uv, _m in tris for p in t if p[2] < lo[2] + (hi[2] - lo[2]) * 0.05]
+    cx = (min(p[0] for p in feet) + max(p[0] for p in feet)) / 2
+    cy = (min(p[1] for p in feet) + max(p[1] for p in feet)) / 2
     scale = args.height / (hi[2] - lo[2]) if args.height else args.scale
     tris = moved(tris, lambda p: ((p[0] - cx) * scale, (p[1] - cy) * scale, (p[2] - lo[2]) * scale))
     if signed_volume(tris) < 0:
