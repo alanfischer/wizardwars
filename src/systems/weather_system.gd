@@ -50,6 +50,38 @@ func _take_rain_floor(map_root: Node) -> void:
 		add_wet_materials(map_root, func(mi: MeshInstance3D) -> float:
 			# The loader names each world mesh after its texture.
 			return PUDDLE_BY_CLASS.get(WorldMaterials.classify(String(mi.name)), PUDDLE_DEFAULT))
+	_cover_movers(map_root)
+
+
+## The bake leaves out brush entities (doors, plats and trains move; breakables break), so each
+## solid one is a cover that keeps the rain off whatever is under it wherever it has got to, sized
+## from its own brush. A func_illusionary is not solid, and rain falls through it as it did in
+## GoldSrc, which traced for solid.
+func _cover_movers(node: Node) -> void:
+	for child in node.get_children():
+		if child is AnimatableBody3D and (child as AnimatableBody3D).collision_layer != 0:
+			var box := _brush_box(child, Transform3D())
+			if box.size != Vector3.ZERO:
+				add_cover(child, box)
+		else:
+			_cover_movers(child)
+
+
+## The meshes under `node` (and not under a body of their own), in its frame.
+static func _brush_box(node: Node, xform: Transform3D) -> AABB:
+	var box := AABB()
+	for child in node.get_children():
+		if child is PhysicsBody3D or not child is Node3D:
+			continue
+		var at: Transform3D = xform * (child as Node3D).transform
+		var b := _brush_box(child, at)
+		var mi := child as MeshInstance3D
+		if mi and mi.mesh:
+			var own := at * mi.mesh.get_aabb()
+			b = own if b.size == Vector3.ZERO else b.merge(own)
+		if b.size != Vector3.ZERO:
+			box = b if box.size == Vector3.ZERO else box.merge(b)
+	return box
 
 
 ## The node this follows. The map-load path builds the system before the local player exists, and
