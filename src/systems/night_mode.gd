@@ -27,8 +27,6 @@ static var _sun_style := 1.0
 ## Whether the sun was compiled onto a style of its own (ww_chasm), which the lightstyle texture
 ## already fades on the world — so only models take _sun_style from here.
 static var _sun_has_layer := false
-## Cloud shadows on open ground: Skybox.cloud_shadows, empty for none.
-static var _clouds := {}
 
 
 ## "on"/"off" or a number, as /night, --night and the pause slider give it; "" if neither.
@@ -64,8 +62,6 @@ static func reset() -> void:
 	_flash = Vector3.ZERO
 	_sun_style = 1.0
 	_sun_has_layer = false
-	_clouds = {}
-	LightGrid.set_clouds({})
 
 
 ## LightEnvironment's lightstyle, e.g. ww_chasm's PotatoC dusk (SetLightStyle('sky', ...)).
@@ -95,26 +91,6 @@ static func set_flash(flash: Vector3) -> void:
 	_push()
 
 
-## Shadows of the procedural sky's clouds on the ground (Skybox.cloud_shadows); empty for none.
-static func set_clouds(clouds: Dictionary) -> void:
-	if clouds == _clouds:
-		return
-	_clouds = clouds
-	for mat in _world_mats:
-		push_clouds(mat, _clouds)
-	LightGrid.set_clouds(_clouds)
-
-
-## Cloud shadow uniforms (clouds.gdshaderinc) onto one material, map or model.
-static func push_clouds(mat: ShaderMaterial, clouds: Dictionary) -> void:
-	if clouds.is_empty():
-		mat.set_shader_parameter("cloud_shadow", 0.0)
-		return
-	for key in clouds:
-		mat.set_shader_parameter(key, clouds[key])
-	mat.set_shader_parameter("cloud_noise", Skybox.cloud_noise())
-
-
 ## The night's linear-light multiplier on the sky's light: ones by day, TINT at full night. Past 1
 ## it keeps darkening down to black, never below: a negative light is NaN under the gamma pow.
 static func night_light() -> Vector3:
@@ -130,7 +106,6 @@ static func _push() -> void:
 	var liquid := night + _flash if has_sun(_root) else Vector3.ONE
 	for mat in _world_mats:
 		mat.set_shader_parameter("sky_light", world)
-		push_clouds(mat, _clouds)
 	for mat in _liquid_mats:
 		mat.set_shader_parameter("sky_light", liquid)
 	LightGrid.set_sky_light(night * style + _flash)

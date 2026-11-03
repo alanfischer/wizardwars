@@ -759,12 +759,8 @@ func _cmd_rain(sender_id: int, args: String) -> void:
 	if not arg.is_valid_float() or float(arg) < 0.0:
 		_reply_err(sender_id, "Usage: /rain [amount]")
 		return
-	var note := ""
-	if ServerVars.get_value("dynamic_weather", false):
-		ServerVars.set_from_string("dynamic_weather", "off")
-		note = " (dynamic weather off)"
 	ServerVars.set_from_string("rain", arg)
-	_reply_ok(sender_id, "rain: %s%s" % [_rain_text(), note])
+	_reply_ok(sender_id, "rain: %s" % _rain_text())
 
 
 func _cmd_dynamic_weather(sender_id: int, args: String) -> void:

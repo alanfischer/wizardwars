@@ -1,14 +1,18 @@
 #ifndef CLOUDS_GDSHADERINC
 #define CLOUDS_GDSHADERINC
 // The procedural sky's cloud layer, in the world: a shell CLOUD_HEIGHT over the map. The sky
-// (sky_procedural) traces the view ray to it and the ground (goldsrc_hook) traces toward the sun,
-// so the cloud in front of the sun is the one whose shadow you are standing in.
+// (sky_procedural) traces the view ray to it and the map and models (goldsrc_hook,
+// mdl_ambient_cube) trace toward the sun, so the cloud in front of the sun is the one whose
+// shadow you are standing in. Global uniforms (project.godot), set by Skybox: one sky at a time.
 
 // Tiling fbm (Skybox.cloud_noise); one tile spans CLOUD_TILE noise units.
-uniform sampler2D cloud_noise : filter_linear_mipmap, repeat_enable, hint_default_black;
-uniform float cloud_scale : hint_range(0.2, 12.0) = 2.2;   // noise units per CLOUD_HEIGHT
-uniform float cloud_speed : hint_range(0.0, 0.2) = 0.008;  // noise units per second
-uniform float cloud_softness : hint_range(0.01, 0.6) = 0.22;
+global uniform sampler2D cloud_noise : filter_linear_mipmap, repeat_enable;
+global uniform float cloud_scale;     // noise units per CLOUD_HEIGHT
+global uniform float cloud_speed;     // noise units per second
+global uniform float cloud_softness;
+global uniform float cloud_cover;     // how much of the sky is cloud, storm included
+global uniform float cloud_shadow;    // how much of the sky's share a cloud takes off; 0 for none
+global uniform vec3 cloud_sun_dir;    // unit, toward the sun
 const float CLOUD_TILE = 12.0;
 const float CLOUD_HEIGHT = 100.0;  // metres over the map's origin
 // The shell curves like a planet this many times its height across, so it meets the horizon at a
@@ -36,9 +40,9 @@ vec2 cloud_wind() {
 	return TIME * cloud_speed * vec2(1.0, 0.35);
 }
 
-// Noise coordinates of where the ray meets the shell, wind included.
-vec2 cloud_coord(vec3 origin, vec3 dir, float dist) {
-	return (origin.xz + dir.xz * dist) * (cloud_scale / CLOUD_HEIGHT) + cloud_wind();
+// Noise coordinates of where the ray meets the shell, before the wind moves the pattern.
+vec2 cloud_layer(vec3 origin, vec3 dir, float dist) {
+	return (origin.xz + dir.xz * dist) * (cloud_scale / CLOUD_HEIGHT);
 }
 
 // Cloud density at `cp`, which comes back moved to where the shape was sampled (billows are the
@@ -51,29 +55,24 @@ float cloud_density(inout vec2 cp) {
 	return cloud_tex(cp) + (cloud_tex(cp * 3.1 + vec2(7.3, 2.9)) - 0.5) * 0.18;
 }
 
-// How much of the sky a cloud of density `n` covers, 0 to 1. `amount` drives coverage, not
-// opacity: at 0 the threshold sits above anything the noise returns, so no cloud at all.
+// The density a cloud starts at. `amount` drives coverage, not opacity: at 0 the threshold sits
+// above anything the noise returns, so no cloud at all.
+float cloud_edge(float amount) {
+	return mix(0.95, 0.22, amount);
+}
+
+// How much of the sky a cloud of density `n` covers, 0 to 1.
 float cloud_coverage(float n, float amount) {
-	float edge = mix(0.95, 0.22, amount);
+	float edge = cloud_edge(amount);
 	return smoothstep(edge - cloud_softness * 0.6, edge + cloud_softness * 1.2, n);
 }
 
-#ifdef CLOUD_SHADOWS
-// For anything the sun lights (map, models): NightMode.set_clouds / LightGrid.set_clouds.
-// cloud_shadow is how much of the sky's share a cloud takes away, 0 for none; cloud_cover is the
-// sky's coverage, storm included.
-uniform float cloud_shadow = 0.0;
-uniform float cloud_cover = 0.0;
-uniform vec3 cloud_sun_dir = vec3(0.0, 1.0, 0.0);
-
-// The sky's share of the light multiplier at world point p: 1 in sun, less under cloud.
+// The multiplier on the sky's share of the light at world point p: 1 in sun, less under cloud.
 float cloud_sunlight(vec3 p) {
 	if (cloud_shadow <= 0.0) {
 		return 1.0;
 	}
-	vec3 sun = normalize(cloud_sun_dir);
-	vec2 cp = cloud_coord(p, sun, cloud_distance(p, sun));
+	vec2 cp = cloud_layer(p, cloud_sun_dir, cloud_distance(p, cloud_sun_dir)) + cloud_wind();
 	return 1.0 - cloud_shadow * cloud_coverage(cloud_density(cp), cloud_cover);
 }
-#endif
 #endif

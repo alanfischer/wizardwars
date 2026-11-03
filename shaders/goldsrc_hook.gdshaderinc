@@ -19,7 +19,6 @@ uniform vec3 rain_sky = vec3(0.0);
 #include "res://shaders/noise.gdshaderinc"
 
 // Shadows of the procedural sky's clouds on open ground (clouds.gdshaderinc).
-#define CLOUD_SHADOWS
 #include "res://shaders/clouds.gdshaderinc"
 
 vec3 goldsrc_lightmap(vec3 lm, float sun_share, vec3 world_pos) {

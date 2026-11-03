@@ -27,6 +27,8 @@ var _enhanced_on := false
 var storm := 0.0
 ## How much of the sky's share of the light a cloud overhead takes off the ground.
 const CLOUD_SHADOW := 0.65
+## Cloud cover once a storm has closed the sky over.
+const STORM_COVER := 0.97
 ## Tiling cloud noise for the procedural sky, made once: sampling it costs a fraction of
 ## computing the octaves per pixel, which pays for the extra samples the cloud shading takes.
 static var _cloud_noise: Texture2D
@@ -35,6 +37,10 @@ static var _cloud_noise: Texture2D
 ## `sun_ent` is the map's light_environment entity dict, used to point the procedural sun the way
 ## the mapper lit the level. Optional — SkyPreset falls back to the sky art, then to a default.
 func setup(sky_name: String, map_root: Node = null, sun_ent: Dictionary = {}) -> void:
+	# The cloud globals outlive a map; a sky with no clouds must not inherit the last one's.
+	RenderingServer.global_shader_parameter_set("cloud_shadow", 0.0)
+	if not ServerVars.value_changed.is_connected(_on_server_var_changed):
+		ServerVars.value_changed.connect(_on_server_var_changed)
 	if sky_name.is_empty():
 		return
 
@@ -119,8 +125,12 @@ static func procedural() -> bool:
 	return bool(ServerVars.get_value("dynamic_weather", false))
 
 
-## Swap the procedural sky in or out. Safe to call repeatedly and before/without a map — the
-## lobby's quality dropdown reaches this on every change.
+func _on_server_var_changed(key: String, _value: Variant) -> void:
+	if key == "dynamic_weather":
+		apply_enhanced(procedural())
+
+
+## Swap the procedural sky in or out. Safe to call repeatedly and before/without a map.
 func apply_enhanced(enabled: bool) -> void:
 	if enabled and _params.is_empty():
 		return  # no sky art loaded, so nothing was measured to stand in for it
@@ -129,6 +139,7 @@ func apply_enhanced(enabled: bool) -> void:
 	for surf in _sky_surfaces:
 		if is_instance_valid(surf):
 			surf.material_override = mat
+	_push_clouds()
 	if enabled:
 		# Which way the sun ended up pointing is the one number a screenshot can't settle when a
 		# sky looks wrong, and it comes from the map rather than from anything here.
@@ -163,23 +174,24 @@ func set_storm(amount: float) -> void:
 	storm = amount
 	if _enhanced_material:
 		_enhanced_material.set_shader_parameter("storm", amount)
+	if _enhanced_on:
+		RenderingServer.global_shader_parameter_set("cloud_cover",
+			lerpf(_params["cloud_amount"], STORM_COVER, storm))
 
 
-## What the ground needs to shade itself under this sky's clouds (NightMode.set_clouds): the
-## clouds.gdshaderinc uniforms as the sky has them, plus the sun and the storm's coverage.
-## Empty unless the procedural sky is drawing clouds.
-func cloud_shadows() -> Dictionary:
+## The clouds.gdshaderinc globals: the procedural sky's cloud layer, and the shadow it casts on
+## the map and models. No shadow unless the procedural sky is drawing clouds.
+func _push_clouds() -> void:
 	var amount: float = _params.get("cloud_amount", 0.0)
-	if not _enhanced_on or amount <= 0.0:
-		return {}
-	return {
-		"cloud_shadow": CLOUD_SHADOW,
-		"cloud_cover": lerpf(amount, 0.97, storm),
-		"cloud_sun_dir": _params.get("sun_dir", Vector3.UP),
-		"cloud_scale": _params.get("cloud_scale", 2.2),
-		"cloud_speed": _params.get("cloud_speed", 0.008),
-		"cloud_softness": _params.get("cloud_softness", 0.22),
-	}
+	var casting := _enhanced_on and amount > 0.0
+	RenderingServer.global_shader_parameter_set("cloud_shadow", CLOUD_SHADOW if casting else 0.0)
+	if not _enhanced_on:
+		return
+	RenderingServer.global_shader_parameter_set("cloud_noise", cloud_noise())
+	RenderingServer.global_shader_parameter_set("cloud_cover", lerpf(amount, STORM_COVER, storm))
+	RenderingServer.global_shader_parameter_set("cloud_sun_dir", (_params["sun_dir"] as Vector3).normalized())
+	for key in ["cloud_scale", "cloud_speed", "cloud_softness"]:
+		RenderingServer.global_shader_parameter_set(key, _params[key])
 
 
 ## The colour the sky draws at the horizon right now, linear, flash aside: what haze over open ground
@@ -218,7 +230,6 @@ func _get_enhanced_material() -> ShaderMaterial:
 	for key in _params:
 		_enhanced_material.set_shader_parameter(key, _params[key])
 	_enhanced_material.set_shader_parameter("storm", storm)
-	_enhanced_material.set_shader_parameter("cloud_noise", cloud_noise())
 	return _enhanced_material
 
 

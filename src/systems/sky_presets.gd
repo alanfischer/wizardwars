@@ -57,20 +57,14 @@ const OVERRIDES := {
 	"null_plainsky256_": {"cloud_amount": 0.0, "sun_energy": 0.0, "sun_glow_energy": 0.25,
 		"sun_halo_energy": 0.15, "horizon_falloff": 0.6},
 	"nottingham": {"cloud_amount": 0.55, "sun_energy": 0.8},
-	"wiz": {"cloud_amount": 0.5},
+	# A slate overcast that read gloomy on 2fort, roc2 and golem, which are meant to be clear days.
+	"wiz": {"cloud_amount": 0.5, "grade": [1.4, Color(0.8, 1.06, 1.15), 0.06]},
 	"purple": {"cloud_amount": 0.45},
 	# Clear-ish daylight.
 	"seascape": {"cloud_amount": 0.28, "horizon_falloff": 1.4},
 	"osaka": {"cloud_amount": 0.35},
 	"forest256_": {"cloud_amount": 0.5},
 	"firey_": {"cloud_amount": 0.6, "cloud_speed": 0.014},
-}
-
-## The procedural gradient's colours pushed somewhere the art does not go: [saturation, tint, lift].
-## Clouds keep the art's own colours. wiz is a slate overcast that read gloomy on 2fort, roc2 and
-## golem, which are meant to be clear days.
-const GRADES := {
-	"wiz": [1.4, Color(0.8, 1.06, 1.15), 0.06],
 }
 
 ## Used when a map has no usable light_environment — six of the thirty do, and a dropped-in map
@@ -95,17 +89,20 @@ static func build(sky_name: String, faces: Array[Image], sun_dir := Vector3.ZERO
 		params["sun_dir"] = (DEFAULT_SUN_DIR.normalized() if stats["is_starfield"]
 			else stats["brightest_dir"])
 
-	for key in OVERRIDES.get(sky_name, {}):
-		params[key] = OVERRIDES[sky_name][key]
-	if GRADES.has(sky_name):
+	var overrides: Dictionary = OVERRIDES.get(sky_name, {})
+	for key in overrides:
+		if key != "grade":
+			params[key] = overrides[key]
+	# "grade" pushes the gradient somewhere the art does not go; clouds keep the art's colours.
+	if overrides.has("grade"):
 		for key in ["zenith_color", "horizon_color"]:
-			params[key] = grade(params[key], GRADES[sky_name])
+			params[key] = grade(params[key], overrides["grade"])
 	return params
 
 
-## Saturation, then tint and lift, in the art's own (sRGB) space.
+## [saturation, tint, lift], applied in that order in the art's own (sRGB) space.
 static func grade(c: Color, g: Array) -> Color:
-	var l := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+	var l := Skybox._luma(c)
 	var sat := Color(l, l, l).lerp(c, g[0])
 	var tint: Color = g[1]
 	var lift: float = g[2]
@@ -179,10 +176,9 @@ static func _derive(stats: Dictionary) -> Dictionary:
 		"sun_halo_energy": 0.25,
 		"sun_halo_exp": 6.0,
 		"cloud_amount": cloud_amount,
-		# Cloud lit/shadow sides bracket the horizon colour, which keeps a cloud deck in the same
-		# family as the sky it sits in however that sky was coloured.
+		# Lit cloud is the horizon colour lightened, which keeps a cloud deck in the same family as
+		# the sky it sits in however that sky was coloured. The shaded side takes the sky's own.
 		"cloud_color": horizon.lightened(0.45),
-		"cloud_shadow_color": horizon.darkened(0.35),
 		"cloud_scale": 2.2,
 		"cloud_speed": 0.008,
 		"cloud_softness": 0.22,

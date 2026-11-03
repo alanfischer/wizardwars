@@ -41,6 +41,7 @@ func _init(rng_seed: int = 0) -> void:
 
 func _ready() -> void:
 	ServerVars.value_changed.connect(_on_server_var_changed)
+	set_process(bool(ServerVars.get_value("dynamic_weather", false)))
 
 
 ## The next shower, after a dry spell from `after`. The first comes sooner, so turning it on shows.
@@ -63,7 +64,7 @@ func rain_at(t: float) -> float:
 
 
 func _process(delta: float) -> void:
-	if not bool(ServerVars.get_value("dynamic_weather", false)) or not NetworkManager.is_authority():
+	if not NetworkManager.is_authority():
 		return
 	_t += delta
 	_since_send += delta
@@ -77,13 +78,21 @@ func _process(delta: float) -> void:
 
 
 func _on_server_var_changed(key: String, value: Variant) -> void:
-	if key != "dynamic_weather" or not NetworkManager.is_authority():
+	if not NetworkManager.is_authority():
 		return
+	if key == "rain":
+		# Rain it did not write (/rain, the slider) is someone taking the weather over by hand.
+		if is_processing() and absf(float(value) - _sent) > 0.001:
+			_sent = -1.0  # theirs now, so turning off leaves it be
+			ServerVars.set_from_string("dynamic_weather", "off")
+		return
+	if key != "dynamic_weather":
+		return
+	set_process(bool(value))
 	var was_raining := _sent > 0.0
 	_sent = -1.0
 	if bool(value):
 		_t = 0.0
 		_plan(0.0)
-	elif was_raining and float(ServerVars.get_value("rain", 0.0)) > 0.0:
-		# Stops the shower it started; a /rain that turned it off has already set its own.
+	elif was_raining:
 		ServerVars.set_from_string("rain", "0")

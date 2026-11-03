@@ -481,8 +481,6 @@ func _ready() -> void:
 func _on_server_var_changed(key: String, _value: Variant) -> void:
 	if key == "bsp_hulls":
 		_apply_bsp_hulls()
-	elif key == "dynamic_weather" and _skybox:
-		_skybox.apply_enhanced(Skybox.procedural())
 	elif key == "night" and _map_root:
 		if NightMode.sky_for(_map_sky_name(_map_root), _map_root) != _built_sky:
 			_build_skybox(_map_root)

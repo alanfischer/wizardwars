@@ -39,7 +39,6 @@ uniform float sun_halo_exp : hint_range(1.0, 64.0) = 6.0;
 
 uniform float cloud_amount : hint_range(0.0, 1.0) = 0.45;
 uniform vec3 cloud_color : source_color = vec3(1.0, 1.0, 1.0);
-uniform vec3 cloud_shadow_color : source_color = vec3(0.42, 0.45, 0.52);
 // A thin, streaky layer high over the main one, drifting faster.
 uniform float cirrus_amount : hint_range(0.0, 1.0) = 0.5;
 
@@ -96,15 +95,16 @@ void fragment() {
 	}
 
 	// Clouds live on a shell over the map (clouds.gdshaderinc), traced from the camera.
-	float amount = mix(cloud_amount, 0.97, storm);
+	float amount = cloud_cover;   // Skybox: cloud_amount, closing over with the storm
 	float storm_cover = 0.0;   // where storm cloud sits, for the lightning below to light it
 	float storm_body = 0.0;
-	float cloud_cover = 0.0;
+	float sun_hidden = 0.0;
 	if (amount > 0.0) {
 		vec3 cam = CAMERA_POSITION_WORLD;
 		float dist = cloud_distance(cam, eye_dir);
 		vec2 wind = cloud_wind();
-		vec2 cp = cloud_coord(cam, eye_dir, dist);
+		vec2 layer = cloud_layer(cam, eye_dir, dist);
+		vec2 cp = layer + wind;
 		float toward = clamp(dot(eye_dir, sun) * 0.5 + 0.5, 0.0, 1.0);
 		// The sky lights the shadowed side, so it takes the sky's colour rather than a grey.
 		vec3 ambient = mix(zenith_color, horizon_color, 0.5);
@@ -113,14 +113,14 @@ void fragment() {
 		float far = smoothstep(1.5 * CLOUD_HEIGHT, cloud_horizon(cam), dist);
 
 		if (cirrus_amount > 0.0 && cloud_amount > 0.0) {
-			vec2 hp = (cp - wind) * 0.6;
+			vec2 hp = layer * 0.6;
 			float c = cloud_tex(vec2(hp.x * 0.25, hp.y) + wind * 2.5 + vec2(3.7, 1.3));
 			float ci = smoothstep(0.55, 0.85, c) * cirrus_amount * 0.45 * (1.0 - storm) * (1.0 - far);
 			col = mix(col, mix(ambient, lit_col, 0.7), ci * smoothstep(0.0, 0.15, up));
 		}
 
 		float n = cloud_density(cp);
-		float edge = mix(0.95, 0.22, amount);
+		float edge = cloud_edge(amount);
 		float cover = cloud_coverage(n, amount);
 		cover *= smoothstep(-0.02, 0.12, up) * (1.0 - 0.5 * far);
 		// Self-shadowing: more cloud between here and the sun means this side faces away from it.
@@ -140,15 +140,15 @@ void fragment() {
 		lit = mix(lit, col, far * 0.5);
 		storm_cover = cover * storm;
 		col = mix(col, lit, cover);
-		cloud_cover = cover;
+		sun_hidden = cover;
 	}
 
 	// Sun last. Thin cloud dims it and thick cloud hides the disc; the glow leaks through.
 	float sd = dot(eye_dir, sun);
 	float disc = smoothstep(cos(sun_size * 1.4), cos(sun_size), sd);
 	float sun_through = 1.0 - 0.95 * storm;
-	col += sun_color * disc * sun_energy * sun_through * (1.0 - smoothstep(0.15, 0.75, cloud_cover));
-	col += sun_color * pow(max(sd, 0.0), sun_glow_exp) * sun_glow_energy * sun_through * (1.0 - 0.6 * cloud_cover);
+	col += sun_color * disc * sun_energy * sun_through * (1.0 - smoothstep(0.15, 0.75, sun_hidden));
+	col += sun_color * pow(max(sd, 0.0), sun_glow_exp) * sun_glow_energy * sun_through * (1.0 - 0.6 * sun_hidden);
 	// The halo is the air between us and the cloud, so it sits over cloud and sky alike.
 	vec2 flat_eye = normalize(eye_dir.xz + vec2(1e-5));
 	vec2 flat_sun = normalize(sun.xz + vec2(1e-5));
