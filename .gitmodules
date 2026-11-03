@@ -10,3 +10,6 @@
 [submodule "extern/pmove-godot"]
 	path = extern/pmove-godot
 	url = ssh://git@github.com/alanfischer/pmove-godot
+[submodule "extern/overcast-godot"]
+	path = extern/overcast-godot
+	url = ssh://git@github.com/alanfischer/overcast-godot

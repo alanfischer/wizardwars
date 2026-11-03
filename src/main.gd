@@ -662,7 +662,6 @@ func load_map_headless(map_name: String) -> void:
 
 	weather_system = WeatherSystem.new()
 	weather_system.name = "WeatherSystem"
-	weather_system.setup()
 	add_child(weather_system)
 
 	Log.info("[Server] Map loaded: %d spawn points" % SpawnSystem.get_all_spawns().size())
@@ -750,7 +749,6 @@ func _load_map(map_name: String) -> void:
 	# follow target is attached once the player exists (and never, on a dedicated server).
 	weather_system = WeatherSystem.new()
 	weather_system.name = "WeatherSystem"
-	weather_system.setup()
 	add_child(weather_system)
 
 	_build_skybox(map_root)

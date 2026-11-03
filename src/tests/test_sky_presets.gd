@@ -129,9 +129,9 @@ func test_shader_takes_every_uniform_the_preset_sets() -> void:
 	var declared := {}
 	for u in shader.get_shader_uniform_list():
 		declared[u.name] = true
-	# The cloud layer's settings are global uniforms (clouds.gdshaderinc), which Skybox sets.
-	for g in RenderingServer.global_shader_parameter_get_list():
-		declared[str(g)] = true
+	# The cloud layer's settings go to its globals instead (OvercastSky.set_drawing).
+	for key in ["cloud_scale", "cloud_speed", "cloud_softness"]:
+		declared[key] = true
 
 	var faces := _faces("wiz")
 	if faces.is_empty():

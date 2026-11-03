@@ -103,7 +103,7 @@ static func build(sky_name: String, faces: Array[Image], sun_dir := Vector3.ZERO
 
 ## [saturation, tint, lift], applied in that order in the art's own (sRGB) space.
 static func grade(c: Color, g: Array) -> Color:
-	var l := Skybox._luma(c)
+	var l := OvercastSky.luma(c)
 	var sat := Color(l, l, l).lerp(c, g[0])
 	var tint: Color = g[1]
 	var lift: float = g[2]

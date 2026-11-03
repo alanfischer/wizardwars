@@ -21,29 +21,18 @@ const PRIORITY := -3
 var _sky_surfaces: Array[MeshInstance3D] = []
 var _cubemap: Cubemap
 var _params: Dictionary = {}
-var _enhanced_material: ShaderMaterial
+## The procedural sky (overcast-godot), drawn on the sky brushes: made the first time it is shown.
+var _overcast: OvercastSky
 var _enhanced_on := false
 ## How far the procedural sky has closed over for rain, 0 to 1. See set_storm.
 var storm := 0.0
-## How much of the sky's share of the light a cloud overhead takes off the ground, in fair weather
-## and under a full storm's deck.
-const CLOUD_SHADOW := 0.65
-const STORM_SHADOW := 0.88
-## Cloud cover once a storm has closed the sky over.
-const STORM_COVER := 0.97
-## Tiling cloud noise for the procedural sky, made once: sampling it costs a fraction of
-## computing the octaves per pixel, which pays for the extra samples the cloud shading takes.
-static var _cloud_noise: Texture2D
-static var _cloud_volume: Texture3D
-## Ray-marched clouds (High quality). See set_volumetric.
-static var _volumetric := false
 
 
 ## `sun_ent` is the map's light_environment entity dict, used to point the procedural sun the way
 ## the mapper lit the level. Optional — SkyPreset falls back to the sky art, then to a default.
 func setup(sky_name: String, map_root: Node = null, sun_ent: Dictionary = {}) -> void:
 	# The cloud globals outlive a map; a sky with no clouds must not inherit the last one's.
-	RenderingServer.global_shader_parameter_set("cloud_shadow", 0.0)
+	OvercastClouds.clear()
 	if not ServerVars.value_changed.is_connected(_on_server_var_changed):
 		ServerVars.value_changed.connect(_on_server_var_changed)
 	if sky_name.is_empty():
@@ -144,7 +133,8 @@ func apply_enhanced(enabled: bool) -> void:
 	for surf in _sky_surfaces:
 		if is_instance_valid(surf):
 			surf.material_override = mat
-	_push_clouds()
+	if _overcast:
+		_overcast.set_drawing(enabled)
 	if enabled:
 		# Which way the sun ended up pointing is the one number a screenshot can't settle when a
 		# sky looks wrong, and it comes from the map rather than from anything here.
@@ -168,152 +158,39 @@ func set_flash(color: Color, dir: Vector3) -> void:
 			seen[mat] = true
 			mat.set_shader_parameter("flash_color", c)
 			mat.set_shader_parameter("flash_dir", dir)
-	if _enhanced_material:
-		_enhanced_material.set_shader_parameter("flash_color", c)
-		_enhanced_material.set_shader_parameter("flash_dir", dir)
+	if _overcast:
+		_overcast.set_flash(color, dir)
 
 
 ## Rain on the procedural sky (dynamic weather): 0 clear, 1 a dark overcast deck. The stock
 ## cubemap has no clouds of its own to thicken, so this leaves it alone.
 func set_storm(amount: float) -> void:
 	storm = amount
-	if _enhanced_material:
-		_enhanced_material.set_shader_parameter("storm", amount)
-	_push_cloud_weather()
-
-
-## High quality's clouds: the procedural sky ray-marches them through 3D noise rather than
-## shading one flat layer, and the ground's cloud shadows follow it. Set by RenderQuality.apply;
-## the volume itself is built only once a procedural sky is drawing it.
-static func set_volumetric(enabled: bool) -> void:
-	_volumetric = enabled
-	RenderingServer.global_shader_parameter_set("cloud_volumetric", 1.0 if enabled else 0.0)
-	if enabled and is_instance_valid(Game.skybox) and Game.skybox._enhanced_on:
-		RenderingServer.global_shader_parameter_set("cloud_volume", cloud_volume())
-
-
-## The clouds.gdshaderinc globals a storm moves: cover, and the shadow cloud casts on the map and
-## models. No shadow unless the procedural sky is drawing clouds. Every frame of a transition.
-func _push_cloud_weather() -> void:
-	var amount: float = _params.get("cloud_amount", 0.0)
-	var casting := _enhanced_on and maxf(amount, storm) > 0.0
-	RenderingServer.global_shader_parameter_set("cloud_shadow",
-		lerpf(CLOUD_SHADOW, STORM_SHADOW, storm) if casting else 0.0)
-	if _enhanced_on:
-		RenderingServer.global_shader_parameter_set("cloud_cover", lerpf(amount, STORM_COVER, storm))
-
-
-## The rest of them, which hold for the sky: pushed when it is swapped in.
-func _push_clouds() -> void:
-	_push_cloud_weather()
-	if not _enhanced_on:
-		return
-	RenderingServer.global_shader_parameter_set("cloud_noise", cloud_noise())
-	if _volumetric:
-		RenderingServer.global_shader_parameter_set("cloud_volume", cloud_volume())
-	RenderingServer.global_shader_parameter_set("cloud_sun_dir", (_params["sun_dir"] as Vector3).normalized())
-	for key in ["cloud_scale", "cloud_speed", "cloud_softness"]:
-		RenderingServer.global_shader_parameter_set(key, _params[key])
+	if _overcast:
+		_overcast.set_storm(amount)
 
 
 ## The colour the sky draws at the horizon right now, linear, flash aside: what haze over open ground
-## fades into (WeatherSystem). Black with no sky art measured. Follows sky_procedural.gdshader's
-## storm greying, in the space that shader works in on this renderer (EntityRender.renderer_is_linear).
+## fades into (WeatherSystem). Black with no sky art measured.
 func horizon_color() -> Color:
 	if _params.is_empty():
 		return Color.BLACK
 	var art: Color = _params["horizon_color"]  # sRGB, measured off the cubemap
 	if not _enhanced_on:
 		return art.srgb_to_linear()
-	var linear := EntityRender.renderer_is_linear()
-	var h := art.srgb_to_linear() if linear else art
-	var grey := _luma(h) * 0.55
-	var col := h.lerp(Color(grey, grey, grey), storm)
-	var blend: float = _params.get("cubemap_blend", 0.0)
-	if blend > 0.0:
-		var a := _luma(h) * 0.5
-		col = col.lerp(h.lerp(Color(a, a, a), storm), blend)
-	return col if linear else col.srgb_to_linear()
-
-
-static func _luma(c: Color) -> float:
-	return c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+	return _overcast.horizon_color()
 
 
 func _get_enhanced_material() -> ShaderMaterial:
-	if _enhanced_material:
-		return _enhanced_material
-	_enhanced_material = ShaderMaterial.new()
-	_enhanced_material.shader = ProceduralSkyShader
+	if _overcast:
+		return _overcast.material
+	_overcast = OvercastSky.new(_params, ProceduralSkyShader)
 	# The stock sky material carries this so the sky draws before the world and reads as a true
 	# background; an override replaces the material outright, so it has to carry it too.
-	_enhanced_material.render_priority = PRIORITY
-	_enhanced_material.set_shader_parameter("sky_cubemap", _cubemap)
-	for key in _params:
-		_enhanced_material.set_shader_parameter(key, _params[key])
-	_enhanced_material.set_shader_parameter("storm", storm)
-	return _enhanced_material
-
-
-static func cloud_noise() -> Texture2D:
-	if _cloud_noise:
-		return _cloud_noise
-	var r := _fbm(7, false, 8.0 / 512.0, 6).get_seamless_image(512, 512)
-	var g := _fbm(11, true, 24.0 / 512.0, 2).get_seamless_image(512, 512)
-	var img := Image.create_from_data(512, 512, false, Image.FORMAT_RG8,
-		_interleave(_bytes(r), _bytes(g)))
-	img.generate_mipmaps()
-	_cloud_noise = ImageTexture.create_from_image(img)
-	return _cloud_noise
-
-
-## Tiling 3D noise for the volumetric clouds: perlin-worley in r (shape: billows where worley
-## cells are), worley distance in g (detail that erodes the edges). Made once, on first use.
-static func cloud_volume() -> Texture3D:
-	if _cloud_volume:
-		return _cloud_volume
-	const N := 64
-	var perlin := _fbm(3, false, 4.0 / N, 4).get_seamless_image_3d(N, N, N)
-	var cells := _fbm(5, true, 6.0 / N, 3).get_seamless_image_3d(N, N, N)
-	var fine := _fbm(9, true, 8.0 / N, 3).get_seamless_image_3d(N, N, N)
-	var slices: Array[Image] = []
-	for z in N:
-		var pd := _bytes(perlin[z])
-		var cd := _bytes(cells[z])
-		for i in pd.size():
-			pd[i] = clampi(int((pd[i] * 0.45 + (255 - cd[i]) * 0.55 - 25.0) * 1.25), 0, 255)
-		slices.append(Image.create_from_data(N, N, false, Image.FORMAT_RG8,
-			_interleave(pd, _bytes(fine[z]))))
-	var tex := ImageTexture3D.new()
-	tex.create(Image.FORMAT_RG8, N, N, N, false, slices)
-	_cloud_volume = tex
-	return _cloud_volume
-
-
-## Fractal noise: perlin, or worley distance (0 at a cell's centre) when `cellular`.
-static func _fbm(seed: int, cellular: bool, frequency: float, octaves: int) -> FastNoiseLite:
-	var noise := FastNoiseLite.new()
-	noise.seed = seed
-	noise.noise_type = FastNoiseLite.TYPE_CELLULAR if cellular else FastNoiseLite.TYPE_PERLIN
-	noise.cellular_return_type = FastNoiseLite.RETURN_DISTANCE
-	noise.frequency = frequency
-	noise.fractal_type = FastNoiseLite.FRACTAL_FBM
-	noise.fractal_octaves = octaves
-	return noise
-
-
-static func _bytes(img: Image) -> PackedByteArray:
-	img.convert(Image.FORMAT_L8)
-	return img.get_data()
-
-
-static func _interleave(r: PackedByteArray, g: PackedByteArray) -> PackedByteArray:
-	var rg := PackedByteArray()
-	rg.resize(r.size() * 2)
-	for i in r.size():
-		rg[i * 2] = r[i]
-		rg[i * 2 + 1] = g[i]
-	return rg
+	_overcast.material.render_priority = PRIORITY
+	_overcast.material.set_shader_parameter("sky_cubemap", _cubemap)
+	_overcast.set_storm(storm)
+	return _overcast.material
 
 
 func _collect_sky_surfaces(node: Node) -> void:
