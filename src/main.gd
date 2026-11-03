@@ -120,6 +120,7 @@ var _auto_bots := 0  # --bots <n>: dedicated server fills with this many AI bots
 ## --timelimit/--scorelimit/--fraglimit <n>, --night <on|off|0-1>, --rain <0-1> and
 ## --lightning <on|off>, applied to the matching server var
 ## in _ready. A dedicated server has no console, so these have to be reachable as flags.
+var _weather_cycle: WeatherCycle
 var _limit_args: Dictionary = {}  # server var name -> unparsed value
 ## Carried across a map change, since _unload_map wipes them: the bots that were in play (so a
 ## rotation doesn't empty a bot server). The local player's role is deliberately NOT carried — a
@@ -226,6 +227,7 @@ func _flag_handlers() -> Dictionary:
 		"--night": func(v: String) -> void: _limit_args["night"] = NightMode.parse(v),
 		"--rain": func(v: String) -> void: _limit_args["rain"] = v.strip_edges(),
 		"--lightning": func(v: String) -> void: _limit_args["lightning"] = v.strip_edges(),
+		"--dynamic-weather": func() -> void: _limit_args["dynamic_weather"] = "on",
 		"--http-downloads-dir": func(v: String) -> void: MapTransfer.http_downloads_dir = v,
 		"--http-base-url": func(v: String) -> void:
 			MapTransfer.http_base_url_override = v
@@ -357,6 +359,8 @@ func _ready() -> void:
 	if _renderer_trial.apply_preference(_renderer_applied, _is_dedicated_server):
 		return  # relaunching; this process is on its way out
 	ServerVars.value_changed.connect(_on_server_var_changed)
+	_weather_cycle = WeatherCycle.new()
+	add_child(_weather_cycle)
 	if not _bsp_hulls_arg.is_empty():
 		var r: Dictionary = ServerVars.set_from_string("bsp_hulls", _bsp_hulls_arg)
 		if not r["ok"]:
@@ -454,9 +458,7 @@ func _ready() -> void:
 	_lobby.quality_changed.connect(func(level: String) -> void:
 		RenderQuality.apply(level, get_viewport(), _current_environment())
 		WorldMaterials.apply(_map_root, RenderQuality.detail_enabled(level))
-		WaterSurfaces.apply(_map_root, RenderQuality.water_depth_enabled(level))
-		if _skybox:
-			_skybox.apply_enhanced(RenderQuality.sky_enhanced(level)))
+		WaterSurfaces.apply(_map_root, RenderQuality.water_depth_enabled(level)))
 	MapTransfer.map_already_cached.connect(_on_map_ready)
 	MapTransfer.map_transfer_complete.connect(_on_map_ready)
 	MapTransfer.map_transfer_failed.connect(_on_map_transfer_failed)
@@ -867,7 +869,7 @@ func _unload_map() -> void:
 	# killing sync dispatch for good. ClientPerf deliberately outlives a map change, overlay and all.
 	var keep := [_lobby, _map_converter, _resource_converter, _blender_map_converter, _xr_rig,
 			_player_spawner, _dyn_spawner, _client_sync, _renderer_trial, _client_perf,
-			_client_join]
+			_client_join, _weather_cycle]
 	for child in get_children():
 		if child in keep:
 			continue

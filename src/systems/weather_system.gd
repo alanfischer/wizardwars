@@ -268,9 +268,14 @@ func _on_server_var_changed(key: String, _value: Variant) -> void:
 
 func _refresh() -> void:
 	var intensity := rain_intensity()
-	if intensity != _shown_intensity:
-		_shown_intensity = intensity
+	# The countdown restarts only when rain starts (dynamic weather moves the rain every second or
+	# so, and it would never run out); heavier rain only ever pulls the next strike in.
+	if intensity > 0 and _shown_intensity <= 0:
 		_next_strike = _strike_gap(intensity) * 0.5
+	elif intensity > _shown_intensity:
+		_next_strike = minf(_next_strike,
+			lerpf(STRIKE_GAP_LIGHT.y, STRIKE_GAP_HEAVY.y, _heaviness(intensity)))
+	_shown_intensity = intensity
 	if intensity <= 0:
 		if _haze_material:
 			_haze_material.set_shader_parameter("streak_opacity", 0.0)

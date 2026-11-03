@@ -59,6 +59,9 @@ func _register_defaults() -> void:
 	# every client sees, and the host times the strikes. See WeatherSystem.
 	register("rain", 0.0, Type.FLOAT)
 	register("lightning", true, Type.BOOL)
+	# Showers that come and go on their own, by writing `rain` (WeatherCycle). Replicated so the
+	# pause panel shows it on clients too.
+	register("dynamic_weather", false, Type.BOOL)
 
 
 func register(key: String, default_value, type: int, replicate: bool = true) -> void:

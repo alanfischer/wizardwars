@@ -263,3 +263,34 @@ openxr/extensions/hand_tracking=true
 shaders/enabled=true
 openxr/enabled.android=true
 openxr/extensions/meta/passthrough=true
+
+[shader_globals]
+
+cloud_noise={
+"type": "sampler2D",
+"value": ""
+}
+cloud_scale={
+"type": "float",
+"value": 2.2
+}
+cloud_speed={
+"type": "float",
+"value": 0.008
+}
+cloud_softness={
+"type": "float",
+"value": 0.22
+}
+cloud_cover={
+"type": "float",
+"value": 0.0
+}
+cloud_shadow={
+"type": "float",
+"value": 0.0
+}
+cloud_sun_dir={
+"type": "vec3",
+"value": Vector3(0, 1, 0)
+}

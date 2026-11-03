@@ -44,6 +44,8 @@ const float RIM_STRENGTH = 0.5;
 // lightmap shader does the same with lm_sun.
 uniform sampler3D acube_sun : filter_linear, hint_default_black;
 uniform vec3 sky_light = vec3(1.0);
+// Shadows of the procedural sky's clouds, the same ones the map takes.
+#include "res://shaders/clouds.gdshaderinc"
 
 // GoldSrc drew kRenderFxGlowShell as a second copy of the model, scaled up and flat-shaded.
 // A second skinned pass per glowing player is the wrong trade here — gl_compatibility charges
@@ -86,7 +88,9 @@ void fragment() {
 	vec3 ambient = wn2.x * (wn.x >= 0.0 ? texture(acube_pos_x, uvw).rgb : texture(acube_neg_x, uvw).rgb)
 	             + wn2.y * (wn.y >= 0.0 ? texture(acube_pos_y, uvw).rgb : texture(acube_neg_y, uvw).rgb)
 	             + wn2.z * (wn.z >= 0.0 ? texture(acube_pos_z, uvw).rgb : texture(acube_neg_z, uvw).rgb);
-	ambient *= pow(max(mix(vec3(1.0), sky_light, texture(acube_sun, uvw).r), vec3(0.0)), vec3(0.55));
+	float sun_share = texture(acube_sun, uvw).r;
+	vec3 sky = sun_share > 0.0 ? sky_light * cloud_sunlight(world_pos) : sky_light;
+	ambient *= pow(max(mix(vec3(1.0), sky, sun_share), vec3(0.0)), vec3(0.55));
 	ambient = max(ambient, vec3(0.05));
 	// 1.5x compensates for GoldSrc half-intensity lightmaps without fully doubling.
 	vec3 base_srgb = linear_output ? gs_to_srgb(albedo.rgb) : albedo.rgb;
