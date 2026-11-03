@@ -42,11 +42,12 @@ const OVERRIDES := {
 		"sun_glow_energy": 0.0, "sun_halo_energy": 0.0, "horizon_falloff": 3.0},
 	"space2": {"cloud_amount": 0.0, "star_amount": 1.0, "sun_energy": 0.0,
 		"sun_glow_energy": 0.0, "sun_halo_energy": 0.0, "horizon_falloff": 3.0},
-	# Night. The disc is the moon: small, cold, and dim enough not to read as daylight.
-	"fullmoon": {"cloud_amount": 0.15, "star_amount": 0.75, "sun_size": 0.018,
+	# Night. The disc is the moon: small, cold, and dim enough not to read as daylight. Moonlit
+	# cloud is thin and soft-edged, not daytime cumulus.
+	"fullmoon": {"cloud_amount": 0.15, "cloud_softness": 0.22, "star_amount": 0.75, "sun_size": 0.018,
 		"sun_color": Color(0.82, 0.86, 1.0), "sun_energy": 1.5, "sun_glow_energy": 0.3,
 		"sun_halo_energy": 0.06, "cirrus_amount": 0.08},
-	"night": {"cloud_amount": 0.22, "star_amount": 0.6, "sun_size": 0.02,
+	"night": {"cloud_amount": 0.22, "cloud_softness": 0.22, "star_amount": 0.6, "sun_size": 0.02,
 		"sun_color": Color(0.8, 0.85, 1.0), "sun_energy": 1.2, "sun_glow_energy": 0.25,
 		"sun_halo_energy": 0.05, "cirrus_amount": 0.08},
 	"avanti": {"cloud_amount": 0.3, "star_amount": 0.45, "sun_energy": 0.6,
@@ -181,7 +182,7 @@ static func _derive(stats: Dictionary) -> Dictionary:
 		"cloud_color": horizon.lightened(0.45),
 		"cloud_scale": 2.2,
 		"cloud_speed": 0.035,
-		"cloud_softness": 0.22,
+		"cloud_softness": 0.1,
 		"star_amount": star_amount,
 		"star_color": Color.WHITE,
 		"cubemap_blend": 0.0,

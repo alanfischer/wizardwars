@@ -243,7 +243,25 @@ static func cloud_noise() -> Texture2D:
 	noise.frequency = 8.0 / 512.0
 	noise.fractal_type = FastNoiseLite.FRACTAL_FBM
 	noise.fractal_octaves = 6
-	var img := noise.get_seamless_image(512, 512)
+	var cells := FastNoiseLite.new()
+	cells.seed = 11
+	cells.noise_type = FastNoiseLite.TYPE_CELLULAR
+	cells.cellular_return_type = FastNoiseLite.RETURN_DISTANCE
+	cells.frequency = 24.0 / 512.0
+	cells.fractal_type = FastNoiseLite.FRACTAL_FBM
+	cells.fractal_octaves = 2
+	var r := noise.get_seamless_image(512, 512)
+	var g := cells.get_seamless_image(512, 512)
+	r.convert(Image.FORMAT_L8)
+	g.convert(Image.FORMAT_L8)
+	var rd := r.get_data()
+	var gd := g.get_data()
+	var rg := PackedByteArray()
+	rg.resize(rd.size() * 2)
+	for i in rd.size():
+		rg[i * 2] = rd[i]
+		rg[i * 2 + 1] = gd[i]
+	var img := Image.create_from_data(512, 512, false, Image.FORMAT_RG8, rg)
 	img.generate_mipmaps()
 	_cloud_noise = ImageTexture.create_from_image(img)
 	return _cloud_noise
