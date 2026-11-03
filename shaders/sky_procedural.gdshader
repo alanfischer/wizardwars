@@ -123,19 +123,26 @@ void fragment() {
 		float edge = cloud_edge(amount);
 		float cover = cloud_coverage(n, amount);
 		cover *= smoothstep(-0.02, 0.12, up) * (1.0 - 0.5 * far);
-		// Self-shadowing: more cloud between here and the sun means this side faces away from it.
-		float toward_sun = cloud_tex(cp + normalize(sun.xz + vec2(1e-4)) * 0.35);
-		float shade = clamp(0.7 + (n - toward_sun) * 8.0, 0.0, 1.0);
-		shade *= 1.0 - 0.4 * smoothstep(edge, edge + 0.25, n);   // thick cores are darker
+		// Light from the sun loses itself in the cloud it crosses on the way (Beer's law: two
+		// steps sunward through the layer) and in the cloud above us, so thick bases go grey.
+		vec2 sun_step = normalize(sun.xz + vec2(1e-4));
+		float thick = max(n - edge, 0.0);
+		float sunward = max(cloud_shape(cp + sun_step * 0.25) - edge, 0.0)
+			+ max(cloud_shape(cp + sun_step * 0.6) - edge, 0.0);
+		float shade = exp(-(sunward * 2.5 + thick * 2.2));
+		// Powder: a thin edge has had little chance to scatter light toward us, so with the sun
+		// behind us a cloud's rim reads darker than its body.
+		shade *= mix(1.0 - exp(-thick * 12.0 - 0.15), 1.0, toward);
 		vec3 lit = mix(shadow_col, lit_col, shade * mix(0.6, 1.0, toward));
 		// Storm cloud: grey, darker than the sky it closes over, and mottled by the same noise
 		// that shaped it so a full deck still has bodies to it rather than one flat lid.
 		storm_body = clamp(0.55 + 0.7 * n, 0.4, 1.3);
 		vec3 heavy = vec3(sky_lum) * mix(0.6, 1.1, toward * toward) * storm_body * mix(0.8, 1.0, shade);
 		lit = mix(lit, heavy, storm);
-		// Thin cloud near the sun glows at its edges: light scattered forward through it.
-		float rim = cover * (1.0 - cover) * 4.0;
-		lit += sun_color * pow(max(dot(eye_dir, sun), 0.0), 24.0) * rim * 0.5 * (1.0 - storm);
+		// Silver lining: thin cloud near the sun scatters it forward (Henyey-Greenstein, g 0.8,
+		// scaled to 1 looking straight at the sun).
+		float hg = pow(0.04 / (1.64 - 1.6 * dot(eye_dir, sun)), 1.5);
+		lit += sun_color * hg * exp(-thick * 10.0) * 1.2 * (1.0 - storm);
 		// Distant cloud sinks into the horizon haze.
 		lit = mix(lit, col, far * 0.5);
 		storm_cover = cover * storm;

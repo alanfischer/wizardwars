@@ -5,7 +5,8 @@
 // mdl_ambient_cube) trace toward the sun, so the cloud in front of the sun is the one whose
 // shadow you are standing in. Global uniforms (project.godot), set by Skybox: one sky at a time.
 
-// Tiling fbm (Skybox.cloud_noise); one tile spans CLOUD_TILE noise units.
+// Tiling noise (Skybox.cloud_noise): perlin fbm in r, worley fbm in g (distance: 0 at a cell's
+// centre). One tile spans CLOUD_TILE noise units.
 global uniform sampler2D cloud_noise : filter_linear_mipmap, repeat_enable;
 global uniform float cloud_scale;     // noise units per CLOUD_HEIGHT
 global uniform float cloud_speed;     // noise units per second
@@ -18,9 +19,27 @@ const float CLOUD_HEIGHT = 100.0;  // metres over the map's origin
 // The shell curves like a planet this many times its height across, so it meets the horizon at a
 // finite distance instead of smearing out to infinity like a flat plane.
 const float CLOUD_EARTH = 12.0;
+const float CLOUD_BILLOW = 0.5;
+// Clouds gather into fields with clear sky between: a slow, broad swing in density that drifts
+// against the wind, so clouds grow and thin out rather than only sliding past. Fades out as a
+// storm closes the sky over.
+const float CLOUD_FIELDS = 0.32;
+const float CLOUD_FIELD_SCALE = 0.13;
 
 float cloud_tex(vec2 p) {
 	return texture(cloud_noise, p / CLOUD_TILE).r;
+}
+
+// 1 for fair-weather cumulus, 0 once a storm has closed the sky into one flat deck.
+float cloud_fair() {
+	return 1.0 - smoothstep(0.7, 0.95, cloud_cover);
+}
+
+// Perlin swelling into round billows: worley cells push the outline out into lobes, so a cloud's
+// edge is cauliflower rather than smoke.
+float cloud_shape(vec2 p) {
+	vec2 t = texture(cloud_noise, p / CLOUD_TILE).rg;
+	return t.r + (0.5 - t.g) * CLOUD_BILLOW * mix(0.3, 1.0, cloud_fair());
 }
 
 // Metres from `origin` along unit `dir` to the cloud shell.
@@ -51,8 +70,11 @@ float cloud_density(inout vec2 cp) {
 	vec2 wind = cloud_wind();
 	vec2 warp = vec2(cloud_tex(cp * 0.5 + vec2(0.31, 0.17) - wind * 0.4),
 		cloud_tex(cp * 0.5 + vec2(5.71, 2.53) + wind * 0.3)) - 0.5;
-	cp += warp * 0.6;
-	return cloud_tex(cp) + (cloud_tex(cp * 3.1 + vec2(7.3, 2.9)) - 0.5) * 0.18;
+	cp += warp * 0.35;
+	float field = cloud_tex(cp * CLOUD_FIELD_SCALE + vec2(2.1, 8.7) - wind * 0.6) - 0.5;
+	float fair = cloud_fair();
+	return cloud_shape(cp) + (0.5 - texture(cloud_noise, (cp * 3.1 + vec2(7.3, 2.9)) / CLOUD_TILE).g)
+		* mix(0.08, 0.2, fair) + field * CLOUD_FIELDS * fair;
 }
 
 // The density a cloud starts at. `amount` drives coverage, not opacity: at 0 the threshold sits
