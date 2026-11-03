@@ -64,7 +64,7 @@ const OVERRIDES := {
 	"seascape": {"cloud_amount": 0.28, "horizon_falloff": 1.4},
 	"osaka": {"cloud_amount": 0.35},
 	"forest256_": {"cloud_amount": 0.5},
-	"firey_": {"cloud_amount": 0.6, "cloud_speed": 0.014},
+	"firey_": {"cloud_amount": 0.6, "cloud_speed": 0.06},
 }
 
 ## Used when a map has no usable light_environment — six of the thirty do, and a dropped-in map
@@ -180,7 +180,7 @@ static func _derive(stats: Dictionary) -> Dictionary:
 		# the sky it sits in however that sky was coloured. The shaded side takes the sky's own.
 		"cloud_color": horizon.lightened(0.45),
 		"cloud_scale": 2.2,
-		"cloud_speed": 0.008,
+		"cloud_speed": 0.035,
 		"cloud_softness": 0.22,
 		"star_amount": star_amount,
 		"star_color": Color.WHITE,

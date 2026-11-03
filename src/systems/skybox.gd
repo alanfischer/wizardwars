@@ -25,8 +25,10 @@ var _enhanced_material: ShaderMaterial
 var _enhanced_on := false
 ## How far the procedural sky has closed over for rain, 0 to 1. See set_storm.
 var storm := 0.0
-## How much of the sky's share of the light a cloud overhead takes off the ground.
+## How much of the sky's share of the light a cloud overhead takes off the ground, in fair weather
+## and under a full storm's deck.
 const CLOUD_SHADOW := 0.65
+const STORM_SHADOW := 0.88
 ## Cloud cover once a storm has closed the sky over.
 const STORM_COVER := 0.97
 ## Tiling cloud noise for the procedural sky, made once: sampling it costs a fraction of
@@ -174,17 +176,16 @@ func set_storm(amount: float) -> void:
 	storm = amount
 	if _enhanced_material:
 		_enhanced_material.set_shader_parameter("storm", amount)
-	if _enhanced_on:
-		RenderingServer.global_shader_parameter_set("cloud_cover",
-			lerpf(_params["cloud_amount"], STORM_COVER, storm))
+	_push_clouds()
 
 
 ## The clouds.gdshaderinc globals: the procedural sky's cloud layer, and the shadow it casts on
 ## the map and models. No shadow unless the procedural sky is drawing clouds.
 func _push_clouds() -> void:
 	var amount: float = _params.get("cloud_amount", 0.0)
-	var casting := _enhanced_on and amount > 0.0
-	RenderingServer.global_shader_parameter_set("cloud_shadow", CLOUD_SHADOW if casting else 0.0)
+	var casting := _enhanced_on and maxf(amount, storm) > 0.0
+	RenderingServer.global_shader_parameter_set("cloud_shadow",
+		lerpf(CLOUD_SHADOW, STORM_SHADOW, storm) if casting else 0.0)
 	if not _enhanced_on:
 		return
 	RenderingServer.global_shader_parameter_set("cloud_noise", cloud_noise())
