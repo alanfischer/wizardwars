@@ -34,6 +34,9 @@ const STORM_COVER := 0.97
 ## Tiling cloud noise for the procedural sky, made once: sampling it costs a fraction of
 ## computing the octaves per pixel, which pays for the extra samples the cloud shading takes.
 static var _cloud_noise: Texture2D
+static var _cloud_volume: Texture3D
+## Ray-marched clouds (High quality). See set_volumetric.
+var volumetric := false
 
 
 ## `sun_ent` is the map's light_environment entity dict, used to point the procedural sun the way
@@ -234,6 +237,15 @@ func _get_enhanced_material() -> ShaderMaterial:
 	return _enhanced_material
 
 
+## High quality's clouds: the procedural sky ray-marches them through 3D noise rather than
+## shading one flat layer, and the ground's cloud shadows follow the same weather map.
+func set_volumetric(enabled: bool) -> void:
+	volumetric = enabled
+	if enabled:
+		RenderingServer.global_shader_parameter_set("cloud_volume", cloud_volume())
+	RenderingServer.global_shader_parameter_set("cloud_volumetric", 1.0 if enabled else 0.0)
+
+
 static func cloud_noise() -> Texture2D:
 	if _cloud_noise:
 		return _cloud_noise
@@ -265,6 +277,56 @@ static func cloud_noise() -> Texture2D:
 	img.generate_mipmaps()
 	_cloud_noise = ImageTexture.create_from_image(img)
 	return _cloud_noise
+
+
+## Tiling 3D noise for the volumetric clouds: perlin-worley in r (shape: billows where worley
+## cells are), worley distance in g (detail that erodes the edges). Made once, on first use.
+static func cloud_volume() -> Texture3D:
+	if _cloud_volume:
+		return _cloud_volume
+	const N := 64
+	var perlin := FastNoiseLite.new()
+	perlin.seed = 3
+	perlin.noise_type = FastNoiseLite.TYPE_PERLIN
+	perlin.frequency = 4.0 / N
+	perlin.fractal_type = FastNoiseLite.FRACTAL_FBM
+	perlin.fractal_octaves = 4
+	var shape := FastNoiseLite.new()
+	shape.seed = 5
+	shape.noise_type = FastNoiseLite.TYPE_CELLULAR
+	shape.cellular_return_type = FastNoiseLite.RETURN_DISTANCE
+	shape.frequency = 6.0 / N
+	shape.fractal_type = FastNoiseLite.FRACTAL_FBM
+	shape.fractal_octaves = 3
+	var fine := FastNoiseLite.new()
+	fine.seed = 9
+	fine.noise_type = FastNoiseLite.TYPE_CELLULAR
+	fine.cellular_return_type = FastNoiseLite.RETURN_DISTANCE
+	fine.frequency = 8.0 / N
+	fine.fractal_type = FastNoiseLite.FRACTAL_FBM
+	fine.fractal_octaves = 3
+	var p := perlin.get_seamless_image_3d(N, N, N)
+	var w := shape.get_seamless_image_3d(N, N, N)
+	var f := fine.get_seamless_image_3d(N, N, N)
+	var slices: Array[Image] = []
+	for z in N:
+		p[z].convert(Image.FORMAT_L8)
+		w[z].convert(Image.FORMAT_L8)
+		f[z].convert(Image.FORMAT_L8)
+		var pd: PackedByteArray = p[z].get_data()
+		var wd: PackedByteArray = w[z].get_data()
+		var fd: PackedByteArray = f[z].get_data()
+		var rg := PackedByteArray()
+		rg.resize(N * N * 2)
+		for i in N * N:
+			var billow := 255 - wd[i]
+			rg[i * 2] = clampi(int((pd[i] * 0.45 + billow * 0.55 - 25.0) * 1.25), 0, 255)
+			rg[i * 2 + 1] = fd[i]
+		slices.append(Image.create_from_data(N, N, false, Image.FORMAT_RG8, rg))
+	var tex := ImageTexture3D.new()
+	tex.create(Image.FORMAT_RG8, N, N, N, false, slices)
+	_cloud_volume = tex
+	return _cloud_volume
 
 
 func _collect_sky_surfaces(node: Node) -> void:

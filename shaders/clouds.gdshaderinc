@@ -14,6 +14,7 @@ global uniform float cloud_softness;
 global uniform float cloud_cover;     // how much of the sky is cloud, storm included
 global uniform float cloud_shadow;    // how much of the sky's share a cloud takes off; 0 for none
 global uniform vec3 cloud_sun_dir;    // unit, toward the sun
+global uniform float cloud_volumetric; // 1 when the sky ray-marches its clouds (High quality)
 const float CLOUD_TILE = 12.0;
 const float CLOUD_HEIGHT = 100.0;  // metres over the map's origin
 // The shell curves like a planet this many times its height across, so it meets the horizon at a
@@ -42,12 +43,18 @@ float cloud_shape(vec2 p) {
 	return t.r + (0.5 - t.g) * CLOUD_BILLOW * mix(0.3, 1.0, cloud_fair());
 }
 
-// Metres from `origin` along unit `dir` to the cloud shell.
-float cloud_distance(vec3 origin, vec3 dir) {
+// Metres from `origin` along unit `dir` to the shell `height` over the map, on the curve the
+// cloud shell's planet gives it.
+float cloud_distance_to(vec3 origin, vec3 dir, float height) {
 	float r = CLOUD_EARTH * CLOUD_HEIGHT;
-	float h = max(CLOUD_HEIGHT - origin.y, 1.0);
+	float h = max(height - origin.y, 1.0);
 	float b = r * dir.y;
 	return -b + sqrt(b * b + 2.0 * r * h + h * h);
+}
+
+// Metres from `origin` along unit `dir` to the cloud shell.
+float cloud_distance(vec3 origin, vec3 dir) {
+	return cloud_distance_to(origin, dir, CLOUD_HEIGHT);
 }
 
 // cloud_distance looking at the horizon.
@@ -89,12 +96,75 @@ float cloud_coverage(float n, float amount) {
 	return smoothstep(edge - cloud_softness * 0.6, edge + cloud_softness * 1.2, n);
 }
 
+// The volumetric clouds' weather map: how much cloud stands over noise point cp, 0 to 1. Smooth
+// and broad, as the 3D noise carves the clouds themselves out of it.
+float cloud_weather(vec2 cp, float field) {
+	float n = cloud_tex(cp * 0.45) + field;
+	float edge = mix(0.75, 0.25, cloud_cover);
+	return smoothstep(edge - 0.15, edge + 0.25, n);
+}
+
+// The fields term of cloud_density, for a ray that samples it once.
+float cloud_field(vec2 cp) {
+	return (cloud_tex(cp * CLOUD_FIELD_SCALE + vec2(2.1, 8.7) - cloud_wind() * 0.6) - 0.5)
+		* CLOUD_FIELDS * cloud_fair();
+}
+
+// Volumetric clouds (High quality, Skybox.set_volumetric): a slab CLOUD_THICK deep over the
+// shell, carved from 3D noise — perlin-worley in r, finer worley in g (Skybox.cloud_volume).
+global uniform sampler3D cloud_volume : filter_linear, repeat_enable;
+const float CLOUD_THICK = 60.0;
+const float VOLUME_TILE = 360.0;   // metres one tile of cloud_volume spans
+const float DETAIL_TILE = 70.0;
+const int LIGHT_STEPS = 4;
+const float EXTINCTION = 0.3;      // per metre at full density
+
+// How far up the slab p is, 0 at its base and 1 at its top, on the curve cloud_distance_to puts
+// the shells on: a planet centred `planet.xyz`, under the viewer, whose surface is at the
+// viewer's height `planet.w`. Measured flat, a distant cloud would sink out of the slab.
+float cloud_height_frac(vec3 p, vec4 planet) {
+	return (length(p - planet.xyz) - CLOUD_EARTH * CLOUD_HEIGHT + planet.w - CLOUD_HEIGHT) / CLOUD_THICK;
+}
+
+// Cloud density at world point p, 0 to 1. `weather` is cloud_weather where p's column meets
+// the shell; `detail` erodes the edges and is skipped for the light march.
+float cloud_volume_density(vec3 p, vec4 planet, float weather, bool detail) {
+	float hf = cloud_height_frac(p, planet);
+	// Flat bases, domed tops that rise with the weather: big clouds tower, thin ones stay low.
+	// A storm flattens them into one deck.
+	float fair = cloud_fair();
+	float top = mix(mix(0.3, 1.0, weather), 0.8, 1.0 - fair);
+	float rise = clamp(hf / top, 0.0, 1.0);
+	float cov = weather * smoothstep(0.0, 0.08, hf) * (1.0 - rise * rise * mix(1.0, 0.3, 1.0 - fair));
+	if (cov <= 0.0) {
+		return 0.0;
+	}
+	vec3 wind = vec3(cloud_wind().x, 0.0, cloud_wind().y) * (CLOUD_HEIGHT / cloud_scale);
+	float s = texture(cloud_volume, (p + wind) / VOLUME_TILE).r;
+	float d = clamp((s - (1.0 - cov)) / max(cov, 1e-3), 0.0, 1.0) * cov;
+	if (detail && d > 0.0) {
+		float e = texture(cloud_volume, (p + wind * 1.3) / DETAIL_TILE).g;
+		// Wispy at the base, billowed higher up.
+		e = mix(1.0 - e, e, clamp(hf * 4.0, 0.0, 1.0));
+		d = clamp((d - e * 0.35) / (1.0 - e * 0.35), 0.0, 1.0);
+	}
+	return d;
+}
+
 // The multiplier on the sky's share of the light at world point p: 1 in sun, less under cloud.
 float cloud_sunlight(vec3 p) {
 	if (cloud_shadow <= 0.0) {
 		return 1.0;
 	}
 	vec2 cp = cloud_layer(p, cloud_sun_dir, cloud_distance(p, cloud_sun_dir)) + cloud_wind();
+	if (cloud_volumetric > 0.5) {
+		// One sample a third of the way up the slab, through the sun's slant of it.
+		vec3 q = p + cloud_sun_dir * cloud_distance_to(p, cloud_sun_dir, CLOUD_HEIGHT + CLOUD_THICK * 0.35);
+		vec4 planet = vec4(p.x, p.y - CLOUD_EARTH * CLOUD_HEIGHT, p.z, p.y);
+		float d = cloud_volume_density(q, planet, cloud_weather(cp, cloud_field(cp)), false);
+		float depth = d * CLOUD_THICK * 0.5 / max(cloud_sun_dir.y, 0.2) * EXTINCTION;
+		return 1.0 - cloud_shadow * (1.0 - exp(-depth));
+	}
 	return 1.0 - cloud_shadow * cloud_coverage(cloud_density(cp), cloud_cover);
 }
 #endif

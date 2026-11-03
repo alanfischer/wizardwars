@@ -10,18 +10,19 @@ extends Object
 const SETTINGS_PATH := "user://settings.cfg"  # shared with LobbyUI and RendererTrial
 const DEFAULT_LEVEL := "medium"
 
-## setting value -> [label, msaa, glow, surface detail, water depth]. Ordered cheapest first;
+## setting value -> [label, msaa, glow, surface detail, water depth, volumetric clouds]. Ordered cheapest first;
 ## the lobby lists them in this order. 2x is the default because multisampling is resolved in
 ## tile memory on the mobile GPUs (Quest) and is close to free on any desktop part, while BSP
 ## maps are nothing but hard geometric edges. Glow and surface detail are the entries that change
 ## how the game LOOKS rather than how cleanly it draws, so both stay off until asked for. Detail
 ## costs a second draw of the world besides (see WorldMaterials). The procedural sky is not a
-## quality setting: it comes with dynamic weather (Skybox.procedural).
+## quality setting: it comes with dynamic weather (Skybox.procedural); High only ray-marches its
+## clouds (Skybox.set_volumetric).
 const LEVELS := {
-	"low": ["Low — no antialiasing", Viewport.MSAA_DISABLED, false, false, false],
-	"medium": ["Medium — 2x antialiasing", Viewport.MSAA_2X, false, false, false],
-	"high": ["High — 4x antialiasing, glow, surface detail, water", Viewport.MSAA_4X,
-		true, true, true],
+	"low": ["Low — no antialiasing", Viewport.MSAA_DISABLED, false, false, false, false],
+	"medium": ["Medium — 2x antialiasing", Viewport.MSAA_2X, false, false, false, false],
+	"high": ["High — 4x antialiasing, glow, surface detail, water, volumetric clouds",
+		Viewport.MSAA_4X, true, true, true, true],
 }
 
 ## Nothing in the scene renders above 1.0: the world shader clamps albedo x lightmap to it
@@ -60,6 +61,11 @@ static func detail_enabled(level := "") -> bool:
 static func water_depth_enabled(level := "") -> bool:
 	var preset: Array = LEVELS.get(level if level else load_level(), LEVELS[DEFAULT_LEVEL])
 	return preset[4]
+
+
+static func volumetric_clouds_enabled(level := "") -> bool:
+	var preset: Array = LEVELS.get(level if level else load_level(), LEVELS[DEFAULT_LEVEL])
+	return preset[5]
 
 
 static func save_level(level: String) -> void:

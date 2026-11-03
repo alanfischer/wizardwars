@@ -57,6 +57,80 @@ const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 #include "res://shaders/noise.gdshaderinc"
 #include "res://shaders/clouds.gdshaderinc"
 
+// Volumetric clouds (High quality): cloud_volume_density in clouds.gdshaderinc, marched here.
+const float MARCH_MAX = 900.0;     // metres of slab a ray marches at most; past it is haze
+const float MARCH_STEP = 12.0;     // metres per step, wanted
+const int MARCH_STEPS_MIN = 16;
+const int MARCH_STEPS_MAX = 48;
+
+float hg_phase(float c, float g) {
+	return (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * c, 1.5);   // x4π: isotropic is 1
+}
+
+// Ray-march the slab along eye_dir. rgb is the light the cloud sends us, alpha how much of the
+// sky behind it the cloud hides; `body` comes back as the mean density it was hidden by.
+vec4 cloud_march(vec3 cam, vec3 eye_dir, vec3 sun, vec3 sun_col, vec3 base_col, vec3 top_col,
+		vec2 frag, out float body) {
+	body = 0.0;
+	float t0 = cloud_distance_to(cam, eye_dir, CLOUD_HEIGHT);
+	float t1 = min(cloud_distance_to(cam, eye_dir, CLOUD_HEIGHT + CLOUD_THICK), t0 + MARCH_MAX);
+	// Overhead the slab is short; toward the horizon a ray crosses a long way of it.
+	int steps = clamp(int((t1 - t0) / MARCH_STEP), MARCH_STEPS_MIN, MARCH_STEPS_MAX);
+	float dt = (t1 - t0) / float(steps);
+	// Interleaved gradient noise: the step pattern turns into a fine grain instead of bands.
+	float jitter = fract(52.9829189 * fract(dot(frag, vec2(0.06711056, 0.00583715))));
+	float c = dot(eye_dir, sun);
+	// Forward-scattering lobe for the silver lining, plus an even share for light that has
+	// bounced around inside the cloud: the sunlit side is bright from any angle.
+	float phase = min(mix(hg_phase(c, 0.65), hg_phase(c, -0.25), 0.35), 6.0) * 0.5 + 0.7;
+	float scale = cloud_scale / CLOUD_HEIGHT;
+	vec2 entry = (cam.xz + eye_dir.xz * t0) * scale + cloud_wind();
+	float field = cloud_field(entry);
+	vec4 planet = vec4(cam.x, cam.y - CLOUD_EARTH * CLOUD_HEIGHT, cam.z, cam.y);
+	vec3 scattered = vec3(0.0);
+	float trans = 1.0;
+	float weight = 0.0;
+	for (int i = 0; i < steps; i++) {
+		vec3 p = cam + eye_dir * (t0 + (float(i) + jitter) * dt);
+		vec2 cp = p.xz * scale + cloud_wind();
+		float weather = cloud_weather(cp, field);
+		if (weather <= 0.0) {
+			continue;
+		}
+		float d = cloud_volume_density(p, planet, weather, true);
+		if (d <= 0.0) {
+			continue;
+		}
+		// Light march toward the sun, steps growing outward.
+		float od = 0.0;
+		float ls = 6.0;
+		vec3 lp = p;
+		for (int j = 0; j < LIGHT_STEPS; j++) {
+			lp += sun * ls;
+			od += cloud_volume_density(lp, planet, weather, false) * ls;
+			ls *= 1.8;
+		}
+		od *= EXTINCTION;
+		// Beer's law, plus a long, weak tail standing in for light scattered many times over.
+		float light = exp(-od) + 0.35 * exp(-od * 0.1);
+		float powder = 1.0 - exp(-d * dt * EXTINCTION * 2.0);
+		float hf = clamp(cloud_height_frac(p, planet), 0.0, 1.0);
+		vec3 amb = mix(base_col, top_col, hf);
+		vec3 radiance = sun_col * light * phase * mix(0.5, 1.0, powder) + amb;
+		float ext = d * EXTINCTION;
+		float absorbed = 1.0 - exp(-ext * dt);
+		scattered += trans * radiance * absorbed;
+		weight += trans * absorbed * d;
+		trans *= 1.0 - absorbed;
+		if (trans < 0.02) {
+			break;
+		}
+	}
+	float alpha = 1.0 - trans;
+	body = weight / max(alpha, 1e-4);
+	return vec4(scattered / max(alpha, 1e-4), alpha);
+}
+
 float hash13(vec3 p) {
 	p = fract(p * 0.1031);
 	p += dot(p, p.yzx + 33.33);
@@ -119,21 +193,37 @@ void fragment() {
 			col = mix(col, mix(ambient, lit_col, 0.7), ci * smoothstep(0.0, 0.15, up));
 		}
 
-		float n = cloud_density(cp);
+		float n;
 		float edge = cloud_edge(amount);
-		float cover = cloud_coverage(n, amount);
-		cover *= smoothstep(-0.02, 0.12, up) * (1.0 - 0.5 * far);
-		// Light from the sun loses itself in the cloud it crosses on the way (Beer's law: two
-		// steps sunward through the layer) and in the cloud above us, so thick bases go grey.
-		vec2 sun_step = normalize(sun.xz + vec2(1e-4));
-		float thick = max(n - edge, 0.0);
-		float sunward = max(cloud_shape(cp + sun_step * 0.25) - edge, 0.0)
-			+ max(cloud_shape(cp + sun_step * 0.6) - edge, 0.0);
-		float shade = exp(-(sunward * 2.5 + thick * 2.2));
-		// Powder: a thin edge has had little chance to scatter light toward us, so with the sun
-		// behind us a cloud's rim reads darker than its body.
-		shade *= mix(1.0 - exp(-thick * 12.0 - 0.15), 1.0, toward);
-		vec3 lit = mix(shadow_col, lit_col, shade * mix(0.6, 1.0, toward));
+		float cover;
+		float shade;
+		vec3 lit;
+		float thick;
+		if (cloud_volumetric > 0.5) {
+			float body;
+			vec4 v = cloud_march(cam, eye_dir, sun, lit_col * 0.8, shadow_col * 0.95, ambient * 0.8 + lit_col * 0.35,
+				FRAGCOORD.xy, body);
+			lit = v.rgb;
+			cover = v.a * smoothstep(-0.02, 0.06, up);
+			n = edge + body * 0.6;
+			shade = clamp(dot(lit, LUMA) / max(dot(lit_col, LUMA), 1e-3), 0.0, 1.0);
+			thick = 1.0;   // the march's phase already lit the thin edges
+		} else {
+			n = cloud_density(cp);
+			cover = cloud_coverage(n, amount);
+			cover *= smoothstep(-0.02, 0.12, up) * (1.0 - 0.5 * far);
+			// Light from the sun loses itself in the cloud it crosses on the way (Beer's law: two
+			// steps sunward through the layer) and in the cloud above us, so thick bases go grey.
+			vec2 sun_step = normalize(sun.xz + vec2(1e-4));
+			thick = max(n - edge, 0.0);
+			float sunward = max(cloud_shape(cp + sun_step * 0.25) - edge, 0.0)
+				+ max(cloud_shape(cp + sun_step * 0.6) - edge, 0.0);
+			shade = exp(-(sunward * 2.5 + thick * 2.2));
+			// Powder: a thin edge has had little chance to scatter light toward us, so with the sun
+			// behind us a cloud's rim reads darker than its body.
+			shade *= mix(1.0 - exp(-thick * 12.0 - 0.15), 1.0, toward);
+			lit = mix(shadow_col, lit_col, shade * mix(0.6, 1.0, toward));
+		}
 		// Storm cloud: grey, darker than the sky it closes over, and mottled by the same noise
 		// that shaped it so a full deck still has bodies to it rather than one flat lid.
 		storm_body = clamp(0.55 + 0.7 * n, 0.4, 1.3);
