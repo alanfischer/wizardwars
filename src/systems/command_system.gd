@@ -135,6 +135,7 @@ func _register_builtins() -> void:
 	_register("combo_chaos", _cmd_combo_chaos, Perm.ADMIN, "/combo_chaos [auto|on|off]", "Trade a map's weapon/ammo pickups and resupply grenades for random combo spellbooks (auto = whatever the map asks for).")
 	_register("night", _cmd_night, Perm.ADMIN, "/night [on|off|amount]", "Moonlight instead of the sun on sky-lit maps (0 day, 1 full night; values above 1 extrapolate). The map's own lights stay lit.")
 	_register("rain", _cmd_rain, Perm.ADMIN, "/rain [amount]", "Rain on any map, 0.01 light to 1 a downpour; values above 1 add drop density. 0 leaves the weather to the map.")
+	_register("dynamicweather", _cmd_dynamic_weather, Perm.ADMIN, "/dynamicweather [on|off]", "Showers come and go on their own, light to heavy. Setting /rain turns it off.")
 	_register("lightning", _cmd_lightning, Perm.ADMIN, "/lightning [on|off]", "Lightning strikes while it rains.")
 	_register("allow_combos", _cmd_allow_combos, Perm.ADMIN, "/allow_combos [on|off]", "Whether two allied wizards can clash staves to earn a combo spell.")
 	_register("siege", _cmd_siege, Perm.ADMIN, "/siege [on|off]", "Co-op: waves of monsters against an altar everyone defends together. Works on any map.")
@@ -758,8 +759,19 @@ func _cmd_rain(sender_id: int, args: String) -> void:
 	if not arg.is_valid_float() or float(arg) < 0.0:
 		_reply_err(sender_id, "Usage: /rain [amount]")
 		return
+	var note := ""
+	if ServerVars.get_value("dynamic_weather", false):
+		ServerVars.set_from_string("dynamic_weather", "off")
+		note = " (dynamic weather off)"
 	ServerVars.set_from_string("rain", arg)
-	_reply_ok(sender_id, "rain: %s" % _rain_text())
+	_reply_ok(sender_id, "rain: %s%s" % [_rain_text(), note])
+
+
+func _cmd_dynamic_weather(sender_id: int, args: String) -> void:
+	var value = _set_bool_var(sender_id, "dynamic_weather", args, "/dynamicweather [on|off]")
+	if value == null:
+		return
+	_reply_ok(sender_id, "dynamic weather: %s" % ("on" if value else "off"))
 
 
 func _rain_text() -> String:

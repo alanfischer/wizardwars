@@ -18,12 +18,20 @@ uniform vec3 rain_sky = vec3(0.0);
 #include "res://shaders/rain_floor.gdshaderinc"
 #include "res://shaders/noise.gdshaderinc"
 
-vec3 goldsrc_lightmap(vec3 lm, float sun_share) {
-	if (sky_light == vec3(1.0)) {
+// Shadows of the procedural sky's clouds on open ground (clouds.gdshaderinc).
+#define CLOUD_SHADOWS
+#include "res://shaders/clouds.gdshaderinc"
+
+vec3 goldsrc_lightmap(vec3 lm, float sun_share, vec3 world_pos) {
+	vec3 sky = sky_light;
+	if (sun_share > 0.0) {
+		sky *= cloud_sunlight(world_pos);
+	}
+	if (sky == vec3(1.0)) {
 		return lm;  // the sun as compiled
 	}
 	// Lightmaps hold pow(light, 0.55), so the share is scaled before that curve, not after.
-	return lm * pow(max(mix(vec3(1.0), sky_light, sun_share), vec3(0.0)), vec3(0.55));
+	return lm * pow(max(mix(vec3(1.0), sky, sun_share), vec3(0.0)), vec3(0.55));
 }
 
 // 1 where rain reaches world point p, 0 under cover. The floor's cells are 16 units across, so

@@ -27,6 +27,8 @@ var _sun_texture: ImageTexture3D
 
 ## NightMode's multiplier on the sky's share, applied to every material the grid binds from then on.
 static var _sky_light := Vector3.ONE
+## Cloud shadows (NightMode.set_clouds), the same uniforms the map's materials get.
+static var _clouds := {}
 
 
 static func from_meta(root: Node3D) -> LightGrid:
@@ -126,6 +128,18 @@ static func set_sky_light(sky_light: Vector3) -> void:
 	_all_acube_materials = alive
 
 
+## Shadows of the procedural sky's clouds on models; empty for none.
+static func set_clouds(clouds: Dictionary) -> void:
+	_clouds = clouds
+	var alive: Array = []
+	for wr: WeakRef in _all_acube_materials:
+		var mat: ShaderMaterial = wr.get_ref() as ShaderMaterial
+		if mat:
+			NightMode.push_clouds(mat, clouds)
+			alive.append(wr)
+	_all_acube_materials = alive
+
+
 static func _track_material(mat: ShaderMaterial) -> void:
 	_all_acube_materials.append(weakref(mat))
 
@@ -152,6 +166,7 @@ func _set_grid_on_material(mat: ShaderMaterial) -> void:
 	if _sun_texture:
 		mat.set_shader_parameter("acube_sun", _sun_texture)
 	mat.set_shader_parameter("sky_light", _sky_light)
+	NightMode.push_clouds(mat, _clouds)
 	LightGrid._track_material(mat)
 
 

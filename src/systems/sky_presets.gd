@@ -39,21 +39,23 @@ const OVERRIDES := {
 	# Starfields. No atmosphere to gradient and no sun — the bright pixel a measurement would
 	# find here is a star, and pointing a sun disc at it would put a second one in the sky.
 	"space": {"cloud_amount": 0.0, "star_amount": 0.9, "sun_energy": 0.0,
-		"sun_glow_energy": 0.0, "horizon_falloff": 3.0},
+		"sun_glow_energy": 0.0, "sun_halo_energy": 0.0, "horizon_falloff": 3.0},
 	"space2": {"cloud_amount": 0.0, "star_amount": 1.0, "sun_energy": 0.0,
-		"sun_glow_energy": 0.0, "horizon_falloff": 3.0},
+		"sun_glow_energy": 0.0, "sun_halo_energy": 0.0, "horizon_falloff": 3.0},
 	# Night. The disc is the moon: small, cold, and dim enough not to read as daylight.
 	"fullmoon": {"cloud_amount": 0.15, "star_amount": 0.75, "sun_size": 0.018,
-		"sun_color": Color(0.82, 0.86, 1.0), "sun_energy": 1.5, "sun_glow_energy": 0.3},
+		"sun_color": Color(0.82, 0.86, 1.0), "sun_energy": 1.5, "sun_glow_energy": 0.3,
+		"sun_halo_energy": 0.06, "cirrus_amount": 0.08},
 	"night": {"cloud_amount": 0.22, "star_amount": 0.6, "sun_size": 0.02,
-		"sun_color": Color(0.8, 0.85, 1.0), "sun_energy": 1.2, "sun_glow_energy": 0.25},
+		"sun_color": Color(0.8, 0.85, 1.0), "sun_energy": 1.2, "sun_glow_energy": 0.25,
+		"sun_halo_energy": 0.05, "cirrus_amount": 0.08},
 	"avanti": {"cloud_amount": 0.3, "star_amount": 0.45, "sun_energy": 0.6,
-		"sun_glow_energy": 0.3},
+		"sun_glow_energy": 0.3, "sun_halo_energy": 0.12, "cirrus_amount": 0.15},
 	# Overcast. The sun is behind the cloud deck, so it contributes glow and no disc.
 	"dark": {"cloud_amount": 0.85, "cloud_softness": 0.3, "sun_energy": 0.0,
-		"sun_glow_energy": 0.2},
+		"sun_glow_energy": 0.2, "sun_halo_energy": 0.15},
 	"null_plainsky256_": {"cloud_amount": 0.0, "sun_energy": 0.0, "sun_glow_energy": 0.25,
-		"horizon_falloff": 0.6},
+		"sun_halo_energy": 0.15, "horizon_falloff": 0.6},
 	"nottingham": {"cloud_amount": 0.55, "sun_energy": 0.8},
 	"wiz": {"cloud_amount": 0.5},
 	"purple": {"cloud_amount": 0.45},
@@ -62,6 +64,13 @@ const OVERRIDES := {
 	"osaka": {"cloud_amount": 0.35},
 	"forest256_": {"cloud_amount": 0.5},
 	"firey_": {"cloud_amount": 0.6, "cloud_speed": 0.014},
+}
+
+## The procedural gradient's colours pushed somewhere the art does not go: [saturation, tint, lift].
+## Clouds keep the art's own colours. wiz is a slate overcast that read gloomy on 2fort, roc2 and
+## golem, which are meant to be clear days.
+const GRADES := {
+	"wiz": [1.4, Color(0.8, 1.06, 1.15), 0.06],
 }
 
 ## Used when a map has no usable light_environment — six of the thirty do, and a dropped-in map
@@ -88,7 +97,19 @@ static func build(sky_name: String, faces: Array[Image], sun_dir := Vector3.ZERO
 
 	for key in OVERRIDES.get(sky_name, {}):
 		params[key] = OVERRIDES[sky_name][key]
+	if GRADES.has(sky_name):
+		for key in ["zenith_color", "horizon_color"]:
+			params[key] = grade(params[key], GRADES[sky_name])
 	return params
+
+
+## Saturation, then tint and lift, in the art's own (sRGB) space.
+static func grade(c: Color, g: Array) -> Color:
+	var l := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+	var sat := Color(l, l, l).lerp(c, g[0])
+	var tint: Color = g[1]
+	var lift: float = g[2]
+	return Color(sat.r * tint.r + lift, sat.g * tint.g + lift, sat.b * tint.b + lift).clamp()
 
 
 ## Mean colour, spread, darkness and brightest direction, read off downsampled copies of the six
@@ -151,10 +172,12 @@ static func _derive(stats: Dictionary) -> Dictionary:
 		"ground_color": stats["ground"],
 		"horizon_falloff": 1.1,
 		"sun_color": Color.WHITE,
-		"sun_size": 0.035,
+		"sun_size": 0.012,
 		"sun_energy": 2.2,
-		"sun_glow_exp": 48.0,
-		"sun_glow_energy": 0.5,
+		"sun_glow_exp": 320.0,
+		"sun_glow_energy": 0.35,
+		"sun_halo_energy": 0.25,
+		"sun_halo_exp": 6.0,
 		"cloud_amount": cloud_amount,
 		# Cloud lit/shadow sides bracket the horizon colour, which keeps a cloud deck in the same
 		# family as the sky it sits in however that sky was coloured.

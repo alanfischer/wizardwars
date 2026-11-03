@@ -1,7 +1,8 @@
 class_name Skybox
 extends Node
 
-## Stands in for the shipped 256px cubemap at the "high" quality level. Applied as a
+## Stands in for the shipped 256px cubemap while dynamic weather is on, on every renderer: the
+## moving clouds and the storm deck closing over are what show the weather coming. Applied as a
 ## material_override on the sky meshes rather than by re-pointing the map's own shared sky
 ## material: the BSP importer caches one material per texture and hands it to every mesh that
 ## needs it (goldsrc_bsp.cpp), so mutating it would edit a resource the map cache may hand back
@@ -9,7 +10,7 @@ extends Node
 const ProceduralSkyShader = preload("res://shaders/sky_procedural.gdshader")
 ## Where the sky sorts in the transparent queue. Must match RENDER_PRIORITY_SKY in
 ## goldsrc_bsp.cpp, which is where the stock sky material gets the same number: an override
-## replaces that material outright, so a mismatch here moves the sky only on the High preset.
+## replaces that material outright, so a mismatch here moves the sky only under dynamic weather.
 ##
 ## Strictly below WaterSurfaces.PRIORITY_BEFORE, and that is the whole point of the number.
 ## The liquid's depth prepass writes depth at the water surface; the sky writes none and is
@@ -24,6 +25,11 @@ var _enhanced_material: ShaderMaterial
 var _enhanced_on := false
 ## How far the procedural sky has closed over for rain, 0 to 1. See set_storm.
 var storm := 0.0
+## How much of the sky's share of the light a cloud overhead takes off the ground.
+const CLOUD_SHADOW := 0.65
+## Tiling cloud noise for the procedural sky, made once: sampling it costs a fraction of
+## computing the octaves per pixel, which pays for the extra samples the cloud shading takes.
+static var _cloud_noise: Texture2D
 
 
 ## `sun_ent` is the map's light_environment entity dict, used to point the procedural sun the way
@@ -79,7 +85,7 @@ func setup(sky_name: String, map_root: Node = null, sun_ent: Dictionary = {}) ->
 		_collect_sky_surfaces(map_root)
 		warn_if_baked_priority_is_stale()
 		_apply_sky_cubemap(map_root, _cubemap)
-		apply_enhanced(RenderQuality.sky_enhanced())
+		apply_enhanced(procedural())
 
 	Log.info("Skybox loaded: %s (%d sky surfaces)" % [sky_name, _sky_surfaces.size()])
 
@@ -87,9 +93,9 @@ func setup(sky_name: String, map_root: Node = null, sun_ent: Dictionary = {}) ->
 ## The sky's sort order is written in two places — here for the procedural override, and in
 ## goldsrc_bsp.cpp for the material baked into the .scn — and only the first is this file's to
 ## set. When they disagree the map still renders, and it renders WRONG in a way that points
-## anywhere but here: the override covers for the baked material, so the High preset looks
-## perfect and every level below it draws water over a hole where the sky should be. That
-## reads as a water bug, it reads as a quality-preset bug, and it is neither. Say so instead.
+## anywhere but here: the override covers for the baked material, so dynamic weather looks
+## perfect and without it water draws over a hole where the sky should be. That reads as a
+## water bug, it reads as a weather bug, and it is neither. Say so instead.
 ## Returns true when it found the disagreement, so a test can drive it without reading the log.
 func warn_if_baked_priority_is_stale() -> bool:
 	for surf in _sky_surfaces:
@@ -102,10 +108,15 @@ func warn_if_baked_priority_is_stale() -> bool:
 			+ "extension that converted it is older than this checkout, or the .scn predates "
 			+ "it: rebuild with ./build_extension.sh, which re-keys the map cache and forces "
 			+ "a reconvert. Until then the sky draws on liquid's depth-prepass rung and water "
-			+ "over it goes flat and opaque on every quality level below High.")
+			+ "over it goes flat and opaque without dynamic weather.")
 			% [baked.render_priority, PRIORITY])
 		return true  # one line is the message; every sky surface in the map shares one material
 	return false
+
+
+## Whether the procedural sky stands in for the art: the `dynamic_weather` server var.
+static func procedural() -> bool:
+	return bool(ServerVars.get_value("dynamic_weather", false))
 
 
 ## Swap the procedural sky in or out. Safe to call repeatedly and before/without a map — the
@@ -146,12 +157,29 @@ func set_flash(color: Color, dir: Vector3) -> void:
 		_enhanced_material.set_shader_parameter("flash_dir", dir)
 
 
-## Rain on the procedural sky (the "high" quality level): 0 clear, 1 a dark overcast deck. The stock
+## Rain on the procedural sky (dynamic weather): 0 clear, 1 a dark overcast deck. The stock
 ## cubemap has no clouds of its own to thicken, so this leaves it alone.
 func set_storm(amount: float) -> void:
 	storm = amount
 	if _enhanced_material:
 		_enhanced_material.set_shader_parameter("storm", amount)
+
+
+## What the ground needs to shade itself under this sky's clouds (NightMode.set_clouds): the
+## clouds.gdshaderinc uniforms as the sky has them, plus the sun and the storm's coverage.
+## Empty unless the procedural sky is drawing clouds.
+func cloud_shadows() -> Dictionary:
+	var amount: float = _params.get("cloud_amount", 0.0)
+	if not _enhanced_on or amount <= 0.0:
+		return {}
+	return {
+		"cloud_shadow": CLOUD_SHADOW,
+		"cloud_cover": lerpf(amount, 0.97, storm),
+		"cloud_sun_dir": _params.get("sun_dir", Vector3.UP),
+		"cloud_scale": _params.get("cloud_scale", 2.2),
+		"cloud_speed": _params.get("cloud_speed", 0.008),
+		"cloud_softness": _params.get("cloud_softness", 0.22),
+	}
 
 
 ## The colour the sky draws at the horizon right now, linear, flash aside: what haze over open ground
@@ -190,7 +218,23 @@ func _get_enhanced_material() -> ShaderMaterial:
 	for key in _params:
 		_enhanced_material.set_shader_parameter(key, _params[key])
 	_enhanced_material.set_shader_parameter("storm", storm)
+	_enhanced_material.set_shader_parameter("cloud_noise", cloud_noise())
 	return _enhanced_material
+
+
+static func cloud_noise() -> Texture2D:
+	if _cloud_noise:
+		return _cloud_noise
+	var noise := FastNoiseLite.new()
+	noise.seed = 7
+	noise.noise_type = FastNoiseLite.TYPE_PERLIN
+	noise.frequency = 8.0 / 512.0
+	noise.fractal_type = FastNoiseLite.FRACTAL_FBM
+	noise.fractal_octaves = 6
+	var img := noise.get_seamless_image(512, 512)
+	img.generate_mipmaps()
+	_cloud_noise = ImageTexture.create_from_image(img)
+	return _cloud_noise
 
 
 func _collect_sky_surfaces(node: Node) -> void:

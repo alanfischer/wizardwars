@@ -268,9 +268,15 @@ func _on_server_var_changed(key: String, _value: Variant) -> void:
 
 func _refresh() -> void:
 	var intensity := rain_intensity()
-	if intensity != _shown_intensity:
-		_shown_intensity = intensity
+	# Only when the rain starts: dynamic weather moves it every second or so, and the countdown
+	# would never run out.
+	# Heavier rain only ever pulls the next strike in.
+	if intensity > 0 and _shown_intensity <= 0:
 		_next_strike = _strike_gap(intensity) * 0.5
+	elif intensity > _shown_intensity:
+		_next_strike = minf(_next_strike,
+			lerpf(STRIKE_GAP_LIGHT.y, STRIKE_GAP_HEAVY.y, _heaviness(intensity)))
+	_shown_intensity = intensity
 	if intensity <= 0:
 		if _haze_material:
 			_haze_material.set_shader_parameter("streak_opacity", 0.0)
@@ -472,6 +478,7 @@ func _process(delta: float) -> void:
 	# starts clear.
 	if Game.skybox and Game.skybox.storm != _storm:
 		Game.skybox.set_storm(_storm)
+	NightMode.set_clouds(Game.skybox.cloud_shadows() if Game.skybox else {})
 	if intensity > 0 and bool(ServerVars.get_value("lightning", true)) and \
 			(not NetworkManager.is_online() or NetworkManager.is_host()):
 		_next_strike -= delta

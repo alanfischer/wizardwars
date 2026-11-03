@@ -90,6 +90,8 @@ var _match_sent_at := 0
 var _rain_slider: HSlider
 var _rain_value: Label
 var _lightning_check: CheckBox
+var _dynamic_weather_check: CheckBox
+var _host_weather_check: CheckBox
 var _mouse_before := Input.MOUSE_MODE_VISIBLE
 
 func _ready() -> void:
@@ -307,6 +309,10 @@ func _build_match_rows(vbox: VBoxContainer) -> void:
 		NetworkManager.send_request_command("lightning %s" % ("on" if on else "off")))
 	_lightning_check.tooltip_text = "Lightning strikes while it rains. (/lightning)"
 	weather.add_child(_lightning_check)
+	_dynamic_weather_check = _make_check("Dynamic", false, func(on: bool) -> void:
+		NetworkManager.send_request_command("dynamicweather %s" % ("on" if on else "off")))
+	_dynamic_weather_check.tooltip_text = "Showers come and go on their own. Moving Rain turns it off. (/dynamicweather)"
+	weather.add_child(_dynamic_weather_check)
 
 	_sync_match_rows()
 	_rain_slider.value_changed.connect(func(v: float) -> void:
@@ -323,7 +329,7 @@ func _build_match_rows(vbox: VBoxContainer) -> void:
 			_flush_match_command()
 			get_tree().create_timer(0.5).timeout.connect(_sync_match_rows))
 	ServerVars.value_changed.connect(func(key: String, _v: Variant) -> void:
-		if key in ["night", "rain", "lightning"] and not _match_dragging:
+		if key in ["night", "rain", "lightning", "dynamic_weather"] and not _match_dragging:
 			_sync_match_rows())
 
 
@@ -359,6 +365,7 @@ func _sync_match_rows() -> void:
 	_rain_slider.set_value_no_signal(rain)
 	_rain_value.text = _rain_text(rain)
 	_lightning_check.set_pressed_no_signal(bool(ServerVars.get_value("lightning", true)))
+	_dynamic_weather_check.set_pressed_no_signal(bool(ServerVars.get_value("dynamic_weather", false)))
 
 
 func _rain_text(v: float) -> String:
@@ -479,6 +486,11 @@ func _build_game_rows(vbox: VBoxContainer) -> void:
 	_map_dropdown = _make_dropdown()
 	_populate_maps()
 	map_row.add_child(_map_dropdown)
+
+	_host_weather_check = _make_check("Dynamic Weather", _load_setting("host", "dynamic_weather", "off") == "on",
+		func(on: bool) -> void: _save_setting("host", "dynamic_weather", "on" if on else "off"))
+	_host_weather_check.tooltip_text = "Showers come and go on their own, light to heavy."
+	map_row.add_child(_host_weather_check)
 
 	_host_btn = _make_button("Host Game", _on_host_pressed)
 	map_row.add_child(_host_btn)
@@ -761,6 +773,7 @@ func _row_label(text: String) -> Label:
 func _set_controls_disabled(disabled: bool) -> void:
 	_controls_disabled = disabled
 	_host_btn.disabled = disabled
+	_host_weather_check.disabled = disabled
 	_join_btn.disabled = disabled
 	_map_dropdown.disabled = disabled
 	_renderer_dropdown.disabled = disabled
@@ -814,6 +827,7 @@ func _on_host_pressed() -> void:
 	var map_name: String = _map_dropdown.get_item_text(_map_dropdown.selected)
 	_set_controls_disabled(true)
 	set_status("Converting %s..." % map_name)
+	ServerVars.set_from_string("dynamic_weather", "on" if _host_weather_check.button_pressed else "off")
 	host_pressed.emit(map_name)
 
 

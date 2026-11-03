@@ -101,13 +101,10 @@ func _ready() -> void:
 		RenderQuality.apply(quality, get_viewport(), sky.get_node_or_null("WorldEnvironment").environment
 				if sky.get_node_or_null("WorldEnvironment") else null)
 		WorldMaterials.apply(map_root, RenderQuality.detail_enabled(quality))
-		sky.apply_enhanced(RenderQuality.sky_enhanced(quality))
 		water_on = RenderQuality.water_depth_enabled(quality)
-		print("quality %s: msaa_3d=%d detail=%s sky=%s water_depth=%s" % [quality,
-				get_viewport().msaa_3d, RenderQuality.detail_enabled(quality),
-				RenderQuality.sky_enhanced(quality), water_on])
-	else:
-		sky.apply_enhanced(args.get("sky", "on") == "on")
+		print("quality %s: msaa_3d=%d detail=%s water_depth=%s" % [quality,
+				get_viewport().msaa_3d, RenderQuality.detail_enabled(quality), water_on])
+	sky.apply_enhanced(args.get("sky", "on") == "on")
 	# --skyprio <n> rewrites every sky surface's render_priority, override included. The sky and
 	# the liquid depth twin both ship at -1, which is the same rung: whichever the renderer puts
 	# first decides whether the twin's depth stamp rejects the sky behind the water.
