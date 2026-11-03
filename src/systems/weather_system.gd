@@ -9,7 +9,8 @@ const TopDownFrame = preload("res://src/systems/top_down_frame.gd")
 const PUDDLE_BY_CLASS := {"ground": 1.0, "mineral": 0.6, "wood": 0.0}
 const PUDDLE_DEFAULT := 0.5
 
-var _player: Node3D
+## The map, handed over before the system enters the tree. None on a test or tool that has no map.
+var map_root: Node
 ## What the map asked for (PotatoC SetWeather). The `rain` server var overrides it while non-zero.
 var _current_type: int = 0
 var _current_intensity: int = 0
@@ -22,14 +23,22 @@ func _ready() -> void:
 	listener_height = 1.5
 	bolt_drawer = _draw_beam_bolt
 	flash_changed.connect(func(k: float) -> void: NightMode.set_flash(FLASH * k))
+	struck.connect(_on_struck)
 	super._ready()
 	ServerVars.value_changed.connect(_on_server_var_changed)
-	var map_root: Node = get_tree().current_scene.get("_map_root") if get_tree().current_scene else null
+	# main hands over each new sky as night rebuilds it (main._build_skybox); this is the one the
+	# map started with, if it was built first.
+	if is_instance_valid(Game.skybox):
+		sky = Game.skybox
+	_apply_night()
 	if map_root:
 		var box := TopDownFrame.world_aabb(map_root)
 		if box.size != Vector3.ZERO:
 			area = box
 		_take_rain_floor(map_root)
+		# Brush entities spawned later (/spawn, a round reset's respawns) cover too, once their own
+		# _ready has said whether they are solid.
+		get_tree().node_added.connect(_on_node_added)
 	_apply_rain()
 
 
@@ -46,10 +55,9 @@ func _take_rain_floor(map_root: Node) -> void:
 	var origin: Vector3 = data["origin"]
 	set_rain_floor({"image": img, "origin": Vector3(origin.x - size.x, origin.y, origin.z),
 		"size": size, "top": float(data["top"])})
-	if DisplayServer.get_name() != "headless":
-		add_wet_materials(map_root, func(mi: MeshInstance3D) -> float:
-			# The loader names each world mesh after its texture.
-			return PUDDLE_BY_CLASS.get(WorldMaterials.classify(String(mi.name)), PUDDLE_DEFAULT))
+	add_wet_materials(map_root, func(mi: MeshInstance3D) -> float:
+		# The loader names each world mesh after its texture.
+		return PUDDLE_BY_CLASS.get(WorldMaterials.classify(String(mi.name)), PUDDLE_DEFAULT))
 	_cover_movers(map_root)
 
 
@@ -59,16 +67,25 @@ func _take_rain_floor(map_root: Node) -> void:
 ## traced for solid.
 func _cover_movers(node: Node) -> void:
 	for child in node.get_children():
-		if child is AnimatableBody3D and (child as AnimatableBody3D).collision_layer != 0:
-			add_cover(child)
+		if child is AnimatableBody3D:
+			_cover_if_solid(child)
 		else:
 			_cover_movers(child)
+
+
+func _on_node_added(node: Node) -> void:
+	if node is AnimatableBody3D and is_instance_valid(map_root) and map_root.is_ancestor_of(node):
+		_cover_if_solid.call_deferred(node)
+
+
+func _cover_if_solid(body: AnimatableBody3D) -> void:
+	if is_instance_valid(body) and body.collision_layer != 0 and not _covers.has(body):
+		add_cover(body)
 
 
 ## The node this follows. The map-load path builds the system before the local player exists, and
 ## a dedicated server never gets one.
 func attach_player(player: Node3D) -> void:
-	_player = player
 	listener = player
 
 
@@ -103,6 +120,14 @@ func _apply_rain() -> void:
 func _on_server_var_changed(key: String, _value: Variant) -> void:
 	if key == "rain" or key == "lightning":
 		_apply_rain()
+	elif key == "night":
+		_apply_night()
+
+
+## The night darkens the rain and the haze the way it darkens the sky's light.
+func _apply_night() -> void:
+	sky_light = sky_light_now()
+	night = NightMode.amount()
 
 
 ## Join snapshot. Default weather is "none", which every peer already starts at, so a dry map
@@ -120,22 +145,22 @@ static func sky_light_now() -> Color:
 
 
 func _process(delta: float) -> void:
-	# The host times the strikes so every peer sees the same one.
+	# The host times the strikes so every peer sees the same one. A role that can change with a
+	# connection, so asked each frame.
 	times_strikes = not NetworkManager.is_online() or NetworkManager.is_host()
 	# GoldSrc drew no rain with the view underwater (v_waterlevel 3); the sound carries on.
-	underwater = _player != null and _player.has_method("head_underwater") and _player.head_underwater()
-	# Night rebuilds the skybox, so it is looked up every frame.
-	sky = Game.skybox
-	sky_light = sky_light_now()
-	night = NightMode.amount()
+	underwater = listener != null and listener.has_method("head_underwater") and listener.head_underwater()
 	super._process(delta)
 
 
 ## The host's strikes reach every client, which draws the same one from the seed.
-@rpc("authority", "call_remote", "reliable")
-func strike(strike_seed: int) -> void:
+func _on_struck(strike_seed: int) -> void:
 	if NetworkManager.is_online() and NetworkManager.is_host():
 		strike.rpc(strike_seed)
+
+
+@rpc("authority", "call_remote", "reliable")
+func strike(strike_seed: int) -> void:
 	super.strike(strike_seed)
 
 

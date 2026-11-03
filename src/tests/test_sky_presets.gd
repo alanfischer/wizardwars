@@ -129,8 +129,8 @@ func test_shader_takes_every_uniform_the_preset_sets() -> void:
 	var declared := {}
 	for u in shader.get_shader_uniform_list():
 		declared[u.name] = true
-	# The cloud layer's settings go to its globals instead (OvercastSky.set_drawing).
-	for key in ["cloud_scale", "cloud_speed", "cloud_softness"]:
+	# The cloud layer's settings go to its globals instead.
+	for key in OvercastSky.LAYER_KEYS:
 		declared[key] = true
 
 	var faces := _faces("wiz")
@@ -138,3 +138,8 @@ func test_shader_takes_every_uniform_the_preset_sets() -> void:
 		return
 	for key in SkyPreset.build("wiz", faces):
 		assert_true(declared.has(key), "sky_procedural declares a '%s' uniform" % key)
+	# Overrides set keys build() leaves to the defaults, and are as easily misspelled.
+	for sky_name in SkyPreset.OVERRIDES:
+		for key in SkyPreset.OVERRIDES[sky_name]:
+			if key != "grade":
+				assert_true(declared.has(key), "sky_procedural declares %s's '%s'" % [sky_name, key])

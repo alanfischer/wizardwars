@@ -45,18 +45,10 @@ vec3 goldsrc_liquid(vec3 albedo, int liquid_type) {
 #endif
 
 #ifdef GOLDSRC_HOOK_SKY
-// Lightning (Skybox.set_flash): the sky lit from within, brightest toward flash_dir (world space).
-// Black is no flash.
-uniform vec3 flash_color = vec3(0.0);
-uniform vec3 flash_dir = vec3(0.0, 1.0, 0.0);
+// Lightning (Skybox.set_flash) on the stock cubemap sky, the same flash the procedural one takes.
+#include "res://addons/overcast/shaders/flash.gdshaderinc"
 
 vec3 goldsrc_sky(vec3 col, vec3 eye_dir) {
-	if (flash_color == vec3(0.0)) {
-		return col;
-	}
-	// Clouds have something to light and open sky only a glow, so it multiplies and then adds.
-	float toward = max(dot(eye_dir, normalize(flash_dir)), 0.0);
-	col *= vec3(1.0) + flash_color * (1.0 + 3.0 * pow(toward, 3.0));
-	return col + flash_color * (0.3 + 0.9 * pow(toward, 4.0));
+	return overcast_flash(col, eye_dir);
 }
 #endif

@@ -31,8 +31,6 @@ var storm := 0.0
 ## `sun_ent` is the map's light_environment entity dict, used to point the procedural sun the way
 ## the mapper lit the level. Optional — SkyPreset falls back to the sky art, then to a default.
 func setup(sky_name: String, map_root: Node = null, sun_ent: Dictionary = {}) -> void:
-	# The cloud globals outlive a map; a sky with no clouds must not inherit the last one's.
-	OvercastClouds.clear()
 	if not ServerVars.value_changed.is_connected(_on_server_var_changed):
 		ServerVars.value_changed.connect(_on_server_var_changed)
 	if sky_name.is_empty():
@@ -188,7 +186,6 @@ func _get_enhanced_material() -> ShaderMaterial:
 	# The stock sky material carries this so the sky draws before the world and reads as a true
 	# background; an override replaces the material outright, so it has to carry it too.
 	_overcast.material.render_priority = PRIORITY
-	_overcast.material.set_shader_parameter("sky_cubemap", _cubemap)
 	_overcast.set_storm(storm)
 	return _overcast.material
 

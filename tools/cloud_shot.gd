@@ -3,9 +3,6 @@ extends Node3D
 ## the volumetric (High quality) clouds, RAIN=0.8 for rain. PERF=1 instead prints the GPU frame time looking up, with
 ## the volumetric clouds off and on.
 
-var _map_root: Node3D  # where WeatherSystem looks for the map
-
-
 func _ready() -> void:
 	ServerVars.set_from_string("dynamic_weather", "1")
 	var out := OS.get_environment("OUT")
@@ -27,17 +24,14 @@ func _ready() -> void:
 		if OS.get_environment("NIGHT") != "":
 			ServerVars.set_from_string("night", OS.get_environment("NIGHT"))
 		NightMode.apply(map)
-		_map_root = map
 		var weather: WeatherSystem = null
 		if OS.get_environment("RAIN") != "":
 			ServerVars.set_from_string("rain", OS.get_environment("RAIN"))
 			weather = WeatherSystem.new()
+			weather.map_root = map
 			add_child(weather)
 			Game.weather_system = weather
-			# Straight to the storm and the soaking the rain would come to.
-			weather.storm = lerpf(weather.STORM_LIGHT, 1.0, weather.heaviness(weather.rain)) - 0.0001
-			weather._wetness = 1.0
-			weather._puddles = weather.heaviness(weather.rain)
+			weather.settle()
 		var spawn := {}
 		for cls in ["info_player_deathmatch", "info_player_start", "info_player_teamspawn"]:
 			spawn = _find(map, cls)
