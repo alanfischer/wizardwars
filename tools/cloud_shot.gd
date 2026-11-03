@@ -15,7 +15,8 @@ func _ready() -> void:
 		add_child(map)
 		var sky := Skybox.new()
 		add_child(sky)
-		sky.set_volumetric(OS.get_environment("VOL") == "1")
+		Game.skybox = sky
+		Skybox.set_volumetric(OS.get_environment("VOL") == "1")
 		var ws := map.get_node_or_null("worldspawn")
 		var sky_name: String = ws.get_meta("entity").get("skyname", "") if ws else ""
 		sky.setup(sky_name, map, _find(map, "light_environment"))
@@ -23,11 +24,11 @@ func _ready() -> void:
 		if OS.get_environment("NIGHT") != "":
 			ServerVars.set_from_string("night", OS.get_environment("NIGHT"))
 		NightMode.apply(map)
-		var spawn := _find(map, "info_player_deathmatch")
-		if spawn.is_empty():
-			spawn = _find(map, "info_player_start")
-		if spawn.is_empty():
-			spawn = _find(map, "info_player_teamspawn")
+		var spawn := {}
+		for cls in ["info_player_deathmatch", "info_player_start", "info_player_teamspawn"]:
+			spawn = _find(map, cls)
+			if not spawn.is_empty():
+				break
 		var cam := Camera3D.new()
 		cam.fov = 80.0
 		cam.far = 4000.0
@@ -41,7 +42,7 @@ func _ready() -> void:
 			DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 			Engine.max_fps = 0
 			for vol in [false, true, false, true]:
-				sky.set_volumetric(vol)
+				Skybox.set_volumetric(vol)
 				for i in 60:
 					await get_tree().process_frame
 				var t0 := Time.get_ticks_usec()

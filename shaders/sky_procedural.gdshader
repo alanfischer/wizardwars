@@ -67,12 +67,11 @@ float hg_phase(float c, float g) {
 	return (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * c, 1.5);   // x4π: isotropic is 1
 }
 
-// Ray-march the slab along eye_dir. rgb is the light the cloud sends us, alpha how much of the
-// sky behind it the cloud hides; `body` comes back as the mean density it was hidden by.
-vec4 cloud_march(vec3 cam, vec3 eye_dir, vec3 sun, vec3 sun_col, vec3 base_col, vec3 top_col,
-		vec2 frag, out float body) {
-	body = 0.0;
-	float t0 = cloud_distance_to(cam, eye_dir, CLOUD_HEIGHT);
+// Ray-march the slab along eye_dir, from `t0` metres out where it meets the shell at noise point
+// `cp` (cloud_distance, cloud_layer + wind). rgb is the light the cloud sends us, alpha how much
+// of the sky behind it the cloud hides; `body` comes back as the mean density it was hidden by.
+vec4 cloud_march(vec3 cam, vec3 eye_dir, float t0, vec2 cp, vec3 sun, vec3 sun_col, vec3 base_col,
+		vec3 top_col, vec2 frag, out float body) {
 	float t1 = min(cloud_distance_to(cam, eye_dir, CLOUD_HEIGHT + CLOUD_THICK), t0 + MARCH_MAX);
 	// Overhead the slab is short; toward the horizon a ray crosses a long way of it.
 	int steps = clamp(int((t1 - t0) / MARCH_STEP), MARCH_STEPS_MIN, MARCH_STEPS_MAX);
@@ -83,21 +82,23 @@ vec4 cloud_march(vec3 cam, vec3 eye_dir, vec3 sun, vec3 sun_col, vec3 base_col, 
 	// Forward-scattering lobe for the silver lining, plus an even share for light that has
 	// bounced around inside the cloud: the sunlit side is bright from any angle.
 	float phase = min(mix(hg_phase(c, 0.65), hg_phase(c, -0.25), 0.35), 6.0) * 0.5 + 0.7;
-	float scale = cloud_scale / CLOUD_HEIGHT;
-	vec2 entry = (cam.xz + eye_dir.xz * t0) * scale + cloud_wind();
-	float field = cloud_field(entry);
-	vec4 planet = vec4(cam.x, cam.y - CLOUD_EARTH * CLOUD_HEIGHT, cam.z, cam.y);
+	float field = cloud_field(cp);
+	vec3 wind = cloud_volume_wind();
+	float fair = cloud_fair();
+	vec3 step_p = eye_dir * dt;
+	vec2 step_cp = eye_dir.xz * dt * (cloud_scale / CLOUD_HEIGHT);
+	vec3 p0 = cam + eye_dir * t0 + step_p * jitter;
+	vec2 cp0 = cp + step_cp * jitter;
 	vec3 scattered = vec3(0.0);
 	float trans = 1.0;
 	float weight = 0.0;
 	for (int i = 0; i < steps; i++) {
-		vec3 p = cam + eye_dir * (t0 + (float(i) + jitter) * dt);
-		vec2 cp = p.xz * scale + cloud_wind();
-		float weather = cloud_weather(cp, field);
+		vec3 p = p0 + step_p * float(i);
+		float weather = cloud_weather(cp0 + step_cp * float(i), field);
 		if (weather <= 0.0) {
 			continue;
 		}
-		float d = cloud_volume_density(p, planet, weather, true);
+		float d = cloud_volume_density(p, cam, wind, fair, weather, true);
 		if (d <= 0.0) {
 			continue;
 		}
@@ -107,18 +108,16 @@ vec4 cloud_march(vec3 cam, vec3 eye_dir, vec3 sun, vec3 sun_col, vec3 base_col, 
 		vec3 lp = p;
 		for (int j = 0; j < LIGHT_STEPS; j++) {
 			lp += sun * ls;
-			od += cloud_volume_density(lp, planet, weather, false) * ls;
+			od += cloud_volume_density(lp, cam, wind, fair, weather, false) * ls;
 			ls *= 1.8;
 		}
 		od *= EXTINCTION;
 		// Beer's law, plus a long, weak tail standing in for light scattered many times over.
 		float light = exp(-od) + 0.35 * exp(-od * 0.1);
 		float powder = 1.0 - exp(-d * dt * EXTINCTION * 2.0);
-		float hf = clamp(cloud_height_frac(p, planet), 0.0, 1.0);
-		vec3 amb = mix(base_col, top_col, hf);
+		vec3 amb = mix(base_col, top_col, clamp(cloud_height_frac(p, cam), 0.0, 1.0));
 		vec3 radiance = sun_col * light * phase * mix(0.5, 1.0, powder) + amb;
-		float ext = d * EXTINCTION;
-		float absorbed = 1.0 - exp(-ext * dt);
+		float absorbed = 1.0 - exp(-d * EXTINCTION * dt);
 		scattered += trans * radiance * absorbed;
 		weight += trans * absorbed * d;
 		trans *= 1.0 - absorbed;
@@ -193,29 +192,33 @@ void fragment() {
 			col = mix(col, mix(ambient, lit_col, 0.7), ci * smoothstep(0.0, 0.15, up));
 		}
 
-		float n;
-		float edge = cloud_edge(amount);
+		// Each path gives the tail what it uses: the cloud's colour and cover, its body for a storm
+		// deck's mottling, how lit it is, and how much silver lining it still needs.
+		vec3 lit;
 		float cover;
 		float shade;
-		vec3 lit;
-		float thick;
+		float rim;
 		if (cloud_volumetric > 0.5) {
-			float body;
-			vec4 v = cloud_march(cam, eye_dir, sun, lit_col * 0.8, shadow_col * 0.95, ambient * 0.8 + lit_col * 0.35,
-				FRAGCOORD.xy, body);
+			float body = 0.0;
+			vec4 v = vec4(0.0);
+			if (up > -0.02) {   // below the horizon it would be marched and thrown away
+				v = cloud_march(cam, eye_dir, dist, cp, sun, lit_col * 0.8, shadow_col * 0.95,
+					ambient * 0.8 + lit_col * 0.35, FRAGCOORD.xy, body);
+			}
 			lit = v.rgb;
 			cover = v.a * smoothstep(-0.02, 0.06, up);
-			n = edge + body * 0.6;
+			storm_body = clamp(0.72 + 0.42 * body, 0.4, 1.3);
 			shade = clamp(dot(lit, LUMA) / max(dot(lit_col, LUMA), 1e-3), 0.0, 1.0);
-			thick = 1.0;   // the march's phase already lit the thin edges
+			rim = 0.0;   // the march's phase lights thin edges itself
 		} else {
-			n = cloud_density(cp);
+			float n = cloud_density(cp);
+			float edge = cloud_edge(amount);
 			cover = cloud_coverage(n, amount);
 			cover *= smoothstep(-0.02, 0.12, up) * (1.0 - 0.5 * far);
 			// Light from the sun loses itself in the cloud it crosses on the way (Beer's law: two
 			// steps sunward through the layer) and in the cloud above us, so thick bases go grey.
 			vec2 sun_step = normalize(sun.xz + vec2(1e-4));
-			thick = max(n - edge, 0.0);
+			float thick = max(n - edge, 0.0);
 			float sunward = max(cloud_shape(cp + sun_step * 0.25) - edge, 0.0)
 				+ max(cloud_shape(cp + sun_step * 0.6) - edge, 0.0);
 			shade = exp(-(sunward * 2.5 + thick * 2.2));
@@ -223,16 +226,17 @@ void fragment() {
 			// behind us a cloud's rim reads darker than its body.
 			shade *= mix(1.0 - exp(-thick * 12.0 - 0.15), 1.0, toward);
 			lit = mix(shadow_col, lit_col, shade * mix(0.6, 1.0, toward));
+			// Mottled by the same noise that shaped it, so a full storm deck still has bodies to it
+			// rather than one flat lid.
+			storm_body = clamp(0.55 + 0.7 * n, 0.4, 1.3);
+			rim = exp(-thick * 10.0);
 		}
-		// Storm cloud: grey, darker than the sky it closes over, and mottled by the same noise
-		// that shaped it so a full deck still has bodies to it rather than one flat lid.
-		storm_body = clamp(0.55 + 0.7 * n, 0.4, 1.3);
+		// Storm cloud: grey, darker than the sky it closes over.
 		vec3 heavy = vec3(sky_lum) * mix(0.6, 1.1, toward * toward) * storm_body * mix(0.8, 1.0, shade);
 		lit = mix(lit, heavy, storm);
 		// Silver lining: thin cloud near the sun scatters it forward (Henyey-Greenstein, g 0.8,
 		// scaled to 1 looking straight at the sun).
-		float hg = pow(0.04 / (1.64 - 1.6 * dot(eye_dir, sun)), 1.5);
-		lit += sun_color * hg * exp(-thick * 10.0) * 1.2 * (1.0 - storm);
+		lit += sun_color * hg_phase(dot(eye_dir, sun), 0.8) / 45.0 * rim * 1.2 * (1.0 - storm);
 		// Distant cloud sinks into the horizon haze.
 		lit = mix(lit, col, far * 0.5);
 		storm_cover = cover * storm;

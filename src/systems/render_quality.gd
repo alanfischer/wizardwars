@@ -50,8 +50,7 @@ static func load_level() -> String:
 ## Whether this level draws the world's detail pass. Read by main.gd rather than applied here:
 ## it needs the loaded map, which is not this class's business.
 static func detail_enabled(level := "") -> bool:
-	var preset: Array = LEVELS.get(level if level else load_level(), LEVELS[DEFAULT_LEVEL])
-	return preset[3]
+	return _preset(level)[3]
 
 
 ## Whether this level gives liquid its depth-driven half: absorption, shoreline foam and wave
@@ -59,13 +58,12 @@ static func detail_enabled(level := "") -> bool:
 ## same division of labour as detail_enabled above. Rides the quality level rather than the
 ## renderer because the depth texture it needs works on both (see WaterSurfaces).
 static func water_depth_enabled(level := "") -> bool:
-	var preset: Array = LEVELS.get(level if level else load_level(), LEVELS[DEFAULT_LEVEL])
-	return preset[4]
+	return _preset(level)[4]
 
 
-static func volumetric_clouds_enabled(level := "") -> bool:
-	var preset: Array = LEVELS.get(level if level else load_level(), LEVELS[DEFAULT_LEVEL])
-	return preset[5]
+## The level's LEVELS row; "" is the stored level.
+static func _preset(level := "") -> Array:
+	return LEVELS.get(level if level else load_level(), LEVELS[DEFAULT_LEVEL])
 
 
 static func save_level(level: String) -> void:
@@ -83,6 +81,7 @@ static func apply(level: String, viewport: Viewport, env: Environment = null) ->
 		return
 	var preset: Array = LEVELS.get(level, LEVELS[DEFAULT_LEVEL])
 	viewport.msaa_3d = preset[1]
+	Skybox.set_volumetric(preset[5])
 	if env:
 		env.glow_enabled = preset[2]
 		env.glow_hdr_threshold = GLOW_HDR_THRESHOLD

@@ -458,9 +458,7 @@ func _ready() -> void:
 	_lobby.quality_changed.connect(func(level: String) -> void:
 		RenderQuality.apply(level, get_viewport(), _current_environment())
 		WorldMaterials.apply(_map_root, RenderQuality.detail_enabled(level))
-		WaterSurfaces.apply(_map_root, RenderQuality.water_depth_enabled(level))
-		if _skybox:
-			_skybox.set_volumetric(RenderQuality.volumetric_clouds_enabled(level)))
+		WaterSurfaces.apply(_map_root, RenderQuality.water_depth_enabled(level)))
 	MapTransfer.map_already_cached.connect(_on_map_ready)
 	MapTransfer.map_transfer_complete.connect(_on_map_ready)
 	MapTransfer.map_transfer_failed.connect(_on_map_transfer_failed)
@@ -510,7 +508,6 @@ func _build_skybox(map_root: Node3D) -> void:
 	Game.skybox = _skybox
 	# Read straight off the map rather than waiting for LightEnvironment._ready: entity _ready
 	# order follows the BSP lump order, and the sky is built here, before any of them run.
-	_skybox.set_volumetric(RenderQuality.volumetric_clouds_enabled())
 	_skybox.setup(_built_sky, map_root, _find_entity(map_root, "light_environment"))
 	_world_env = _skybox.get_node_or_null("WorldEnvironment") as WorldEnvironment
 	# Skybox builds a fresh Environment per map, so the quality level has to be stamped onto this
