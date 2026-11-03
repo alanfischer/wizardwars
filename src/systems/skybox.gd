@@ -34,6 +34,9 @@ const STORM_COVER := 0.97
 ## Tiling cloud noise for the procedural sky, made once: sampling it costs a fraction of
 ## computing the octaves per pixel, which pays for the extra samples the cloud shading takes.
 static var _cloud_noise: Texture2D
+static var _cloud_volume: Texture3D
+## Ray-marched clouds (High quality). See set_volumetric.
+static var _volumetric := false
 
 
 ## `sun_ent` is the map's light_environment entity dict, used to point the procedural sun the way
@@ -176,20 +179,38 @@ func set_storm(amount: float) -> void:
 	storm = amount
 	if _enhanced_material:
 		_enhanced_material.set_shader_parameter("storm", amount)
-	_push_clouds()
+	_push_cloud_weather()
 
 
-## The clouds.gdshaderinc globals: the procedural sky's cloud layer, and the shadow it casts on
-## the map and models. No shadow unless the procedural sky is drawing clouds.
-func _push_clouds() -> void:
+## High quality's clouds: the procedural sky ray-marches them through 3D noise rather than
+## shading one flat layer, and the ground's cloud shadows follow it. Set by RenderQuality.apply;
+## the volume itself is built only once a procedural sky is drawing it.
+static func set_volumetric(enabled: bool) -> void:
+	_volumetric = enabled
+	RenderingServer.global_shader_parameter_set("cloud_volumetric", 1.0 if enabled else 0.0)
+	if enabled and is_instance_valid(Game.skybox) and Game.skybox._enhanced_on:
+		RenderingServer.global_shader_parameter_set("cloud_volume", cloud_volume())
+
+
+## The clouds.gdshaderinc globals a storm moves: cover, and the shadow cloud casts on the map and
+## models. No shadow unless the procedural sky is drawing clouds. Every frame of a transition.
+func _push_cloud_weather() -> void:
 	var amount: float = _params.get("cloud_amount", 0.0)
 	var casting := _enhanced_on and maxf(amount, storm) > 0.0
 	RenderingServer.global_shader_parameter_set("cloud_shadow",
 		lerpf(CLOUD_SHADOW, STORM_SHADOW, storm) if casting else 0.0)
+	if _enhanced_on:
+		RenderingServer.global_shader_parameter_set("cloud_cover", lerpf(amount, STORM_COVER, storm))
+
+
+## The rest of them, which hold for the sky: pushed when it is swapped in.
+func _push_clouds() -> void:
+	_push_cloud_weather()
 	if not _enhanced_on:
 		return
 	RenderingServer.global_shader_parameter_set("cloud_noise", cloud_noise())
-	RenderingServer.global_shader_parameter_set("cloud_cover", lerpf(amount, STORM_COVER, storm))
+	if _volumetric:
+		RenderingServer.global_shader_parameter_set("cloud_volume", cloud_volume())
 	RenderingServer.global_shader_parameter_set("cloud_sun_dir", (_params["sun_dir"] as Vector3).normalized())
 	for key in ["cloud_scale", "cloud_speed", "cloud_softness"]:
 		RenderingServer.global_shader_parameter_set(key, _params[key])
@@ -237,34 +258,62 @@ func _get_enhanced_material() -> ShaderMaterial:
 static func cloud_noise() -> Texture2D:
 	if _cloud_noise:
 		return _cloud_noise
-	var noise := FastNoiseLite.new()
-	noise.seed = 7
-	noise.noise_type = FastNoiseLite.TYPE_PERLIN
-	noise.frequency = 8.0 / 512.0
-	noise.fractal_type = FastNoiseLite.FRACTAL_FBM
-	noise.fractal_octaves = 6
-	var cells := FastNoiseLite.new()
-	cells.seed = 11
-	cells.noise_type = FastNoiseLite.TYPE_CELLULAR
-	cells.cellular_return_type = FastNoiseLite.RETURN_DISTANCE
-	cells.frequency = 24.0 / 512.0
-	cells.fractal_type = FastNoiseLite.FRACTAL_FBM
-	cells.fractal_octaves = 2
-	var r := noise.get_seamless_image(512, 512)
-	var g := cells.get_seamless_image(512, 512)
-	r.convert(Image.FORMAT_L8)
-	g.convert(Image.FORMAT_L8)
-	var rd := r.get_data()
-	var gd := g.get_data()
-	var rg := PackedByteArray()
-	rg.resize(rd.size() * 2)
-	for i in rd.size():
-		rg[i * 2] = rd[i]
-		rg[i * 2 + 1] = gd[i]
-	var img := Image.create_from_data(512, 512, false, Image.FORMAT_RG8, rg)
+	var r := _fbm(7, false, 8.0 / 512.0, 6).get_seamless_image(512, 512)
+	var g := _fbm(11, true, 24.0 / 512.0, 2).get_seamless_image(512, 512)
+	var img := Image.create_from_data(512, 512, false, Image.FORMAT_RG8,
+		_interleave(_bytes(r), _bytes(g)))
 	img.generate_mipmaps()
 	_cloud_noise = ImageTexture.create_from_image(img)
 	return _cloud_noise
+
+
+## Tiling 3D noise for the volumetric clouds: perlin-worley in r (shape: billows where worley
+## cells are), worley distance in g (detail that erodes the edges). Made once, on first use.
+static func cloud_volume() -> Texture3D:
+	if _cloud_volume:
+		return _cloud_volume
+	const N := 64
+	var perlin := _fbm(3, false, 4.0 / N, 4).get_seamless_image_3d(N, N, N)
+	var cells := _fbm(5, true, 6.0 / N, 3).get_seamless_image_3d(N, N, N)
+	var fine := _fbm(9, true, 8.0 / N, 3).get_seamless_image_3d(N, N, N)
+	var slices: Array[Image] = []
+	for z in N:
+		var pd := _bytes(perlin[z])
+		var cd := _bytes(cells[z])
+		for i in pd.size():
+			pd[i] = clampi(int((pd[i] * 0.45 + (255 - cd[i]) * 0.55 - 25.0) * 1.25), 0, 255)
+		slices.append(Image.create_from_data(N, N, false, Image.FORMAT_RG8,
+			_interleave(pd, _bytes(fine[z]))))
+	var tex := ImageTexture3D.new()
+	tex.create(Image.FORMAT_RG8, N, N, N, false, slices)
+	_cloud_volume = tex
+	return _cloud_volume
+
+
+## Fractal noise: perlin, or worley distance (0 at a cell's centre) when `cellular`.
+static func _fbm(seed: int, cellular: bool, frequency: float, octaves: int) -> FastNoiseLite:
+	var noise := FastNoiseLite.new()
+	noise.seed = seed
+	noise.noise_type = FastNoiseLite.TYPE_CELLULAR if cellular else FastNoiseLite.TYPE_PERLIN
+	noise.cellular_return_type = FastNoiseLite.RETURN_DISTANCE
+	noise.frequency = frequency
+	noise.fractal_type = FastNoiseLite.FRACTAL_FBM
+	noise.fractal_octaves = octaves
+	return noise
+
+
+static func _bytes(img: Image) -> PackedByteArray:
+	img.convert(Image.FORMAT_L8)
+	return img.get_data()
+
+
+static func _interleave(r: PackedByteArray, g: PackedByteArray) -> PackedByteArray:
+	var rg := PackedByteArray()
+	rg.resize(r.size() * 2)
+	for i in r.size():
+		rg[i * 2] = r[i]
+		rg[i * 2 + 1] = g[i]
+	return rg
 
 
 func _collect_sky_surfaces(node: Node) -> void:

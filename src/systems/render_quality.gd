@@ -10,18 +10,19 @@ extends Object
 const SETTINGS_PATH := "user://settings.cfg"  # shared with LobbyUI and RendererTrial
 const DEFAULT_LEVEL := "medium"
 
-## setting value -> [label, msaa, glow, surface detail, water depth]. Ordered cheapest first;
+## setting value -> [label, msaa, glow, surface detail, water depth, volumetric clouds]. Ordered cheapest first;
 ## the lobby lists them in this order. 2x is the default because multisampling is resolved in
 ## tile memory on the mobile GPUs (Quest) and is close to free on any desktop part, while BSP
 ## maps are nothing but hard geometric edges. Glow and surface detail are the entries that change
 ## how the game LOOKS rather than how cleanly it draws, so both stay off until asked for. Detail
 ## costs a second draw of the world besides (see WorldMaterials). The procedural sky is not a
-## quality setting: it comes with dynamic weather (Skybox.procedural).
+## quality setting: it comes with dynamic weather (Skybox.procedural); High only ray-marches its
+## clouds (Skybox.set_volumetric).
 const LEVELS := {
-	"low": ["Low — no antialiasing", Viewport.MSAA_DISABLED, false, false, false],
-	"medium": ["Medium — 2x antialiasing", Viewport.MSAA_2X, false, false, false],
-	"high": ["High — 4x antialiasing, glow, surface detail, water", Viewport.MSAA_4X,
-		true, true, true],
+	"low": ["Low — no antialiasing", Viewport.MSAA_DISABLED, false, false, false, false],
+	"medium": ["Medium — 2x antialiasing", Viewport.MSAA_2X, false, false, false, false],
+	"high": ["High — 4x antialiasing, glow, surface detail, water, volumetric clouds",
+		Viewport.MSAA_4X, true, true, true, true],
 }
 
 ## Nothing in the scene renders above 1.0: the world shader clamps albedo x lightmap to it
@@ -49,8 +50,7 @@ static func load_level() -> String:
 ## Whether this level draws the world's detail pass. Read by main.gd rather than applied here:
 ## it needs the loaded map, which is not this class's business.
 static func detail_enabled(level := "") -> bool:
-	var preset: Array = LEVELS.get(level if level else load_level(), LEVELS[DEFAULT_LEVEL])
-	return preset[3]
+	return _preset(level)[3]
 
 
 ## Whether this level gives liquid its depth-driven half: absorption, shoreline foam and wave
@@ -58,8 +58,12 @@ static func detail_enabled(level := "") -> bool:
 ## same division of labour as detail_enabled above. Rides the quality level rather than the
 ## renderer because the depth texture it needs works on both (see WaterSurfaces).
 static func water_depth_enabled(level := "") -> bool:
-	var preset: Array = LEVELS.get(level if level else load_level(), LEVELS[DEFAULT_LEVEL])
-	return preset[4]
+	return _preset(level)[4]
+
+
+## The level's LEVELS row; "" is the stored level.
+static func _preset(level := "") -> Array:
+	return LEVELS.get(level if level else load_level(), LEVELS[DEFAULT_LEVEL])
 
 
 static func save_level(level: String) -> void:
@@ -77,6 +81,7 @@ static func apply(level: String, viewport: Viewport, env: Environment = null) ->
 		return
 	var preset: Array = LEVELS.get(level, LEVELS[DEFAULT_LEVEL])
 	viewport.msaa_3d = preset[1]
+	Skybox.set_volumetric(preset[5])
 	if env:
 		env.glow_enabled = preset[2]
 		env.glow_hdr_threshold = GLOW_HDR_THRESHOLD

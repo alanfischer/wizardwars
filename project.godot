@@ -294,3 +294,11 @@ cloud_sun_dir={
 "type": "vec3",
 "value": Vector3(0, 1, 0)
 }
+cloud_volumetric={
+"type": "float",
+"value": 0.0
+}
+cloud_volume={
+"type": "sampler3D",
+"value": ""
+}
