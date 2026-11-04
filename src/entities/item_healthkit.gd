@@ -40,7 +40,6 @@ func _ready() -> void:
 	else:
 		push_warning("item_healthkit: failed to load models/health.mdl")
 
-	rotation = parse_angles(ent)
 	_touch.add_box()
 	_seed_game_visible()
 

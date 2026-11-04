@@ -30,6 +30,7 @@ func _ready() -> void:
 			var model := AssetLoader.load_model(mdl_path)
 			if model:
 				add_child(model)
+				EntityRender.hold_sequence(model, 0)
 			else:
 				push_warning("info_tfgoal %d: failed to load %s" % [goal_no, mdl_path])
 

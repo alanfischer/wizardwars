@@ -66,6 +66,7 @@ func _ready() -> void:
 		if model:
 			add_child(model)
 			_has_model = true
+			EntityRender.hold_sequence(model, 0)
 			EntityRender.apply_model_render_properties(model, ent)
 			# Re-track so _compute_local_aabb captures the real mesh AABB, not a
 			# zero-size point — otherwise PVS uses only the base position and the

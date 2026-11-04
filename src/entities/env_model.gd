@@ -30,17 +30,15 @@ func _ready() -> void:
 			VisibilitySystem.untrack_node(_entity.entity_id)
 			VisibilitySystem.track_node(_entity.entity_id, self)
 
-	rotation = parse_angles(ent)
 	EntityRender.apply_render_properties(model, ent)
 
 	var anim_player := model.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	if anim_player:
-		var anims := anim_player.get_animation_list()
-		var seq_idx := parse_int(ent, "sequence", 0)
-		if seq_idx < anims.size():
-			anim_player.play(anims[seq_idx])
-		elif anims.size() > 0:
-			anim_player.play(anims[0])
+		var anim := EntityRender.sequence_name(model, parse_int(ent, "sequence", 0))
+		if anim.is_empty():
+			anim = EntityRender.sequence_name(model, 0)
+		if not anim.is_empty():
+			anim_player.play(anim)
 
 	var spawnflags := parse_spawnflags(ent)
 	var has_targetname : bool = not ent.get("targetname", "").is_empty()

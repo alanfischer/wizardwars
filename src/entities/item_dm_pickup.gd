@@ -59,7 +59,6 @@ func _ready() -> void:
 		_mana = AMMO_MANA
 	SoundSystem.precache(BOOK_SOUND)
 	SoundSystem.precache(MANA_SOUND)
-	rotation = parse_angles(ent)
 	_touch.add_box()
 
 	add_child(BlobShadow.new(0.3))

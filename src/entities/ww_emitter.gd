@@ -52,7 +52,9 @@ func _ready() -> void:
 	p.preprocess = life  # spawn already in steady state
 	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
 	p.emission_box_extents = (hi - lo) * 0.5
-	p.position = (hi + lo) * 0.5
+	# mins/maxs, pitch and angle are all world axes: the importer's turn of this node is not ours.
+	p.top_level = true
+	p.position = global_position + (hi + lo) * 0.5
 	p.direction = _emit_direction()
 	p.spread = maxf(spread, 0.0)
 	p.initial_velocity_min = speed
