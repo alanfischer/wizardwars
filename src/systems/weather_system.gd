@@ -79,7 +79,7 @@ func _on_node_added(node: Node) -> void:
 
 
 func _cover_if_solid(body: AnimatableBody3D) -> void:
-	if is_instance_valid(body) and body.collision_layer != 0 and not _covers.has(body):
+	if is_instance_valid(body) and body.collision_layer != 0 and not has_cover(body):
 		add_cover(body)
 
 
