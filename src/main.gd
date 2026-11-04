@@ -117,7 +117,7 @@ var _auto_team := 0  # --team <1-4>: auto-join team on game start
 var _auto_class := 0  # --class <name>: auto-pick class on game start
 var _auto_name := ""  # --name <name>: set player name from command line
 var _auto_bots := 0  # --bots <n>: dedicated server fills with this many AI bots on startup
-## --timelimit/--scorelimit/--fraglimit <n>, --night <on|off|0-1>, --rain <0-1> and
+## --timelimit/--scorelimit/--fraglimit <n>, --time <hours|h:mm|name>, --rain <0-1> and
 ## --lightning <on|off>, applied to the matching server var
 ## in _ready. A dedicated server has no console, so these have to be reachable as flags.
 var _weather_cycle: WeatherCycle
@@ -224,7 +224,7 @@ func _flag_handlers() -> Dictionary:
 		"--timelimit": func(v: String) -> void: _limit_args["timelimit"] = v.strip_edges(),
 		"--scorelimit": func(v: String) -> void: _limit_args["scorelimit"] = v.strip_edges(),
 		"--fraglimit": func(v: String) -> void: _limit_args["fraglimit"] = v.strip_edges(),
-		"--night": func(v: String) -> void: _limit_args["night"] = NightMode.parse(v),
+		"--time": func(v: String) -> void: _limit_args["time"] = NightMode.parse(v),
 		"--rain": func(v: String) -> void: _limit_args["rain"] = v.strip_edges(),
 		"--lightning": func(v: String) -> void: _limit_args["lightning"] = v.strip_edges(),
 		"--dynamic-weather": func() -> void: _limit_args["dynamic_weather"] = "on",
@@ -481,7 +481,7 @@ func _ready() -> void:
 func _on_server_var_changed(key: String, _value: Variant) -> void:
 	if key == "bsp_hulls":
 		_apply_bsp_hulls()
-	elif key == "night" and _map_root:
+	elif key == "time" and _map_root:
 		if NightMode.sky_for(_map_sky_name(_map_root), _map_root) != _built_sky:
 			_build_skybox(_map_root)
 			apply_vr_passthrough(XRManager.vr_passthrough)
@@ -496,7 +496,8 @@ func _map_sky_name(map_root: Node3D) -> String:
 
 
 ## From the worldspawn skyname, or the night sky standing in for it. Rebuilt whole when night
-## swaps one for the other: the procedural sky and the Environment are measured off the cubemap.
+## swaps one for the other. The procedural sky is measured off the map's own sky either way, and
+## does its own night.
 func _build_skybox(map_root: Node3D) -> void:
 	if _skybox:
 		remove_child(_skybox)
@@ -508,7 +509,8 @@ func _build_skybox(map_root: Node3D) -> void:
 	Game.skybox = _skybox
 	# Read straight off the map rather than waiting for LightEnvironment._ready: entity _ready
 	# order follows the BSP lump order, and the sky is built here, before any of them run.
-	_skybox.setup(_built_sky, map_root, _find_entity(map_root, "light_environment"))
+	_skybox.setup(_built_sky, map_root, _find_entity(map_root, "light_environment"),
+		_map_sky_name(map_root))
 	_world_env = _skybox.get_node_or_null("WorldEnvironment") as WorldEnvironment
 	if weather_system:
 		weather_system.sky = _skybox.overcast

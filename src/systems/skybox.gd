@@ -28,31 +28,17 @@ var overcast: SkyboxSky
 
 ## `sun_ent` is the map's light_environment entity dict, used to point the procedural sun the way
 ## the mapper lit the level. Optional — SkyPreset falls back to the sky art, then to a default.
-func setup(sky_name: String, map_root: Node = null, sun_ent: Dictionary = {}) -> void:
+## `day_sky` is the sky the procedural one is measured off, when the cubemap shown is the night
+## standing in for it: the procedural sky does its own night.
+func setup(sky_name: String, map_root: Node = null, sun_ent: Dictionary = {}, day_sky := "") -> void:
 	if not ServerVars.value_changed.is_connected(_on_server_var_changed):
 		ServerVars.value_changed.connect(_on_server_var_changed)
 	if sky_name.is_empty():
 		return
 
-	# Cubemap layer order +X,-X,+Y,-Y,+Z,-Z maps to GoldSrc rt,lf,up,dn,bk,ft
-	# (gl_warp.c convention: ft=-Y, bk=+Y); shader maps cubemap Y->GS Z(up), Z->GS Y(forward).
-	var suffixes := ["rt", "lf", "up", "dn", "bk", "ft"]
-
-	var images: Array[Image] = []
-	for suffix in suffixes:
-		var img := AssetLoader.load_sky_image(sky_name, suffix)
-		if img == null:
-			var path := "sky/%s%s.tga" % [sky_name, suffix]
-			var tex := load(path) as Texture2D
-			if tex == null:
-				push_warning("Sky texture not found: %s" % path)
-				return
-			img = tex.get_image()
-		images.append(img)
-
-	# HL's up/down face orientation (MakeSkyVec st_to_vec) doesn't match OpenGL cubemap convention.
-	images[2].rotate_90(COUNTERCLOCKWISE)
-	images[3].rotate_90(CLOCKWISE)
+	var images := _load_faces(sky_name)
+	if images.is_empty():
+		return
 
 	_cubemap = Cubemap.new()
 	_cubemap.create_from_images(images)
@@ -73,7 +59,14 @@ func setup(sky_name: String, map_root: Node = null, sun_ent: Dictionary = {}) ->
 
 	# Measured after the two rotations above, so the face orientations SkyPreset reasons about
 	# are the ones the cubemap actually ended up with.
-	_params = SkyPreset.build(sky_name, images,
+	var measured := sky_name
+	var faces := images
+	if not day_sky.is_empty() and day_sky != sky_name:
+		var day_faces := _load_faces(day_sky)
+		if not day_faces.is_empty():
+			measured = day_sky
+			faces = day_faces
+	_params = SkyPreset.build(measured, faces,
 		SkyPreset.sun_dir_from_light_environment(sun_ent),
 		SkyPreset.sun_color_from_light_environment(sun_ent))
 
@@ -83,6 +76,7 @@ func setup(sky_name: String, map_root: Node = null, sun_ent: Dictionary = {}) ->
 	# The stock sky material carries this so the sky draws before the world and reads as a true
 	# background; an override replaces the material outright, so it has to carry it too.
 	overcast.render_priority = PRIORITY
+	overcast.time_of_day = NightMode.hours()
 
 	if map_root != null:
 		_collect_sky_surfaces(map_root)
@@ -125,6 +119,8 @@ static func procedural() -> bool:
 func _on_server_var_changed(key: String, _value: Variant) -> void:
 	if key == "dynamic_weather":
 		apply_enhanced(procedural())
+	elif key == "time" and overcast:
+		overcast.time_of_day = NightMode.hours()
 
 
 ## Swap the procedural sky in or out. Safe to call repeatedly and before/without a map.
@@ -175,3 +171,27 @@ func _apply_sky_cubemap(node: Node, cubemap: Cubemap) -> void:
 			mat.set_shader_parameter("sky_cubemap", cubemap)
 	for child in node.get_children():
 		_apply_sky_cubemap(child, cubemap)
+
+
+## The six faces in cubemap order, rotated as the cubemap needs; empty if any is missing.
+static func _load_faces(sky_name: String) -> Array[Image]:
+	# Cubemap layer order +X,-X,+Y,-Y,+Z,-Z maps to GoldSrc rt,lf,up,dn,bk,ft
+	# (gl_warp.c convention: ft=-Y, bk=+Y); shader maps cubemap Y->GS Z(up), Z->GS Y(forward).
+	var suffixes := ["rt", "lf", "up", "dn", "bk", "ft"]
+
+	var images: Array[Image] = []
+	for suffix in suffixes:
+		var img := AssetLoader.load_sky_image(sky_name, suffix)
+		if img == null:
+			var path := "sky/%s%s.tga" % [sky_name, suffix]
+			var tex := load(path) as Texture2D
+			if tex == null:
+				push_warning("Sky texture not found: %s" % path)
+				return []
+			img = tex.get_image()
+		images.append(img)
+
+	# HL's up/down face orientation (MakeSkyVec st_to_vec) doesn't match OpenGL cubemap convention.
+	images[2].rotate_90(COUNTERCLOCKWISE)
+	images[3].rotate_90(CLOCKWISE)
+	return images

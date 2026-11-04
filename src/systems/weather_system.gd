@@ -120,14 +120,13 @@ func _apply_rain() -> void:
 func _on_server_var_changed(key: String, _value: Variant) -> void:
 	if key == "rain" or key == "lightning":
 		_apply_rain()
-	elif key == "night":
+	elif key == "time":
 		_apply_night()
 
 
 ## The night darkens the rain and the haze the way it darkens the sky's light.
 func _apply_night() -> void:
 	sky_light = sky_light_now()
-	night = NightMode.amount()
 
 
 ## Join snapshot. Default weather is "none", which every peer already starts at, so a dry map

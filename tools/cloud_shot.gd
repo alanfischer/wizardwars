@@ -22,8 +22,8 @@ func _ready() -> void:
 		sky.setup(sky_name, map, _find(map, "light_environment"))
 		if sky.overcast:
 			sky.overcast.storm = storm
-		if OS.get_environment("NIGHT") != "":
-			ServerVars.set_from_string("night", OS.get_environment("NIGHT"))
+		if OS.get_environment("TIME") != "":
+			ServerVars.set_from_string("time", OS.get_environment("TIME"))
 		NightMode.apply(map)
 		var weather: WeatherSystem = null
 		if OS.get_environment("RAIN") != "":

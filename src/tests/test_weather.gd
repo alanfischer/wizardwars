@@ -1,6 +1,6 @@
 extends "res://src/tests/test_base.gd"
-## `rain` and `night` both take values past 1: rain draws more drops and night keeps darkening.
-## Everything else has to stop at a downpour and at black. (Overcast tests the weather itself.)
+## `rain` takes values past 1, where it only draws more drops; `time` is hours round the clock.
+## (Overcast tests the weather itself.)
 ##
 ## Scene-run only (needs the ServerVars autoload): res://src/tests/run_tests.tscn.
 
@@ -20,14 +20,28 @@ func test_the_rain_var_reaches_overcast_unchanged() -> void:
 	weather.free()
 
 
-func test_night_past_full_stays_lit_by_something() -> void:
-	for night in ["1", "1.5", "4"]:
-		ServerVars.set_from_string("night", night)
+func test_every_hour_lights_the_rain_with_a_number() -> void:
+	for t in ["0", "6", "12", "18", "18:30", "23.75"]:
+		ServerVars.set_from_string("time", NightMode.parse(t))
 		var n := NightMode.night_light()
-		assert_true(n.x >= 0.0 and n.y >= 0.0 and n.z >= 0.0, "night %s never goes below black" % night)
+		assert_true(n.x >= 0.0 and n.y >= 0.0 and n.z >= 0.0, "%s never goes below black" % t)
 		var sky := WeatherSystem.sky_light_now()
-		assert_false(is_nan(sky.r) or is_nan(sky.g) or is_nan(sky.b), "night %s lights the rain with a number" % night)
-	ServerVars.set_from_string("night", "0")
+		assert_false(is_nan(sky.r) or is_nan(sky.g) or is_nan(sky.b), "%s lights the rain with a number" % t)
+	ServerVars.set_from_string("time", "12")
+
+
+func test_time_reads_as_hours_names_and_clock_times() -> void:
+	assert_eq(NightMode.parse("18:30"), "18.5", "h:mm")
+	assert_eq(NightMode.parse("dusk"), "18.0", "a name")
+	assert_eq(NightMode.parse("6"), "6.0", "plain hours")
+	assert_eq(NightMode.parse("25"), "", "past the clock")
+	assert_eq(NightMode.parse("12:75"), "", "not a minute")
+	assert_eq(NightMode.format(18.5), "18:30", "and back")
+	ServerVars.set_from_string("time", "12")
+	assert_eq(NightMode.night_light(), Vector3.ONE, "noon is the map as lit")
+	ServerVars.set_from_string("time", "0")
+	assert_almost_eq(NightMode.amount(), 1.0, 1e-6, "midnight is full night")
+	ServerVars.set_from_string("time", "12")
 
 
 ## The extension bakes its rain floor from the max-X corner and Overcast reads from the min-X one:

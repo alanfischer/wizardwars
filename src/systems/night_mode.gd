@@ -1,16 +1,16 @@
 class_name NightMode
 extends Object
-## How much of the sky's light reaches the map: the `night` server var (0 day … 1 full night) and
-## any lightstyle a map plays on its light_environment, the map's own lights left as they are.
+## How much of the sky's light reaches the map: the `time` server var (hours; Overcast's day, dusk
+## and night) and any lightstyle a map plays on its light_environment, the map's own lights left as
+## they are.
 ##
 ## How much of each lightmap luxel the sky put there is baked at conversion (GoldSrcBSP's
 ## compute_sun_fractions: lm_sun on world materials, sun_slices in the light grid for models).
 ## Everything here comes down to one linear-light multiplier on that share, `sky_light`. A map
 ## with no light_environment has no share to turn, so it is left exactly as it was.
 
-## Moonlight, as the multiplier at full night.
-const TINT := Color(0.12, 0.14, 0.24)
-## Any night at all swaps the map's sky for this one, unless the map's own already reads as night.
+## Past half night the map's cubemap sky gives way to this one, unless the map's own already reads
+## as night. The procedural sky (dynamic weather) does its own night, off the map's day sky.
 const SKY := "fullmoon"
 const NIGHT_SKIES := ["fullmoon", "night", "space", "space2"]
 ## hlrad writes pow(light, gamma); a lightstyle scales that stored value, so its linear twin is
@@ -29,18 +29,42 @@ static var _sun_style := 1.0
 static var _sun_has_layer := false
 
 
-## "on"/"off" or a number, as /night, --night and the pause slider give it; "" if neither.
+## Times by name, for /time and --time.
+const NAMED := {"midnight": 0.0, "night": 0.0, "dawn": 6.0, "sunrise": 6.0, "morning": 9.0,
+	"noon": 12.0, "day": 12.0, "afternoon": 15.0, "dusk": 18.0, "sunset": 18.0, "evening": 19.5}
+
+
+## Hours, as /time, --time and the pause slider give it: a name (NAMED), "h", "h.5" or "h:mm",
+## 0 to 24. "" if none of those.
 static func parse(text: String) -> String:
 	var t := text.strip_edges().to_lower()
-	if t == "on":
-		return "1"
-	if t == "off":
-		return "0"
-	return str(float(t)) if t.is_valid_float() else ""
+	if NAMED.has(t):
+		return str(NAMED[t])
+	var parts := t.split(":")
+	if parts.size() == 2 and parts[0].is_valid_int() and parts[1].is_valid_int():
+		var m := int(parts[1])
+		if m < 0 or m >= 60:
+			return ""
+		t = str(int(parts[0]) + m / 60.0)
+	if not t.is_valid_float() or float(t) < 0.0 or float(t) > 24.0:
+		return ""
+	return str(float(t))
 
 
+## "18:30".
+static func format(hours: float) -> String:
+	var minutes := roundi(hours * 60.0) % (24 * 60)
+	return "%d:%02d" % [minutes / 60, minutes % 60]
+
+
+## The `time` server var, hours.
+static func hours() -> float:
+	return float(ServerVars.get_value("time", 12.0))
+
+
+## 0 by day to 1 at full night, at the server's time.
 static func amount() -> float:
-	return float(ServerVars.get_value("night", 0.0))
+	return OvercastSky.night_at(hours())
 
 
 ## Whether conversion found a sky share to turn down: no light_environment, no night.
@@ -49,7 +73,7 @@ static func has_sun(map_root: Node) -> bool:
 
 
 static func sky_for(sky_name: String, map_root: Node) -> String:
-	if sky_name.is_empty() or amount() <= 0.0 or sky_name in NIGHT_SKIES or not has_sun(map_root):
+	if sky_name.is_empty() or amount() < 0.5 or sky_name in NIGHT_SKIES or not has_sun(map_root):
 		return sky_name
 	return SKY
 
@@ -91,11 +115,11 @@ static func set_flash(flash: Vector3) -> void:
 	_push()
 
 
-## The night's linear-light multiplier on the sky's light: ones by day, TINT at full night. Past 1
-## it keeps darkening down to black, never below: a negative light is NaN under the gamma pow.
+## The time of day's linear-light multiplier on the sky's light: ones by day, warm at dusk,
+## moonlight at night (OvercastSky.scene_light_at).
 static func night_light() -> Vector3:
-	var t := amount()
-	return Vector3(lerpf(1.0, TINT.r, t), lerpf(1.0, TINT.g, t), lerpf(1.0, TINT.b, t)).max(Vector3.ZERO)
+	var c := OvercastSky.scene_light_at(hours())
+	return Vector3(c.r, c.g, c.b).max(Vector3.ZERO)
 
 
 static func _push() -> void:
