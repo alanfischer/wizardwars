@@ -302,3 +302,39 @@ overcast_volume={
 "type": "sampler3D",
 "value": ""
 }
+overcast_height={
+"type": "float",
+"value": 100.0
+}
+overcast_rain_floor={
+"type": "sampler2D",
+"value": ""
+}
+overcast_has_rain_floor={
+"type": "bool",
+"value": false
+}
+overcast_rain_floor_origin={
+"type": "vec3",
+"value": Vector3(0, 0, 0)
+}
+overcast_rain_floor_size={
+"type": "vec2",
+"value": Vector2(1, 1)
+}
+overcast_rain_top={
+"type": "float",
+"value": 1000000.0
+}
+overcast_wetness={
+"type": "float",
+"value": 0.0
+}
+overcast_puddles={
+"type": "float",
+"value": 0.0
+}
+overcast_rain_sky={
+"type": "vec3",
+"value": Vector3(0, 0, 0)
+}

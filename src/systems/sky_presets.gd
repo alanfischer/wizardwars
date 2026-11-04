@@ -164,7 +164,7 @@ static func _derive(stats: Dictionary) -> Dictionary:
 	var star_amount := clampf(inverse_lerp(0.5, 0.95, stats["dark_fraction"]), 0.0, 1.0)
 
 	var horizon: Color = stats["horizon"]
-	# Only what is measured or differs from OvercastSky.defaults(), which fill in the rest.
+	# Only what is measured or differs from OvercastSky.DEFAULTS, which fill in the rest.
 	return {
 		"zenith_color": stats["zenith"],
 		"horizon_color": horizon,

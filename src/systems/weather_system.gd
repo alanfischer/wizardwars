@@ -22,6 +22,8 @@ func _ready() -> void:
 	rain_filter = SoundSystem.rain_filter()
 	listener_height = 1.5
 	bolt_drawer = _draw_beam_bolt
+	light_from_sky = false  # NightMode's light, which knows the map's lightmaps
+	wet_ground = false  # until the map turns out to have a rain floor
 	flash_changed.connect(func(k: float) -> void: NightMode.set_flash(FLASH * k))
 	struck.connect(_on_struck)
 	super._ready()
@@ -55,10 +57,37 @@ func _take_rain_floor(map_root: Node) -> void:
 	var origin: Vector3 = data["origin"]
 	rain_floor = OvercastRainFloor.create(img, Vector3(origin.x - size.x, origin.y, origin.z), size,
 		float(data["top"]))
-	add_wet_materials(map_root, func(mi: MeshInstance3D) -> float:
-		# The loader names each world mesh after its texture.
-		return PUDDLE_BY_CLASS.get(WorldMaterials.classify(String(mi.name)), PUDDLE_DEFAULT))
+	# Without a floor rain would wet the map indoors too.
+	wet_ground = true
+	_set_puddle_scales(map_root)
 	_cover_movers(map_root)
+
+
+var _pools_by_shader := {}  # Shader -> whether it takes puddle_scale
+
+
+## How readily each world surface pools, by its texture's WorldMaterials class. The loader names
+## each world mesh after its texture.
+func _set_puddle_scales(root: Node) -> void:
+	for mi: MeshInstance3D in root.find_children("*", "MeshInstance3D", true, false):
+		if mi.mesh == null:
+			continue
+		var pools: float = PUDDLE_BY_CLASS.get(WorldMaterials.classify(String(mi.name)), PUDDLE_DEFAULT)
+		for i in mi.mesh.get_surface_count():
+			var mat := mi.get_surface_override_material(i) as ShaderMaterial
+			if mat == null:
+				mat = mi.mesh.surface_get_material(i) as ShaderMaterial
+			if mat and _pools(mat.shader):
+				mat.set_shader_parameter("puddle_scale", pools)
+
+
+func _pools(shader: Shader) -> bool:
+	if shader == null:
+		return false
+	if not _pools_by_shader.has(shader):
+		_pools_by_shader[shader] = shader.get_shader_uniform_list().any(
+			func(u: Dictionary) -> bool: return u["name"] == "puddle_scale")
+	return _pools_by_shader[shader]
 
 
 ## The bake leaves out brush entities (doors, plats and trains move; breakables break), so each
@@ -79,7 +108,7 @@ func _on_node_added(node: Node) -> void:
 
 
 func _cover_if_solid(body: AnimatableBody3D) -> void:
-	if is_instance_valid(body) and body.collision_layer != 0 and not _covers.has(body):
+	if is_instance_valid(body) and body.collision_layer != 0 and not has_cover(body):
 		add_cover(body)
 
 

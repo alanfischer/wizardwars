@@ -65,3 +65,34 @@ func test_the_maps_rain_floor_lands_where_the_extension_baked_it() -> void:
 		assert_eq(weather.floor_at(q), want, "column at %s" % q)
 	weather.free()
 	map_root.free()
+
+
+## Rain wets the map only where it has a rain floor, and each surface pools as its texture would.
+func test_the_maps_surfaces_pool_by_their_material() -> void:
+	var wet := Shader.new()
+	wet.code = 'shader_type spatial;\n#include "res://addons/overcast/shaders/wet.gdshaderinc"\nvoid fragment() {}'
+	var map_root := Node3D.new()
+	var mats := {}
+	for tex in ["out_wd", "grass1"]:
+		var mi := MeshInstance3D.new()
+		mi.name = tex
+		mi.mesh = BoxMesh.new()
+		var mat := ShaderMaterial.new()
+		mat.shader = wet
+		mi.mesh.surface_set_material(0, mat)
+		map_root.add_child(mi)
+		mats[tex] = mat
+	var weather := WeatherSystem.new()
+	weather.wet_ground = false
+	weather._take_rain_floor(map_root)
+	assert_false(weather.wet_ground, "a map with no rain floor stays dry")
+	var img := Image.create_empty(2, 2, false, Image.FORMAT_RF)
+	map_root.set_meta("rain_floor", {"image": img, "origin": Vector3(2, 0, 0), "size": Vector2(2, 2), "top": 9.0})
+	weather._take_rain_floor(map_root)
+	assert_true(weather.wet_ground, "one with a floor gets wet")
+	assert_eq(mats["out_wd"].get_shader_parameter("puddle_scale"), 0.0, "wood drains")
+	assert_eq(mats["grass1"].get_shader_parameter("puddle_scale"),
+		WeatherSystem.PUDDLE_BY_CLASS.get(WorldMaterials.classify("grass1"), WeatherSystem.PUDDLE_DEFAULT),
+		"and the rest pool as their class does")
+	weather.free()
+	map_root.free()
