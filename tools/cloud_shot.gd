@@ -20,7 +20,8 @@ func _ready() -> void:
 		var ws := map.get_node_or_null("worldspawn")
 		var sky_name: String = ws.get_meta("entity").get("skyname", "") if ws else ""
 		sky.setup(sky_name, map, _find(map, "light_environment"))
-		sky.set_storm(storm)
+		if sky.overcast:
+			sky.overcast.storm = storm
 		if OS.get_environment("NIGHT") != "":
 			ServerVars.set_from_string("night", OS.get_environment("NIGHT"))
 		NightMode.apply(map)

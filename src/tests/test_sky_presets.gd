@@ -129,9 +129,9 @@ func test_shader_takes_every_uniform_the_preset_sets() -> void:
 	var declared := {}
 	for u in shader.get_shader_uniform_list():
 		declared[u.name] = true
-	# The cloud layer's settings go to its globals instead.
-	for key in OvercastSky.LAYER_KEYS:
-		declared[key] = true
+	# Or a property of the sky itself (the cloud layer's settings).
+	for p in OvercastSky.new({"drawing": false}).get_property_list():
+		declared[p.name] = true
 
 	var faces := _faces("wiz")
 	if faces.is_empty():

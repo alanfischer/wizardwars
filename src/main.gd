@@ -511,7 +511,7 @@ func _build_skybox(map_root: Node3D) -> void:
 	_skybox.setup(_built_sky, map_root, _find_entity(map_root, "light_environment"))
 	_world_env = _skybox.get_node_or_null("WorldEnvironment") as WorldEnvironment
 	if weather_system:
-		weather_system.sky = _skybox
+		weather_system.sky = _skybox.overcast
 	# Skybox builds a fresh Environment per map, so the quality level has to be stamped onto this
 	# one — before precache_resources reuses the resource to warm the model shaders.
 	RenderQuality.apply(RenderQuality.load_level(), get_viewport(), _current_environment())
