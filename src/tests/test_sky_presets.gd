@@ -129,12 +129,17 @@ func test_shader_takes_every_uniform_the_preset_sets() -> void:
 	var declared := {}
 	for u in shader.get_shader_uniform_list():
 		declared[u.name] = true
-	# The cloud layer's settings are global uniforms (clouds.gdshaderinc), which Skybox sets.
-	for g in RenderingServer.global_shader_parameter_get_list():
-		declared[str(g)] = true
+	# The cloud layer's settings go to its globals instead.
+	for key in OvercastSky.LAYER_KEYS:
+		declared[key] = true
 
 	var faces := _faces("wiz")
 	if faces.is_empty():
 		return
 	for key in SkyPreset.build("wiz", faces):
 		assert_true(declared.has(key), "sky_procedural declares a '%s' uniform" % key)
+	# Overrides set keys build() leaves to the defaults, and are as easily misspelled.
+	for sky_name in SkyPreset.OVERRIDES:
+		for key in SkyPreset.OVERRIDES[sky_name]:
+			if key != "grade":
+				assert_true(declared.has(key), "sky_procedural declares %s's '%s'" % [sky_name, key])

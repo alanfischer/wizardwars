@@ -510,6 +510,8 @@ func _build_skybox(map_root: Node3D) -> void:
 	# order follows the BSP lump order, and the sky is built here, before any of them run.
 	_skybox.setup(_built_sky, map_root, _find_entity(map_root, "light_environment"))
 	_world_env = _skybox.get_node_or_null("WorldEnvironment") as WorldEnvironment
+	if weather_system:
+		weather_system.sky = _skybox
 	# Skybox builds a fresh Environment per map, so the quality level has to be stamped onto this
 	# one — before precache_resources reuses the resource to warm the model shaders.
 	RenderQuality.apply(RenderQuality.load_level(), get_viewport(), _current_environment())
@@ -662,7 +664,7 @@ func load_map_headless(map_name: String) -> void:
 
 	weather_system = WeatherSystem.new()
 	weather_system.name = "WeatherSystem"
-	weather_system.setup()
+	weather_system.map_root = map_root
 	add_child(weather_system)
 
 	Log.info("[Server] Map loaded: %d spawn points" % SpawnSystem.get_all_spawns().size())
@@ -750,7 +752,7 @@ func _load_map(map_name: String) -> void:
 	# follow target is attached once the player exists (and never, on a dedicated server).
 	weather_system = WeatherSystem.new()
 	weather_system.name = "WeatherSystem"
-	weather_system.setup()
+	weather_system.map_root = map_root
 	add_child(weather_system)
 
 	_build_skybox(map_root)

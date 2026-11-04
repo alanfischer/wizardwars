@@ -1,6 +1,6 @@
 extends Node3D
 ## Renders the procedural sky's clouds from a map's spawn. OUT=dir, MAPS=a,b, STORM=0, VOL=1 for
-## the volumetric (High quality) clouds. PERF=1 instead prints the GPU frame time looking up, with
+## the volumetric (High quality) clouds, RAIN=0.8 for rain. PERF=1 instead prints the GPU frame time looking up, with
 ## the volumetric clouds off and on.
 
 func _ready() -> void:
@@ -16,7 +16,7 @@ func _ready() -> void:
 		var sky := Skybox.new()
 		add_child(sky)
 		Game.skybox = sky
-		Skybox.set_volumetric(OS.get_environment("VOL") == "1")
+		OvercastClouds.set_volumetric(OS.get_environment("VOL") == "1")
 		var ws := map.get_node_or_null("worldspawn")
 		var sky_name: String = ws.get_meta("entity").get("skyname", "") if ws else ""
 		sky.setup(sky_name, map, _find(map, "light_environment"))
@@ -24,6 +24,14 @@ func _ready() -> void:
 		if OS.get_environment("NIGHT") != "":
 			ServerVars.set_from_string("night", OS.get_environment("NIGHT"))
 		NightMode.apply(map)
+		var weather: WeatherSystem = null
+		if OS.get_environment("RAIN") != "":
+			ServerVars.set_from_string("rain", OS.get_environment("RAIN"))
+			weather = WeatherSystem.new()
+			weather.map_root = map
+			add_child(weather)
+			Game.weather_system = weather
+			weather.settle()
 		var spawn := {}
 		for cls in ["info_player_deathmatch", "info_player_start", "info_player_teamspawn"]:
 			spawn = _find(map, cls)
@@ -42,7 +50,7 @@ func _ready() -> void:
 			DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 			Engine.max_fps = 0
 			for vol in [false, true, false, true]:
-				Skybox.set_volumetric(vol)
+				OvercastClouds.set_volumetric(vol)
 				for i in 60:
 					await get_tree().process_frame
 				var t0 := Time.get_ticks_usec()
@@ -63,6 +71,8 @@ func _ready() -> void:
 			get_viewport().get_texture().get_image().save_png("%s/%s_%s.png" % [out, map_name, v[2]])
 		map.queue_free()
 		sky.queue_free()
+		if weather:
+			weather.queue_free()
 		cam.queue_free()
 		await get_tree().process_frame
 	get_tree().quit()

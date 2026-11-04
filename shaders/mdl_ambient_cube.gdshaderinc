@@ -45,7 +45,7 @@ const float RIM_STRENGTH = 0.5;
 uniform sampler3D acube_sun : filter_linear, hint_default_black;
 uniform vec3 sky_light = vec3(1.0);
 // Shadows of the procedural sky's clouds, the same ones the map takes.
-#include "res://shaders/clouds.gdshaderinc"
+#include "res://addons/overcast/shaders/clouds.gdshaderinc"
 
 // GoldSrc drew kRenderFxGlowShell as a second copy of the model, scaled up and flat-shaded.
 // A second skinned pass per glowing player is the wrong trade here — gl_compatibility charges

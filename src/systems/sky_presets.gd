@@ -103,7 +103,7 @@ static func build(sky_name: String, faces: Array[Image], sun_dir := Vector3.ZERO
 
 ## [saturation, tint, lift], applied in that order in the art's own (sRGB) space.
 static func grade(c: Color, g: Array) -> Color:
-	var l := Skybox._luma(c)
+	var l := OvercastSky.luma(c)
 	var sat := Color(l, l, l).lerp(c, g[0])
 	var tint: Color = g[1]
 	var lift: float = g[2]
@@ -164,28 +164,18 @@ static func _derive(stats: Dictionary) -> Dictionary:
 	var star_amount := clampf(inverse_lerp(0.5, 0.95, stats["dark_fraction"]), 0.0, 1.0)
 
 	var horizon: Color = stats["horizon"]
+	# Only what is measured or differs from OvercastSky.defaults(), which fill in the rest.
 	return {
 		"zenith_color": stats["zenith"],
 		"horizon_color": horizon,
 		"ground_color": stats["ground"],
-		"horizon_falloff": 1.1,
 		"sun_color": Color.WHITE,
-		"sun_size": 0.012,
-		"sun_energy": 2.2,
-		"sun_glow_exp": 320.0,
-		"sun_glow_energy": 0.35,
-		"sun_halo_energy": 0.25,
-		"sun_halo_exp": 6.0,
 		"cloud_amount": cloud_amount,
 		# Lit cloud is the horizon colour lightened, which keeps a cloud deck in the same family as
 		# the sky it sits in however that sky was coloured. The shaded side takes the sky's own.
 		"cloud_color": horizon.lightened(0.45),
-		"cloud_scale": 2.2,
-		"cloud_speed": 0.035,
-		"cloud_softness": 0.1,
 		"star_amount": star_amount,
 		"star_color": Color.WHITE,
-		"cubemap_blend": 0.0,
 	}
 
 
