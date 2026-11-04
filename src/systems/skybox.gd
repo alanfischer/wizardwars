@@ -21,40 +21,24 @@ const PRIORITY := -3
 var _sky_surfaces: Array[MeshInstance3D] = []
 var _cubemap: Cubemap
 var _params: Dictionary = {}
-## The procedural sky (overcast-godot), drawn on the sky brushes: made the first time it is shown.
-var _overcast: OvercastSky
-var _enhanced_on := false
-## How far the procedural sky has closed over for rain, 0 to 1. See set_storm.
-var storm := 0.0
+## The procedural sky (overcast-godot), drawn on the sky brushes under dynamic weather; the
+## weather's sky either way. None until sky art is measured.
+var overcast: SkyboxSky
 
 
 ## `sun_ent` is the map's light_environment entity dict, used to point the procedural sun the way
 ## the mapper lit the level. Optional — SkyPreset falls back to the sky art, then to a default.
-func setup(sky_name: String, map_root: Node = null, sun_ent: Dictionary = {}) -> void:
+## `day_sky` is the sky the procedural one is measured off, when the cubemap shown is the night
+## standing in for it: the procedural sky does its own night.
+func setup(sky_name: String, map_root: Node = null, sun_ent: Dictionary = {}, day_sky := "") -> void:
 	if not ServerVars.value_changed.is_connected(_on_server_var_changed):
 		ServerVars.value_changed.connect(_on_server_var_changed)
 	if sky_name.is_empty():
 		return
 
-	# Cubemap layer order +X,-X,+Y,-Y,+Z,-Z maps to GoldSrc rt,lf,up,dn,bk,ft
-	# (gl_warp.c convention: ft=-Y, bk=+Y); shader maps cubemap Y->GS Z(up), Z->GS Y(forward).
-	var suffixes := ["rt", "lf", "up", "dn", "bk", "ft"]
-
-	var images: Array[Image] = []
-	for suffix in suffixes:
-		var img := AssetLoader.load_sky_image(sky_name, suffix)
-		if img == null:
-			var path := "sky/%s%s.tga" % [sky_name, suffix]
-			var tex := load(path) as Texture2D
-			if tex == null:
-				push_warning("Sky texture not found: %s" % path)
-				return
-			img = tex.get_image()
-		images.append(img)
-
-	# HL's up/down face orientation (MakeSkyVec st_to_vec) doesn't match OpenGL cubemap convention.
-	images[2].rotate_90(COUNTERCLOCKWISE)
-	images[3].rotate_90(CLOCKWISE)
+	var images := _load_faces(sky_name)
+	if images.is_empty():
+		return
 
 	_cubemap = Cubemap.new()
 	_cubemap.create_from_images(images)
@@ -75,9 +59,24 @@ func setup(sky_name: String, map_root: Node = null, sun_ent: Dictionary = {}) ->
 
 	# Measured after the two rotations above, so the face orientations SkyPreset reasons about
 	# are the ones the cubemap actually ended up with.
-	_params = SkyPreset.build(sky_name, images,
+	var measured := sky_name
+	var faces := images
+	if not day_sky.is_empty() and day_sky != sky_name:
+		var day_faces := _load_faces(day_sky)
+		if not day_faces.is_empty():
+			measured = day_sky
+			faces = day_faces
+	_params = SkyPreset.build(measured, faces,
 		SkyPreset.sun_dir_from_light_environment(sun_ent),
 		SkyPreset.sun_color_from_light_environment(sun_ent))
+
+	var params := _params.duplicate()
+	params["drawing"] = false
+	overcast = SkyboxSky.new(self, params)
+	# The stock sky material carries this so the sky draws before the world and reads as a true
+	# background; an override replaces the material outright, so it has to carry it too.
+	overcast.render_priority = PRIORITY
+	overcast.time_of_day = NightMode.hours()
 
 	if map_root != null:
 		_collect_sky_surfaces(map_root)
@@ -120,19 +119,20 @@ static func procedural() -> bool:
 func _on_server_var_changed(key: String, _value: Variant) -> void:
 	if key == "dynamic_weather":
 		apply_enhanced(procedural())
+	elif key == "time" and overcast:
+		overcast.time_of_day = NightMode.hours()
 
 
 ## Swap the procedural sky in or out. Safe to call repeatedly and before/without a map.
 func apply_enhanced(enabled: bool) -> void:
 	if enabled and _params.is_empty():
 		return  # no sky art loaded, so nothing was measured to stand in for it
-	var mat := _get_enhanced_material() if enabled else null
-	_enhanced_on = enabled
+	var mat := overcast if enabled else null
 	for surf in _sky_surfaces:
 		if is_instance_valid(surf):
 			surf.material_override = mat
-	if _overcast:
-		_overcast.set_drawing(enabled)
+	if overcast:
+		overcast.drawing = enabled
 	if enabled:
 		# Which way the sun ended up pointing is the one number a screenshot can't settle when a
 		# sky looks wrong, and it comes from the map rather than from anything here.
@@ -142,10 +142,9 @@ func apply_enhanced(enabled: bool) -> void:
 		Log.info("Procedural sky off: drawing the shipped cubemap")
 
 
-## Light the sky from within, brightest toward `dir` (world space); black puts it out. Lightning.
-## Both materials take it — the map's own and the procedural override — so a quality change
-## mid-flash cannot leave one lit.
-func set_flash(color: Color, dir: Vector3) -> void:
+## Lightning on the map's own sky material (SkyboxSky.set_flash lights the procedural one), so a
+## quality change mid-flash cannot leave one lit.
+func flash_stock(color: Color, dir: Vector3) -> void:
 	var c := Vector3(color.r, color.g, color.b)
 	var seen := {}
 	for surf in _sky_surfaces:
@@ -156,38 +155,6 @@ func set_flash(color: Color, dir: Vector3) -> void:
 			seen[mat] = true
 			mat.set_shader_parameter("flash_color", c)
 			mat.set_shader_parameter("flash_dir", dir)
-	if _overcast:
-		_overcast.set_flash(color, dir)
-
-
-## Rain on the procedural sky (dynamic weather): 0 clear, 1 a dark overcast deck. The stock
-## cubemap has no clouds of its own to thicken, so this leaves it alone.
-func set_storm(amount: float) -> void:
-	storm = amount
-	if _overcast:
-		_overcast.set_storm(amount)
-
-
-## The colour the sky draws at the horizon right now, linear, flash aside: what haze over open ground
-## fades into (WeatherSystem). Black with no sky art measured.
-func horizon_color() -> Color:
-	if _params.is_empty():
-		return Color.BLACK
-	var art: Color = _params["horizon_color"]  # sRGB, measured off the cubemap
-	if not _enhanced_on:
-		return art.srgb_to_linear()
-	return _overcast.horizon_color()
-
-
-func _get_enhanced_material() -> ShaderMaterial:
-	if _overcast:
-		return _overcast.material
-	_overcast = OvercastSky.new(_params, ProceduralSkyShader)
-	# The stock sky material carries this so the sky draws before the world and reads as a true
-	# background; an override replaces the material outright, so it has to carry it too.
-	_overcast.material.render_priority = PRIORITY
-	_overcast.set_storm(storm)
-	return _overcast.material
 
 
 func _collect_sky_surfaces(node: Node) -> void:
@@ -204,3 +171,27 @@ func _apply_sky_cubemap(node: Node, cubemap: Cubemap) -> void:
 			mat.set_shader_parameter("sky_cubemap", cubemap)
 	for child in node.get_children():
 		_apply_sky_cubemap(child, cubemap)
+
+
+## The six faces in cubemap order, rotated as the cubemap needs; empty if any is missing.
+static func _load_faces(sky_name: String) -> Array[Image]:
+	# Cubemap layer order +X,-X,+Y,-Y,+Z,-Z maps to GoldSrc rt,lf,up,dn,bk,ft
+	# (gl_warp.c convention: ft=-Y, bk=+Y); shader maps cubemap Y->GS Z(up), Z->GS Y(forward).
+	var suffixes := ["rt", "lf", "up", "dn", "bk", "ft"]
+
+	var images: Array[Image] = []
+	for suffix in suffixes:
+		var img := AssetLoader.load_sky_image(sky_name, suffix)
+		if img == null:
+			var path := "sky/%s%s.tga" % [sky_name, suffix]
+			var tex := load(path) as Texture2D
+			if tex == null:
+				push_warning("Sky texture not found: %s" % path)
+				return []
+			img = tex.get_image()
+		images.append(img)
+
+	# HL's up/down face orientation (MakeSkyVec st_to_vec) doesn't match OpenGL cubemap convention.
+	images[2].rotate_90(COUNTERCLOCKWISE)
+	images[3].rotate_90(CLOCKWISE)
+	return images

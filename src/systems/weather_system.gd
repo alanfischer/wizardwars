@@ -29,7 +29,7 @@ func _ready() -> void:
 	# main hands over each new sky as night rebuilds it (main._build_skybox); this is the one the
 	# map started with, if it was built first.
 	if is_instance_valid(Game.skybox):
-		sky = Game.skybox
+		sky = Game.skybox.overcast
 	_apply_night()
 	if map_root:
 		var box := TopDownFrame.world_aabb(map_root)
@@ -53,8 +53,8 @@ func _take_rain_floor(map_root: Node) -> void:
 	img.flip_x()
 	var size: Vector2 = data["size"]
 	var origin: Vector3 = data["origin"]
-	set_rain_floor({"image": img, "origin": Vector3(origin.x - size.x, origin.y, origin.z),
-		"size": size, "top": float(data["top"])})
+	rain_floor = OvercastRainFloor.create(img, Vector3(origin.x - size.x, origin.y, origin.z), size,
+		float(data["top"]))
 	add_wet_materials(map_root, func(mi: MeshInstance3D) -> float:
 		# The loader names each world mesh after its texture.
 		return PUDDLE_BY_CLASS.get(WorldMaterials.classify(String(mi.name)), PUDDLE_DEFAULT))
@@ -120,14 +120,13 @@ func _apply_rain() -> void:
 func _on_server_var_changed(key: String, _value: Variant) -> void:
 	if key == "rain" or key == "lightning":
 		_apply_rain()
-	elif key == "night":
+	elif key == "time":
 		_apply_night()
 
 
 ## The night darkens the rain and the haze the way it darkens the sky's light.
 func _apply_night() -> void:
 	sky_light = sky_light_now()
-	night = NightMode.amount()
 
 
 ## Join snapshot. Default weather is "none", which every peer already starts at, so a dry map

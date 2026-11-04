@@ -82,8 +82,8 @@ var _bg: ColorRect
 var _pause_row: HBoxContainer  # the Resume button, shown only over a match
 var _lobby_only: Array[Control] = []  # what the pause panel sets aside: the logo, the join rows
 var _pause_only: Array[Control] = []  # and what it adds: settings of the match being played
-var _night_slider: HSlider
-var _night_value: Label
+var _time_slider: HSlider
+var _time_value: Label
 var _match_dragging := false
 var _match_pending := ""  # a dragged slider's command not sent yet
 var _match_sent_at := 0
@@ -272,21 +272,20 @@ func _build_match_rows(vbox: VBoxContainer) -> void:
 	var row := _add_row(vbox, "Map")
 	row.visible = false
 	_pause_only.append(row)
-	row.add_child(_caption("Day"))
-	_night_slider = HSlider.new()
-	_night_slider.min_value = 0
-	_night_slider.max_value = 100
-	_night_slider.step = 5
-	_night_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_night_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_night_slider.tooltip_text = "Moonlight instead of the sun. The map's own lights stay lit. (/night)"
-	row.add_child(_night_slider)
-	row.add_child(_caption("Night"))
-	_night_value = Label.new()
-	_night_value.custom_minimum_size.x = 40
-	_night_value.add_theme_color_override("font_color", TEXT_COLOR)
-	_night_value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(_night_value)
+	row.add_child(_caption("Time"))
+	_time_slider = HSlider.new()
+	_time_slider.min_value = 0
+	_time_slider.max_value = 24
+	_time_slider.step = 0.25
+	_time_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_time_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_time_slider.tooltip_text = "Time of day: warm light toward dusk, moonlight at night. The map's own lights stay lit. (/time)"
+	row.add_child(_time_slider)
+	_time_value = Label.new()
+	_time_value.custom_minimum_size.x = 40
+	_time_value.add_theme_color_override("font_color", TEXT_COLOR)
+	_time_value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(_time_value)
 
 	var weather := _add_row(vbox, "Weather")
 	weather.visible = false
@@ -318,18 +317,18 @@ func _build_match_rows(vbox: VBoxContainer) -> void:
 	_rain_slider.value_changed.connect(func(v: float) -> void:
 		_rain_value.text = _rain_text(v)
 		_send_match_command("rain %.2f" % v))
-	_night_slider.value_changed.connect(func(v: float) -> void:
-		_night_value.text = "%d%%" % int(v)
-		_send_match_command("night %.2f" % (v / 100.0)))
+	_time_slider.value_changed.connect(func(v: float) -> void:
+		_time_value.text = NightMode.format(v)
+		_send_match_command("time %.2f" % v))
 	# While one is held, the echoes of what it sent are behind the handle: leave both alone.
-	for slider: HSlider in [_rain_slider, _night_slider]:
+	for slider: HSlider in [_rain_slider, _time_slider]:
 		slider.drag_started.connect(func() -> void: _match_dragging = true)
 		slider.drag_ended.connect(func(_changed: bool) -> void:
 			_match_dragging = false
 			_flush_match_command()
 			get_tree().create_timer(0.5).timeout.connect(_sync_match_rows))
 	ServerVars.value_changed.connect(func(key: String, _v: Variant) -> void:
-		if key in ["night", "rain", "lightning", "dynamic_weather"] and not _match_dragging:
+		if key in ["time", "rain", "lightning", "dynamic_weather"] and not _match_dragging:
 			_sync_match_rows())
 
 
@@ -358,9 +357,9 @@ func _caption(text: String) -> Label:
 
 
 func _sync_match_rows() -> void:
-	var v := roundf(NightMode.amount() * 100.0)
-	_night_slider.set_value_no_signal(v)
-	_night_value.text = "%d%%" % int(v)
+	var v := NightMode.hours()
+	_time_slider.set_value_no_signal(v)
+	_time_value.text = NightMode.format(v)
 	var rain := float(ServerVars.get_value("rain", 0.0))
 	_rain_slider.set_value_no_signal(rain)
 	_rain_value.text = _rain_text(rain)
