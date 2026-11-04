@@ -286,28 +286,6 @@ func parse_vector3(s: String) -> Vector3:
 	return Vector3(-x * GameConsts.SCALE_FACTOR, z * GameConsts.SCALE_FACTOR, y * GameConsts.SCALE_FACTOR)
 
 
-func parse_angles(e: Dictionary) -> Vector3:
-	if not e.has("angles"):
-		return Vector3(0, parse_yaw(e), 0)
-	var parts: PackedStringArray = str(e["angles"]).split(" ")
-	var pitch := deg_to_rad(-float(parts[0])) if parts.size() > 0 else 0.0
-	var yaw := deg_to_rad(float(parts[1])) + PI / 2.0 if parts.size() > 1 else 0.0
-	var roll := deg_to_rad(-float(parts[2])) if parts.size() > 2 else 0.0
-	return Vector3(pitch, yaw, roll)
-
-
-func parse_yaw(e: Dictionary) -> float:
-	var angle_deg := 0.0
-	if e.has("angles"):
-		var parts: PackedStringArray = str(e["angles"]).split(" ")
-		angle_deg = float(parts[1])
-	elif e.has("angle"):
-		angle_deg = float(str(e["angle"]))
-	else:
-		return 0.0
-	return deg_to_rad(angle_deg) + PI / 2.0
-
-
 func parse_spawnflags(e: Dictionary) -> int:
 	return int(e.get("spawnflags", "0"))
 

@@ -58,7 +58,8 @@ func _build_particles(tex: Texture2D) -> CPUParticles3D:
 	p.explosiveness = 1.0  # the whole burst leaves at once
 	p.amount = 1  # one gib per restart(); the delay between them is the point
 	p.lifetime = life
-	p.direction = _shoot_direction()
+	# The importer turns this node by its angles (pitch -90 straight up), so it shoots forward.
+	p.direction = Vector3.FORWARD
 	p.spread = parse_float(ent, "m_flVariance", 0.0)
 	p.initial_velocity_min = speed
 	p.initial_velocity_max = speed
@@ -82,17 +83,6 @@ func _build_particles(tex: Texture2D) -> CPUParticles3D:
 	var tint := Color.WHITE if (rc.r == 0.0 and rc.g == 0.0 and rc.b == 0.0) else rc
 	p.color = Color(tint.r, tint.g, tint.b, renderamt / 255.0)
 	return p
-
-
-## GoldSrc view-angle convention: pitch -90 = straight up (every shipped
-## shooter uses it). Forward = (cos p·cos y, cos p·sin y, -sin p) → Godot.
-## Read raw, not via parse_angles — that builds a node rotation, not a heading.
-func _shoot_direction() -> Vector3:
-	var parts := str(ent.get("angles", "0 0 0")).split(" ")
-	var pitch := deg_to_rad(float(parts[0])) if parts.size() > 0 else 0.0
-	var yaw := deg_to_rad(float(parts[1])) if parts.size() > 1 else 0.0
-	var g := Vector3(cos(pitch) * cos(yaw), cos(pitch) * sin(yaw), -sin(pitch))
-	return Vector3(-g.x, g.z, g.y)
 
 
 func trigger(_activator: Node, _type: TriggerSystem.Type) -> void:

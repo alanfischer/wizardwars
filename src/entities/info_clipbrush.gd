@@ -18,8 +18,10 @@ func _ready() -> void:
 	super()
 	# parse_vector3 maps GoldSrc (x,y,z) -> Godot (-x, z, y) * scale; box
 	# dimensions are unsigned, so take magnitudes of the mapped extents.
+	# The importer turns this node 90° past the clip's yaw (its -Z faces the yaw), so the box's
+	# X and Z swap to stand at the yaw itself.
 	var mapped := parse_vector3(ent.get("size", "0 0 0"))
-	var box_size := Vector3(absf(mapped.x), absf(mapped.y), absf(mapped.z))
+	var box_size := Vector3(absf(mapped.z), absf(mapped.y), absf(mapped.x))
 	if box_size.x <= 0.0 or box_size.y <= 0.0 or box_size.z <= 0.0:
 		push_warning("info_clipbrush '%s': non-positive size '%s'" % [name, ent.get("size", "")])
 		return
@@ -34,13 +36,5 @@ func _ready() -> void:
 	var shape := CollisionShape3D.new()
 	shape.shape = box
 	body.add_child(shape)
-
-	# Yaw about Godot Y (GoldSrc Z-up). Matches parse_angles' yaw sense without
-	# its +90° model-facing offset. Auto-generated boxes are axis-aligned (no
-	# angles key) so this is a no-op for them; kept for hand-authored clips.
-	if ent.has("angles"):
-		var parts := str(ent["angles"]).split(" ")
-		if parts.size() > 1:
-			body.rotation.y = deg_to_rad(float(parts[1]))
 
 	add_child(body)

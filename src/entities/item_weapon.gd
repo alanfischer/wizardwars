@@ -41,7 +41,6 @@ func _ready() -> void:
 	if _model:
 		add_child(_model)
 		add_child(BlobShadow.new(0.3))
-	rotation = parse_angles(ent)
 	_touch.add_box()
 	_seed_game_visible()
 

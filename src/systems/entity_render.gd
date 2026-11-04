@@ -143,6 +143,30 @@ func apply_model_render_properties(model: Node3D, ent: Dictionary) -> void:
 		AssetLoader.set_model_alpha(model, alpha)
 
 
+## A model's sequence by its number in the file (pev->sequence), which the AnimationPlayer's
+## alphabetical list does not keep; the importer records the file's order. "" past the last.
+func sequence_name(model: Node, index: int) -> String:
+	var sequences: Array = model.get_meta("sequences", [])
+	if not sequences.is_empty():
+		return sequences[index]["name"] if index < sequences.size() else ""
+	var player := model.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if player and index < player.get_animation_list().size():
+		return player.get_animation_list()[index]
+	return ""
+
+
+## Holds a model on the first frame of its sequence `index`, as GoldSrc draws an entity whose
+## framerate is 0. Left unposed it would show its rest pose, which is no sequence and faces 90° off.
+func hold_sequence(model: Node, index: int) -> void:
+	var player := model.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	var anim := sequence_name(model, index)
+	if player == null or anim.is_empty():
+		return
+	player.play(anim)
+	player.seek(0.0, true)
+	player.pause()
+
+
 ## True when any surface of a mesh draws through a '{'-masked texture.
 func _mesh_is_masked(mesh_inst: MeshInstance3D) -> bool:
 	for surf_idx in mesh_inst.mesh.get_surface_count():

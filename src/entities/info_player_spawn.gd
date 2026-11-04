@@ -17,8 +17,6 @@ var group_no: int = 0
 var items: int = 0  # item_tfgoal goal_no to auto-give on spawn
 func _ready() -> void:
 	super()
-	if ent.has("angle") or ent.has("angles"):
-		rotation.y = parse_yaw(ent)
 	team_no = parse_int(ent, "team_no", 0)
 	goal_no = parse_int(ent, "goal_no", 0)
 	group_no = parse_int(ent, "group_no", 0)

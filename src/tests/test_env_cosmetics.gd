@@ -14,6 +14,7 @@ func _teardown_test() -> void:
 func _spawn(script: GDScript, keys: Dictionary) -> Node3D:
 	var n: Node3D = script.new()
 	n.set_meta("entity", keys)
+	n.rotation = GoldSrcBSP.entity_rotation(keys)  # as the map importer turns it
 	_root().add_child(n)
 	_spawned.append(n)
 	return n
@@ -78,9 +79,9 @@ func test_shooter_aims_along_its_angles() -> void:
 		"m_flGibLife": ".1", "m_flVelocity": "400", "m_flVariance": "6",
 		"rendermode": "5", "rendercolor": "0 0 255", "renderamt": "255", "spawnflags": "1",
 	})
-	# GoldSrc pitch -90 is straight up; every shipped shooter is a fountain.
-	assert_vec3_almost_eq(s._shoot_direction(), Vector3.UP, 0.001,
-		"pitch -90 shoots straight up")
+	# GoldSrc pitch -90 is straight up; every shipped shooter is a fountain. The shooter fires
+	# along its node's forward (headless builds no particles to ask).
+	assert_vec3_almost_eq(-s.global_basis.z, Vector3.UP, 0.001, "pitch -90 shoots straight up")
 
 
 func test_shooter_reads_its_burst_keys() -> void:

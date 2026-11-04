@@ -133,7 +133,6 @@ func _create_light_node() -> void:
 		var spot := SpotLight3D.new()
 		spot.spot_range = range_godot
 		spot.spot_angle = parse_float(ent, "_cone2", 45.0)
-		spot.rotation = parse_angles(ent)
 		_light_node = spot
 	else:
 		var omni := OmniLight3D.new()
