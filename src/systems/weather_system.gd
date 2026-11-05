@@ -53,10 +53,15 @@ func _take_rain_floor(map_root: Node) -> void:
 	# The extension's floor runs from its max-X corner; Overcast's from its min-X one.
 	var img: Image = (data["image"] as Image).duplicate()
 	img.flip_x()
+	# The air under cover, which wind blows rain in through; a map converted before it had none.
+	var air: Image = null
+	if data.has("under"):
+		air = (data["under"] as Image).duplicate()
+		air.flip_x()
 	var size: Vector2 = data["size"]
 	var origin: Vector3 = data["origin"]
 	rain_floor = OvercastRainFloor.create(img, Vector3(origin.x - size.x, origin.y, origin.z), size,
-		float(data["top"]))
+		float(data["top"]), air)
 	# Without a floor rain would wet the map indoors too.
 	wet_ground = true
 	_set_puddle_scales(map_root)
