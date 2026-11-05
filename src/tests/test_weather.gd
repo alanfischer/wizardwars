@@ -55,6 +55,11 @@ func test_the_maps_rain_floor_lands_where_the_extension_baked_it() -> void:
 	var size := Vector2(5.0, 3.0)
 	var map_root := Node3D.new()
 	map_root.set_meta("rain_floor", {"image": img, "origin": origin, "size": size, "top": 9.0})
+	var under := Image.create_empty(5, 3, false, Image.FORMAT_RGF)
+	for y in 3:
+		for x in 5:
+			under.set_pixel(x, y, Color(x * 10 + y - 1, x * 10 + y - 3, 0))
+	map_root.get_meta("rain_floor")["under"] = under
 	var weather := WeatherSystem.new()
 	weather._take_rain_floor(map_root)
 	for q in [Vector3(3.5, 0, -0.5), Vector3(-0.5, 0, 1.5), Vector3(1.2, 0, 0.7)]:
@@ -63,6 +68,10 @@ func test_the_maps_rain_floor_lands_where_the_extension_baked_it() -> void:
 		var v: float = (q.z - origin.z) / size.y
 		var want := img.get_pixel(int(u * 5), int(v * 3)).r
 		assert_eq(weather.floor_at(q), want, "column at %s" % q)
+		# The air under cover is flipped with it: Overcast reads it by the same column.
+		var f: OvercastRainFloor = weather.rain_floor
+		var cell := Vector2i(int((q.x - f.origin.x) / f.size.x * 5), int((q.z - f.origin.z) / f.size.y * 3))
+		assert_eq(f.under.get_pixel(cell.x, cell.y).r, want - 1.0, "air under the column at %s" % q)
 	weather.free()
 	map_root.free()
 

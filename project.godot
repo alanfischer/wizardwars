@@ -334,6 +334,26 @@ overcast_puddles={
 "type": "float",
 "value": 0.0
 }
+overcast_snow_cover={
+"type": "float",
+"value": 0.0
+}
+overcast_rainfall={
+"type": "float",
+"value": 0.0
+}
+overcast_rain_slant={
+"type": "vec2",
+"value": Vector2(0, 0)
+}
+overcast_rain_under={
+"type": "sampler2D",
+"value": ""
+}
+overcast_rain_beyond_floor={
+"type": "bool",
+"value": false
+}
 overcast_rain_sky={
 "type": "vec3",
 "value": Vector3(0, 0, 0)
