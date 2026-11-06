@@ -346,6 +346,14 @@ overcast_rain_slant={
 "type": "vec2",
 "value": Vector2(0, 0)
 }
+overcast_ground_slant={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+overcast_ground_shift={
+"type": "float",
+"value": 1.0
+}
 overcast_rain_under={
 "type": "sampler2D",
 "value": ""
