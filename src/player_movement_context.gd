@@ -244,6 +244,7 @@ func get_modifiers(
 		mods.velocity_override_active = true
 		mods.override_velocity = _flight_velocity(cfg, state.velocity, cmd)
 	StatusSystem.contribute_movement_modifiers(_owner, mods)
+	_slick_when_wet(mods, state)
 	# GoldSrc basevelocity: applied to position without altering the player's own state
 	# velocity. Do NOT clear _push_base_vel here — it must survive every command in a
 	# server batch; the caller clears it once per frame.
@@ -255,3 +256,14 @@ func get_modifiers(
 		mods.base_velocity = Vector3(full_push.x, 0.0, full_push.z)
 		mods.no_friction = true
 	return mods
+
+
+## Rain-soaked ground is a little slick: less ground friction, and so less grip to speed up.
+## Goes by the server's wetness, so the client predicts what the server simulates.
+func _slick_when_wet(mods: Movement.MovementModifiers, state: Movement.MovementState) -> void:
+	var weather := Game.weather_system
+	if weather == null:
+		return
+	var wet := weather.wet_at(state.position)
+	if wet > 0.0:
+		mods.friction_scale *= lerpf(1.0, float(ServerVars.get_value("wet_friction", 1.0)), wet)

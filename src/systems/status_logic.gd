@@ -51,8 +51,8 @@ func apply_frost(target: Node, duration: float) -> bool:
 
 func contribute_movement_modifiers(target: Node, mods: Movement.MovementModifiers) -> void:
 	var mult := get_friction_multiplier(target)
-	mods.friction_scale = mult
-	mods.accel_scale = mult
+	mods.friction_scale *= mult
+	mods.accel_scale *= mult
 
 
 ## Returns FROST_FRICTION_MULT if frosted, 1.0 otherwise.
