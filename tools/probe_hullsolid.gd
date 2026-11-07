@@ -4,12 +4,12 @@ extends SceneTree
 ## can be told apart from "hull carriers are invisible to shape queries".
 
 func _initialize() -> void:
-	var root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
-	get_root().add_child(root)
+	var map_root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
+	get_root().add_child(map_root)
 	await physics_frame
 	await physics_frame
 
-	var space := root.get_world_3d().direct_space_state
+	var space := map_root.get_world_3d().direct_space_state
 	var tiny := SphereShape3D.new()
 	tiny.radius = 0.05
 	var q := PhysicsShapeQueryParameters3D.new()
@@ -20,7 +20,7 @@ func _initialize() -> void:
 
 	var leg: AnimatableBody3D = null
 	var world: Node3D = null
-	for n in root.find_children("*", "AnimatableBody3D", true, false):
+	for n in map_root.find_children("*", "AnimatableBody3D", true, false):
 		var cn: String = n.get_meta("entity", {}).get("classname", "")
 		if "rightleg" in cn:
 			leg = n

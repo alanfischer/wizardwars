@@ -130,7 +130,7 @@ func test_it_drifts_when_it_has_nothing_to_chase() -> void:
 ## 20 a think at whatever it is facing — 200 a second, which is what makes standing in front of
 ## one for even a moment a mistake.
 func test_the_stare_burns_what_it_is_facing() -> void:
-	var spirit := _spirit_at(ARENA, Vector3.FORWARD)
+	var _spirit := _spirit_at(ARENA, Vector3.FORWARD)
 	var victim := _target_at(ARENA + Vector3(0.0, 0.0, -8.0))
 
 	await _tick(30)  # half a second

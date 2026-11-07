@@ -10,13 +10,13 @@ const LADDER_MARGIN := 0.1
 
 func _initialize() -> void:
 	print("engine = %s" % ProjectSettings.get_setting("physics/3d/physics_engine"))
-	var root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
-	get_root().add_child(root)
+	var map_root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
+	get_root().add_child(map_root)
 	await physics_frame
 
 	var gs_yaw := 0.0
 	var leg: AnimatableBody3D = null
-	for n in root.find_children("*", "AnimatableBody3D", true, false):
+	for n in map_root.find_children("*", "AnimatableBody3D", true, false):
 		var cn: String = n.get_meta("entity", {}).get("classname", "")
 		if cn == "func_golem_body":
 			gs_yaw = deg_to_rad(float(String(n.get_meta("entity", {}).get("angles", "0 0 0")).split(" ")[1]))
@@ -64,7 +64,7 @@ func _initialize() -> void:
 	print("ladder box size=%s  world centre=%s  (y %.2f .. %.2f)" % [box.size, axis,
 		axis.y - box.size.y * 0.5, axis.y + box.size.y * 0.5])
 
-	var space := root.get_world_3d().direct_space_state
+	var space := map_root.get_world_3d().direct_space_state
 
 	# Player hull and the LadderDetector cylinder, both posed from the feet position.
 	var hull := CapsuleShape3D.new()

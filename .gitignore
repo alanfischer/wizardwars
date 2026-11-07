@@ -33,3 +33,4 @@ __pycache__/
 # stamps from it. Kept out of git so the public source never names the server.
 /release.env
 /default_server.txt
+override.cfg

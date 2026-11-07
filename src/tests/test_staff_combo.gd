@@ -24,7 +24,12 @@ func _duelist(elem: int, team: int, with_staff := true) -> _Duelist:
 	d.element = elem
 	d.team = team
 	d.is_dead = false
-	d.weapons = [StaffScript.new() if with_staff else MissileWeapon.new()] as Array[Weapon]
+	var weapon: Weapon
+	if with_staff:
+		weapon = StaffScript.new()
+	else:
+		weapon = MissileWeapon.new()
+	d.weapons = [weapon] as Array[Weapon]
 	d.current_weapon_idx = 0
 	_root().add_child(d)
 	_spawned.append(d)

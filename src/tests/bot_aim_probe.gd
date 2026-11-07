@@ -95,6 +95,7 @@ func _run() -> void:
 	if dir == Vector3.INF:
 		var g = BotSystem._waypoints
 		var n: int = 0 if g == null else g.positions.size()
+		@warning_ignore("integer_division")
 		for i in range(0, n, maxi(1, n / 400)):
 			base = g.positions[i]
 			dir = _clear_dir(shooter, base)

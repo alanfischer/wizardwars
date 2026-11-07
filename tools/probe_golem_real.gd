@@ -41,7 +41,6 @@ extends Node
 const Movement = preload("res://addons/pmove/movement.gd")
 const MovementConfig = preload("res://addons/pmove/movement_config.gd")
 const InputCommand = preload("res://addons/pmove/input_command.gd")
-const ServerMovement = preload("res://addons/pmove/server_movement.gd")
 
 const S := 0.025
 ## How far each engine span probe reaches, GoldSrc units. Wide enough to clear the
@@ -148,7 +147,7 @@ func engine_spans() -> String:
 	tp.from = player.global_transform
 	tp.margin = player.safe_margin
 	tp.recovery_as_collision = false
-	var tr := PhysicsTestMotionResult3D.new()
+	var motion_result := PhysicsTestMotionResult3D.new()
 	var basis_inv := golem_body.global_transform.basis.inverse()
 	var out := PackedStringArray()
 	for ax in 3:
@@ -157,12 +156,12 @@ func engine_spans() -> String:
 			gs[ax] = sgn
 			var dir: Vector3 = (golem_body.global_transform.basis * gs_to_godot(gs.x, gs.y, gs.z)).normalized()
 			tp.motion = dir * (SPAN_PROBE * S)
-			PhysicsServer3D.body_test_motion(player.get_rid(), tp, tr)
-			var t: Vector3 = basis_inv * tr.get_travel()
+			PhysicsServer3D.body_test_motion(player.get_rid(), tp, motion_result)
+			var t: Vector3 = basis_inv * motion_result.get_travel()
 			var trav: float = Vector3(-t.x, t.z, t.y)[ax] * sgn / S
 			var who := "open"
-			if tr.get_collision_count() > 0:
-				who = axis_label(gs_normal(tr.get_collision_normal(0)))
+			if motion_result.get_collision_count() > 0:
+				who = axis_label(gs_normal(motion_result.get_collision_normal(0)))
 			out.append("%s%s=%6.2f %-3s" % [
 				"-" if sgn < 0.0 else "+", "xyz"[ax], trav, who])
 	return " ".join(out)
@@ -519,17 +518,17 @@ func _run() -> void:
 			tp.margin = player.safe_margin
 			tp.recovery_as_collision = true
 			tp.max_collisions = 8
-			var tr := PhysicsTestMotionResult3D.new()
-			PhysicsServer3D.body_test_motion(player.get_rid(), tp, tr)
+			var motion_result := PhysicsTestMotionResult3D.new()
+			PhysicsServer3D.body_test_motion(player.get_rid(), tp, motion_result)
 			# WHICH body, and which of its faces. A normal alone cannot tell the torso's
 			# cockpit wall from a limb sweeping through it, and that distinction is the
 			# whole question for the one-tick anomalies.
-			var msg := "        manifold: " + contacts_str(tr)
+			var msg := "        manifold: " + contacts_str(motion_result)
 			# Can a backward step still proceed?
 			var back_dir: Vector3 = (golem_body.global_transform.basis * gs_to_godot(-1.0, 0.0, 0.0)).normalized()
 			tp.motion = back_dir * 0.15
-			PhysicsServer3D.body_test_motion(player.get_rid(), tp, tr)
-			msg += "   back step unsafe_frac=%.2f" % tr.get_collision_unsafe_fraction()
+			PhysicsServer3D.body_test_motion(player.get_rid(), tp, motion_result)
+			msg += "   back step unsafe_frac=%.2f" % motion_result.get_collision_unsafe_fraction()
 			print(msg)
 		# Left the golem, judged against the TORSO'S OWN BRUSH BOUNDS rather than a
 		# threshold on x. An earlier `after.x < -60` called three of this probe's

@@ -84,7 +84,7 @@ func test_it_drifts_where_it_was_aimed_and_never_turns() -> void:
 
 ## 80 a snap, on a half-second clock, after a second of building up to the first one.
 func test_it_snaps_at_what_it_can_see_on_its_own_clock() -> void:
-	var cloud := _cloud_at(ARENA, Vector3.UP)  # sent straight up, so it stays over the target
+	var _cloud := _cloud_at(ARENA, Vector3.UP)  # sent straight up, so it stays over the target
 	var victim := _target_at(ARENA + Vector3(3.0, -1.0, 0.0))
 
 	await _tick(50)  # 0.83s — inside the wind-up
@@ -98,7 +98,7 @@ func test_it_snaps_at_what_it_can_see_on_its_own_clock() -> void:
 
 
 func test_it_will_not_snap_at_its_own_side() -> void:
-	var cloud := _cloud_at(ARENA, Vector3.UP)  # team BLUE
+	var _cloud := _cloud_at(ARENA, Vector3.UP)  # team BLUE
 	var ally := _target_at(ARENA + Vector3(3.0, -1.0, 0.0))
 	ally.team = GameConsts.Team.BLUE
 

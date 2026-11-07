@@ -7,11 +7,11 @@ func _env(n: String, d: float) -> float:
 func gs(x: float, y: float, z: float) -> Vector3:
 	return Vector3(-x * S, z * S, y * S)
 func _initialize() -> void:
-	var root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
-	get_root().add_child(root)
+	var map_root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
+	get_root().add_child(map_root)
 	for i in 20: await physics_frame
 	var body: AnimatableBody3D
-	for n in root.find_children("*", "AnimatableBody3D", true, false):
+	for n in map_root.find_children("*", "AnimatableBody3D", true, false):
 		if String(n.get_meta("entity", {}).get("classname", "")) == "func_golem_body":
 			body = n
 	var h := _env("H", 1.8)
@@ -26,7 +26,7 @@ func _initialize() -> void:
 	cs.shape = cap
 	cs.position = Vector3(0, h * 0.5, 0)
 	player.add_child(cs)
-	root.add_child(player)
+	map_root.add_child(player)
 	player.global_position = body.global_transform * gs(_env("X", -18.04), _env("Y", -80.09), _env("Z", -111.63))
 	PhysicsServer3D.body_set_state(player.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM, player.global_transform)
 	await physics_frame

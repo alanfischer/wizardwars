@@ -149,6 +149,7 @@ func _play(tree: SceneTree, map_name: String, spot: Vector3, seconds: float) -> 
 	for c in closest:
 		if c <= 6.0:
 			reached += 1
+	@warning_ignore("integer_division")
 	print("PLAY  %-16s %-12s spawned %d  tracked %d  closed median %.0fm best %.0fm  reached altar %d"
 			% [map_name, kind.get_file().get_basename(), made, live.size(),
 			gained[gained.size() / 2] if gained.size() > 0 else 0.0,

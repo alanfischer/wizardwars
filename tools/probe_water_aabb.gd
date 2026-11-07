@@ -35,5 +35,6 @@ func _ready() -> void:
 		var pts: PackedStringArray = []
 		for k in seen:
 			pts.append("(%.1f,%.1f,%.1f)" % [seen[k].x, seen[k].y, seen[k].z])
+		@warning_ignore("integer_division")
 		print("%-34s y=%.2f  %d faces  %s" % [mi.get_path(), g.position.y, verts.size() / 3, " ".join(pts)])
 	get_tree().quit(0)

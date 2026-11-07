@@ -216,7 +216,7 @@ func test_the_ball_closes_on_an_enemy_and_kills_it() -> void:
 ## An ally in the way is passed straight through rather than spending the ball on someone it
 ## can't hurt — the reason it needs its own contact test instead of the shared one.
 func test_the_ball_passes_through_its_own_side() -> void:
-	var ball := _ball_at(ARENA)   # team BLUE
+	var _ball := _ball_at(ARENA)   # team BLUE
 	var friend := _target_at(ARENA + Vector3(0.0, 0.9, -2.0))
 	friend.team = GameConsts.Team.BLUE
 	var foe := _target_at(ARENA + Vector3(0.0, 0.9, -6.0))

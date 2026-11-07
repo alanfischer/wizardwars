@@ -112,11 +112,11 @@ func _initialize() -> void:
 		var ps: PackedScene = load("user://resources/maps/%s.scn" % map)
 		if not ps:
 			continue
-		var root: Node3D = ps.instantiate()
-		get_root().add_child(root)
+		var map_root: Node3D = ps.instantiate()
+		get_root().add_child(map_root)
 		await physics_frame
 		var ladders: Array = []
-		for n in root.find_children("*", "", true, false):
+		for n in map_root.find_children("*", "", true, false):
 			if String(n.get_meta("entity", {}).get("classname", "")) != "func_ladder":
 				continue
 			if n is AnimatableBody3D:
@@ -129,12 +129,12 @@ func _initialize() -> void:
 			vol.monitorable = true
 			ladders.append([n, vol])
 		if ladders.is_empty():
-			root.queue_free()
+			map_root.queue_free()
 			await process_frame
 			continue
 		await physics_frame
 		await physics_frame
-		_space = root.get_world_3d().direct_space_state
+		_space = map_root.get_world_3d().direct_space_state
 		_faces.clear()
 
 		var cap := CapsuleShape3D.new(); cap.height = 1.8; cap.radius = 0.4
@@ -191,6 +191,6 @@ func _initialize() -> void:
 						if _strafe_is_lateral(cfg, traced, traced):
 							trace_ok += 1
 		print("%-18s %5d  %8d | %6d -> %6d" % [map, cells, freeclimb, ship_ok, trace_ok])
-		root.queue_free()
+		map_root.queue_free()
 		await process_frame
 	quit(0)

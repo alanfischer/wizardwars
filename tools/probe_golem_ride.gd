@@ -125,22 +125,22 @@ func probe_now(tag: String) -> void:
 	tp.margin = player.safe_margin
 	tp.recovery_as_collision = true
 	tp.max_collisions = 4
-	var tr := PhysicsTestMotionResult3D.new()
-	PhysicsServer3D.body_test_motion(player.get_rid(), tp, tr)
+	var motion_result := PhysicsTestMotionResult3D.new()
+	PhysicsServer3D.body_test_motion(player.get_rid(), tp, motion_result)
 	var here := local_gs(player.global_position)
-	var rl := local_gs(player.global_position + tr.get_travel()) - here
+	var rl := local_gs(player.global_position + motion_result.get_travel()) - here
 	var ns := ""
-	for i in tr.get_collision_count():
-		ns += " n%d=%s d=%.4f" % [i, tr.get_collision_normal(i), tr.get_collision_depth(i)]
+	for i in motion_result.get_collision_count():
+		ns += " n%d=%s d=%.4f" % [i, motion_result.get_collision_normal(i), motion_result.get_collision_depth(i)]
 	print("      %s recovery would move (local GS) (%6.2f,%6.2f,%6.2f)%s" % [tag, rl.x, rl.y, rl.z, ns])
 
 func _initialize() -> void:
-	var root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
-	get_root().add_child(root)
+	var map_root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
+	get_root().add_child(map_root)
 	for i in 20:
 		await physics_frame
 
-	for n in root.find_children("*", "AnimatableBody3D", true, false):
+	for n in map_root.find_children("*", "AnimatableBody3D", true, false):
 		if String(n.get_meta("entity", {}).get("classname", "")) == "func_golem_body":
 			body_node = n
 	body_node.sync_to_physics = false
@@ -159,7 +159,7 @@ func _initialize() -> void:
 	shape_node.shape = cap
 	shape_node.position = Vector3(0, 0.9, 0)
 	player.add_child(shape_node)
-	root.add_child(player)
+	map_root.add_child(player)
 
 	carry_query.collision_mask = 417
 	var sphere := SphereShape3D.new()

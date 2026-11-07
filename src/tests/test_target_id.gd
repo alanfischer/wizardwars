@@ -26,7 +26,7 @@ func _make_player(pid: int, team: int, elem := GameConsts.Element.FIRE, player_n
 
 func _teardown_test() -> void:
 	NetworkManager.swap_peer_table()
-	await super()
+	super()
 
 
 func test_an_ally_is_named_with_their_health() -> void:

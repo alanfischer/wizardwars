@@ -68,7 +68,7 @@ func test_the_spell_is_a_pickup_not_a_class_spell() -> void:
 
 
 func test_it_bites_an_enemy_it_lands_on() -> void:
-	var wombat := _wombat_at(ARENA)
+	var _wombat := _wombat_at(ARENA)
 	var foe := _target_at(ARENA + Vector3(0.0, -0.3, 0.0))  # under its feet
 
 	await _tick(3)
@@ -79,7 +79,7 @@ func test_it_bites_an_enemy_it_lands_on() -> void:
 
 ## The half of the spell nothing else in the set does: it is worth throwing into your own side.
 func test_it_heals_a_teammate_it_lands_on() -> void:
-	var wombat := _wombat_at(ARENA)
+	var _wombat := _wombat_at(ARENA)
 	var friend := _target_at(ARENA + Vector3(0.0, -0.3, 0.0), GameConsts.Team.BLUE)
 
 	await _tick(3)

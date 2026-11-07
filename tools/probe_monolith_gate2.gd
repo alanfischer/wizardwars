@@ -16,8 +16,8 @@ const S := 0.025
 
 
 func _initialize() -> void:
-	var root: Node3D = (load("user://resources/maps/ww_monoliths.scn") as PackedScene).instantiate()
-	get_root().add_child(root)
+	var map_root: Node3D = (load("user://resources/maps/ww_monoliths.scn") as PackedScene).instantiate()
+	get_root().add_child(map_root)
 	for i in 10:
 		await physics_frame
 
@@ -27,7 +27,7 @@ func _initialize() -> void:
 		if a.begins_with("model="): want_model = int(a.substr(6))
 		if a.begins_with("rot="): yaw = float(a.substr(4))
 	var gate: Node3D = null
-	for n in root.find_children("*", "AnimatableBody3D", true, false):
+	for n in map_root.find_children("*", "AnimatableBody3D", true, false):
 		var e: Dictionary = n.get_meta("entity", {})
 		if String(e.get("targetname", "")) == "gate_1" and int(n.get_meta("bsp_model", -1)) == want_model:
 			gate = n
@@ -46,14 +46,14 @@ func _initialize() -> void:
 	var cap := CapsuleShape3D.new()
 	shape.shape = cap
 	player.add_child(shape)
-	root.add_child(player)
+	map_root.add_child(player)
 
 	var params := PhysicsTestMotionParameters3D.new()
 	params.margin = player.safe_margin
 	params.recovery_as_collision = true
 	params.max_collisions = 4
 	var res := PhysicsTestMotionResult3D.new()
-	var space := root.get_world_3d().direct_space_state
+	var space := map_root.get_world_3d().direct_space_state
 
 	# name, capsule height, shape y offset, feet-to-eye of the probe line
 	var cases := [

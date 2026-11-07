@@ -125,7 +125,7 @@ func test_passing_a_node_fires_its_message() -> void:
 	_track("t1", Vector3.ZERO, {"target": "t2"})
 	_track("t2", Vector3(0, 0, 1), {"target": "t3", "message": "arrived"})
 	_track("t3", Vector3(0, 0, 40))
-	var t: FuncTrackTrain = await _train({"speed": "400"})
+	var _t: FuncTrackTrain = await _train({"speed": "400"})
 	var tree := Engine.get_main_loop() as SceneTree
 	for i in 20:
 		await tree.physics_frame

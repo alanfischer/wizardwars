@@ -4,7 +4,6 @@ extends "res://src/tests/test_base.gd"
 ## key is often plain text) passes through — but the Flag→Grail rename applies to all three, so a
 ## literal "You have the flag!" never reaches the HUD still saying flag.
 
-const GoalMessages = preload("res://src/entities/goal_messages.gd")
 
 
 func test_literal_text_gets_the_grail_rename() -> void:

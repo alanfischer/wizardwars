@@ -175,6 +175,7 @@ func test_the_hulls_climb_out() -> void:
 		if sw["out"] > 0:
 			out += 1
 	assert_gt(tried, 0, "the swimmers should start in the water")
+	@warning_ignore("integer_division")
 	assert_gt(out, tried / 2,
 		"most of the %d swimmers should be out of the water inside %d ticks (got %d)"
 			% [tried, BUDGET, out])

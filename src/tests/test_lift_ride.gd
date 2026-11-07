@@ -140,11 +140,11 @@ func test_rides_to_the_top() -> void:
 	var state := Movement.MovementState.new()
 	state.bind_body(body)
 	state.on_floor = true
-	var seq := 0
+	var seq := [0]  # boxed: a lambda's captures are copies
 	var step := func() -> void:
 		var cmd := InputCommand.new()
-		cmd.seq = seq
-		seq += 1
+		cmd.seq = seq[0]
+		seq[0] += 1
 		cmd.delta = TICK
 		sim.simulate_tick(body, state, cmd)
 	for i in 30:

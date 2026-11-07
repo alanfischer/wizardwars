@@ -39,6 +39,7 @@ func _assert_covered_once(map_name: String) -> void:
 	var probed := 0
 	for key in planes:
 		var faces: Array = planes[key]
+		@warning_ignore("integer_division")
 		var step: int = maxi(1, faces.size() / PROBES)
 		for i in range(0, faces.size(), step):
 			probed += 1
@@ -72,6 +73,7 @@ func _liquid_planes(map_name: String) -> Dictionary:
 		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 		var idx: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
 		var xf: Transform3D = (mi as MeshInstance3D).global_transform
+		@warning_ignore("integer_division")
 		for t in (idx.size() if idx.size() > 0 else verts.size()) / 3:
 			var p: Array[Vector3] = []
 			for k in 3:

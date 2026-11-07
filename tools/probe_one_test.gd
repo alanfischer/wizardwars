@@ -15,11 +15,11 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	var name := DEFAULT_TEST
+	var suite := DEFAULT_TEST
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--test="):
-			name = a.substr(7)
-	var path := "res://src/tests/%s.gd" % name
+			suite = a.substr(7)
+	var path := "res://src/tests/%s.gd" % suite
 	var script := load(path) as GDScript
 	if script == null:
 		printerr("no such suite: %s" % path)
