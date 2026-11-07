@@ -18,4 +18,3 @@ func set_flash(color: Color, dir: Vector3) -> void:
 	var box := _skybox.get_ref() as Skybox
 	if box:
 		box.flash_stock(color, dir)
-
