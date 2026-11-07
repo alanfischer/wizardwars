@@ -193,3 +193,77 @@ func test_soaked_ground_is_slick_and_stacks_with_frost() -> void:
 	Game.weather_system = was
 	body.free()
 	weather.free()
+
+
+func test_the_snow_var_is_the_share_of_the_fall_that_is_snow() -> void:
+	var weather := WeatherSystem.new()
+	ServerVars.set_from_string("rain", "0.6")
+	ServerVars.set_from_string("snow", "1")
+	weather._apply_rain()
+	assert_almost_eq(weather.rain, 0.6, 1e-6, "how much falls is still the rain var")
+	assert_almost_eq(weather.snowfall(), 0.6, 1e-6, "and all of it is snow")
+	assert_eq(weather.rainfall(), 0.0, "none of it rain")
+	ServerVars.set_from_string("snow", "0")
+	ServerVars.set_from_string("rain", "0")
+	weather.free()
+
+
+## The commands reply to their sender, which asks the peer who it is: offline here, as a lone host.
+func _offline_host() -> MultiplayerPeer:
+	var was := CommandSystem.multiplayer.multiplayer_peer
+	CommandSystem.multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
+	return was
+
+
+func test_snow_with_nothing_falling_starts_a_fall() -> void:
+	var was := _offline_host()
+	var me: int = CommandSystem.multiplayer.get_unique_id()
+	ServerVars.set_from_string("rain", "0")
+	CommandSystem._cmd_snow(me, "1")
+	assert_eq(float(ServerVars.get_value("snow")), 1.0, "all of it snow")
+	assert_eq(float(ServerVars.get_value("rain")), CommandSystem.SNOW_START, "and some of it falls")
+	CommandSystem._cmd_snow(me, "0.5 0.2")
+	assert_eq(float(ServerVars.get_value("snow")), 0.5, "sleet")
+	assert_almost_eq(float(ServerVars.get_value("rain")), 0.2, 1e-6, "as much as was asked for")
+	CommandSystem._cmd_snow(me, "1")
+	assert_almost_eq(float(ServerVars.get_value("rain")), 0.2, 1e-6, "what is falling keeps falling")
+	CommandSystem._cmd_snow(me, "2")
+	assert_eq(float(ServerVars.get_value("snow")), 1.0, "a share past 1 is refused")
+	ServerVars.set_from_string("snow", "0")
+	ServerVars.set_from_string("rain", "0")
+	CommandSystem.multiplayer.multiplayer_peer = was
+
+
+func test_snow_leaves_dynamic_weather_running() -> void:
+	ServerVars.set_from_string("rain", "0")
+	ServerVars.set_from_string("dynamic_weather", "on")
+	var was := _offline_host()
+	CommandSystem._cmd_snow(CommandSystem.multiplayer.get_unique_id(), "1")
+	CommandSystem.multiplayer.multiplayer_peer = was
+	assert_eq(float(ServerVars.get_value("rain")), 0.0, "a dry spell is left to the showers")
+	assert_eq(bool(ServerVars.get_value("dynamic_weather")), true, "which then come as snow")
+	ServerVars.set_from_string("dynamic_weather", "off")
+	ServerVars.set_from_string("snow", "0")
+
+
+## The map's world shaders take Overcast's wet ground and lying snow through the hook.
+func test_the_world_hook_compiles_with_wet_ground_and_snow() -> void:
+	var shader := Shader.new()
+	shader.code = """
+shader_type spatial;
+#define GOLDSRC_HOOK_WORLD
+#include "res://shaders/goldsrc_hook.gdshaderinc"
+varying vec3 world_pos;
+void vertex() { world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
+void fragment() {
+	vec3 lit = goldsrc_lightmap(vec3(0.5), 1.0, world_pos);
+	vec3 albedo = vec3(0.5);
+	goldsrc_surface(lit, albedo, world_pos, vec3(0.0, 1.0, 0.0), NORMAL, VIEW);
+	ALBEDO = albedo + lit;
+}
+"""
+	var declared := {}
+	for u in shader.get_shader_uniform_list():
+		declared[u["name"]] = true
+	assert_true(declared.has("puddle_scale"), "the hook wets the ground")
+	assert_true(declared.has("snow_scale"), "and lays snow on it")

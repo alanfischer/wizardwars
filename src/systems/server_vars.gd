@@ -62,6 +62,9 @@ func _register_defaults() -> void:
 	# Showers that come and go on their own, by writing `rain` and the wind (WeatherCycle); the map's
 	# own weather is ignored while on. Replicated so the pause panel shows it on clients too.
 	register("dynamic_weather", false, Type.BOOL)
+	# How much of what falls is snow: 0 rain, 1 snow, sleet between. How much falls is still `rain`
+	# (or the map's, or dynamic weather's), so dynamic weather's showers come as snow too.
+	register("snow", 0.0, Type.FLOAT)
 	# Wind across the ground, m/s, blowing toward wind_dir (degrees round from +Z toward +X).
 	register("wind", 0.0, Type.FLOAT)
 	register("wind_dir", 0.0, Type.FLOAT)
