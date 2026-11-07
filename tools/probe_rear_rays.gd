@@ -33,11 +33,11 @@ func local_gs(p: Vector3) -> Vector3:
 
 
 func _initialize() -> void:
-	var root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
-	get_root().add_child(root)
+	var map_root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
+	get_root().add_child(map_root)
 	for i in 20:
 		await physics_frame
-	for n in root.find_children("*", "AnimatableBody3D", true, false):
+	for n in map_root.find_children("*", "AnimatableBody3D", true, false):
 		if String(n.get_meta("entity", {}).get("classname", "")) == "func_golem_body":
 			body_node = n
 	space = body_node.get_world_3d().direct_space_state

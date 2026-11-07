@@ -30,11 +30,11 @@ func _set_height(h: float) -> void:
 
 
 func _initialize() -> void:
-	var root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
-	get_root().add_child(root)
+	var map_root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
+	get_root().add_child(map_root)
 	for i in 20:
 		await physics_frame
-	for n in root.find_children("*", "AnimatableBody3D", true, false):
+	for n in map_root.find_children("*", "AnimatableBody3D", true, false):
 		if String(n.get_meta("entity", {}).get("classname", "")) == "func_golem_body":
 			body_node = n
 
@@ -47,7 +47,7 @@ func _initialize() -> void:
 	cap.radius = 0.4
 	shape.shape = cap
 	player.add_child(shape)
-	root.add_child(player)
+	map_root.add_child(player)
 
 	var p := PhysicsTestMotionParameters3D.new()
 	p.margin = player.safe_margin

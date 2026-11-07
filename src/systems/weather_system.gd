@@ -1,3 +1,4 @@
+@tool
 class_name WeatherSystem
 extends "res://addons/overcast/overcast_weather.gd"
 ## Overcast's rain and lightning, wired into the game: the map's own weather (PotatoC SetWeather)
@@ -46,8 +47,8 @@ func _ready() -> void:
 
 ## The map's rain floor (MapConverter, GoldSrcBSP.bake_rain_floor), so no drop is drawn under a
 ## roof. A map converted before it existed has none: it rains everywhere and nothing gets wet.
-func _take_rain_floor(map_root: Node) -> void:
-	var data: Dictionary = map_root.get_meta("rain_floor", {})
+func _take_rain_floor(root: Node) -> void:
+	var data: Dictionary = root.get_meta("rain_floor", {})
 	if data.is_empty():
 		return
 	# The extension's floor runs from its max-X corner; Overcast's from its min-X one.
@@ -64,8 +65,8 @@ func _take_rain_floor(map_root: Node) -> void:
 		float(data["top"]), air)
 	# Without a floor rain would wet the map indoors too.
 	wet_ground = true
-	_set_puddle_scales(map_root)
-	_cover_movers(map_root)
+	_set_puddle_scales(root)
+	_cover_movers(root)
 
 
 var _pools_by_shader := {}  # Shader -> whether it takes puddle_scale

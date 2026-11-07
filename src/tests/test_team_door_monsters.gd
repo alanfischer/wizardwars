@@ -201,7 +201,7 @@ func _counting_target() -> CountingTarget:
 func test_a_monster_works_a_door_trigger() -> void:
 	var d = _door({"targetname": "spawn_door"})
 	TriggerSystem.register("spawn_door", d)
-	var t := _trigger({"team_no": "1"})
+	var _t := _trigger({"team_no": "1"})
 	_monster_body()
 	await _tick(4)
 	assert_true(d.state != FuncDoorBase.State.AT_BOTTOM,

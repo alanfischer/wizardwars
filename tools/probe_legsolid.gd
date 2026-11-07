@@ -1,11 +1,11 @@
 extends SceneTree
 func _initialize() -> void:
-	var root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
-	get_root().add_child(root)
+	var map_root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
+	get_root().add_child(map_root)
 	await physics_frame
 	await physics_frame
 	var leg: AnimatableBody3D = null
-	for n in root.find_children("*", "AnimatableBody3D", true, false):
+	for n in map_root.find_children("*", "AnimatableBody3D", true, false):
 		if "rightleg" in String(n.get_meta("entity", {}).get("classname", "")):
 			leg = n
 	print("leg layer=%d mask=%d  shapes=%d  meta=%s" % [leg.collision_layer, leg.collision_mask,
@@ -34,7 +34,7 @@ func _initialize() -> void:
 			cell_centres.append(cc)
 			print("  cell %s centroid %s" % [c.name, cc])
 
-	var space := root.get_world_3d().direct_space_state
+	var space := map_root.get_world_3d().direct_space_state
 	# A tiny sphere dead in the middle of the leg hull: must report the leg.
 	var tiny := SphereShape3D.new()
 	tiny.radius = 0.05

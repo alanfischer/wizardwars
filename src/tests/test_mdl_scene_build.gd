@@ -44,5 +44,6 @@ func test_cut_clips_span_every_frame() -> void:
 			if n > 1:
 				assert_almost_eq(anim.track_get_key_time(t, n - 1), last_frame, 1e-4,
 					"%s track %d ends on its last frame" % [anim_name, t])
+	@warning_ignore("integer_division")
 	assert_lt(keys, frames / 2, "most per-frame keys are cut")
 	mdl.free()

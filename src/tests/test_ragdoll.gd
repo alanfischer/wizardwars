@@ -83,14 +83,14 @@ func _pool_below(pos: Vector3, below: float, depth := 3.0,
 	return area
 
 
-func _skull_at(pos: Vector3, seed := 5) -> TumblingCorpse:
+func _skull_at(pos: Vector3, skull_seed := 5) -> TumblingCorpse:
 	var corpse: TumblingCorpse = CorpseScript.new()
 	corpse.setup({
 		"position": pos,
 		"velocity": Vector3.ZERO,
 		"model": "models/flyingskull.mdl",
 		"kind": TumblingCorpse.Kind.PROP,
-		"seed": seed,
+		"seed": skull_seed,
 	}, true)
 	_root().add_child(corpse)
 	_keep(corpse)
@@ -947,6 +947,7 @@ func test_the_prune_takes_only_leaves_off_the_bird() -> void:
 	for entry in boxes:
 		kept[entry["bone"]] = true
 	assert_true(kept.size() < before.size(), "the bird loses bones — it hitboxes every toe")
+	@warning_ignore("integer_division")
 	assert_true(kept.size() > before.size() / 2, "but it is still a bird, not a stump")
 
 	for bone in before:

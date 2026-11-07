@@ -168,6 +168,7 @@ func _run() -> void:
 	var hbox := AABB()
 	for i in tris.size():
 		hbox = AABB(tris[i], Vector3.ZERO) if i == 0 else hbox.expand(tris[i])
+	@warning_ignore("integer_division")
 	print("hull 1 -> %d triangles from %d model(s)%s in %d ms, extent %.0f x %.0f x %.0f m" % [
 			tris.size() / 3, models,
 			"" if not settle else " (%d re-posed, %d dropped)" % [moved.size(), dropped.size()],

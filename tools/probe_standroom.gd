@@ -19,13 +19,13 @@ func gs_to_godot(x: float, y: float, z: float) -> Vector3:
 
 
 func _initialize() -> void:
-	var root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
-	get_root().add_child(root)
+	var map_root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
+	get_root().add_child(map_root)
 	for i in 20:
 		await physics_frame
 
 	var leg: AnimatableBody3D = null
-	for n in root.find_children("*", "AnimatableBody3D", true, false):
+	for n in map_root.find_children("*", "AnimatableBody3D", true, false):
 		if "leftleg" in String(n.get_meta("entity", {}).get("classname", "")):
 			leg = n
 
@@ -41,7 +41,7 @@ func _initialize() -> void:
 	cs.shape = cap
 	cs.position = Vector3(0, 0.45, 0)
 	b.add_child(cs)
-	root.add_child(b)
+	map_root.add_child(b)
 	var body := GodotBody.new(b)
 	var cfg := MovementConfig.new()
 

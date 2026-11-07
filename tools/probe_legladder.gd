@@ -8,14 +8,14 @@ const LADDER_MARGIN := 0.0
 
 
 func _initialize() -> void:
-	var root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
-	get_root().add_child(root)
+	var map_root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
+	get_root().add_child(map_root)
 	await physics_frame
 
 	# The golem body's yaw, and the leg brush entities, straight out of the scene.
 	var gs_yaw := 0.0
 	var legs: Array = []
-	for n in root.find_children("*", "AnimatableBody3D", true, false):
+	for n in map_root.find_children("*", "AnimatableBody3D", true, false):
 		var cn: String = n.get_meta("entity", {}).get("classname", "")
 		if cn == "func_golem_body":
 			var angles: String = n.get_meta("entity", {}).get("angles", "0 0 0")
@@ -52,7 +52,7 @@ func _initialize() -> void:
 		+ Vector3(0.0, (min_y + max_y) * 0.5, 0.0)
 
 	# Build the volume IN the map, next to everything else on the ladder layer.
-	var bare := root
+	var bare := map_root
 	var area := Area3D.new()
 	area.name = "GolemLadder"
 	area.collision_layer = GameConsts.MASK_LADDER
@@ -74,7 +74,7 @@ func _initialize() -> void:
 	leg.add_child(wrapper)
 
 	# The map's own func_ladder volumes, switched on the way FuncLadder._ready does.
-	for n in root.find_children("*", "AnimatableBody3D", true, false):
+	for n in map_root.find_children("*", "AnimatableBody3D", true, false):
 		if n.get_meta("entity", {}).get("classname", "") == "func_ladder":
 			n.collision_layer = 0
 			var v := n.get_node("Volume") as Area3D
@@ -110,7 +110,6 @@ func _initialize() -> void:
 	var last_hit := -INF
 	var first_hit := INF
 	var gaps: Array = []
-	var prev_hit := false
 	var wrong_first: Array = []
 	while y <= y1:
 		var centre := Vector3(base.x, y + 0.9, base.z)   # detector centre for feet at y
@@ -134,7 +133,6 @@ func _initialize() -> void:
 			last_hit = maxf(last_hit, y)
 		if truth and not hit:
 			gaps.append(y)
-		prev_hit = hit
 		y += step
 
 	print("feet range where the server reports the ladder: %.2f .. %.2f" % [first_hit, last_hit])

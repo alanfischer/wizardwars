@@ -48,7 +48,7 @@ func _setup_test(_name: String) -> void:
 
 
 func test_a_body_inside_is_reported_entered() -> void:
-	var area := _make_area(Vector3(4, 4, 4))
+	var _area := _make_area(Vector3(4, 4, 4))
 	var body := _make_body()
 	await _tick(3)
 	assert_eq(_entered.size(), 1, "precondition: the overlap is detected at all")
@@ -85,7 +85,7 @@ func test_the_shape_coming_back_re_reports_a_body_that_never_moved() -> void:
 
 
 func test_leaving_the_world_reports_the_body_out() -> void:
-	var area := _make_area(Vector3(4, 4, 4))
+	var _area := _make_area(Vector3(4, 4, 4))
 	var body := _make_body()
 	await _tick(3)
 	assert_eq(_entered.size(), 1, "precondition: inside")
@@ -95,7 +95,7 @@ func test_leaving_the_world_reports_the_body_out() -> void:
 
 
 func test_a_freed_body_does_not_come_back_when_a_new_one_arrives() -> void:
-	var area := _make_area(Vector3(4, 4, 4))
+	var _area := _make_area(Vector3(4, 4, 4))
 	var first := _make_body()
 	await _tick(3)
 	first.queue_free()

@@ -52,11 +52,11 @@ func shot(label: String, at: Vector3, motion_gs: Vector3) -> void:
 
 
 func _initialize() -> void:
-	var root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
-	get_root().add_child(root)
+	var map_root: Node3D = (load("user://resources/maps/ww_golem.scn") as PackedScene).instantiate()
+	get_root().add_child(map_root)
 	for i in 20:
 		await physics_frame
-	for n in root.find_children("*", "AnimatableBody3D", true, false):
+	for n in map_root.find_children("*", "AnimatableBody3D", true, false):
 		if String(n.get_meta("entity", {}).get("classname", "")) == "func_golem_body":
 			body_node = n
 
@@ -71,7 +71,7 @@ func _initialize() -> void:
 	cs.shape = cap
 	cs.position = Vector3(0, 0.9, 0)
 	player.add_child(cs)
-	root.add_child(player)
+	map_root.add_child(player)
 	await physics_frame
 
 	if OS.get_environment("DOOR") != "":

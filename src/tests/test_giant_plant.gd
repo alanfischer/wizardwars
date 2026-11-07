@@ -99,7 +99,7 @@ func test_the_plant_walks_at_an_enemy_and_bites_it() -> void:
 ## through it once per physics frame.
 func test_a_bite_waits_out_its_cooldown() -> void:
 	_floor_at(ARENA - Vector3(0.0, 0.5, 0.0), Vector3(40.0, 1.0, 40.0))
-	var plant := _plant_at(ARENA)
+	var _plant := _plant_at(ARENA)
 	var target := _target_at(ARENA + Vector3(0.0, 0.0, 1.5))  # already inside bite range
 
 	await _tick(60)  # one second

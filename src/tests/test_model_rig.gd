@@ -29,7 +29,7 @@ func _rig_with(policy := ModelRig.Loop.MODEL, looping := PackedStringArray()) ->
 	return rig
 
 
-func _anim(length: float, loop_mode: int) -> Animation:
+func _anim(length: float, loop_mode: Animation.LoopMode) -> Animation:
 	var anim := Animation.new()
 	anim.length = length
 	anim.loop_mode = loop_mode

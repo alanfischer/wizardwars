@@ -17,13 +17,13 @@ func gs_to_godot(x: float, y: float, z: float) -> Vector3:
 
 
 func _initialize() -> void:
-	var root: Node3D = (load("user://resources/maps/ww_monoliths.scn") as PackedScene).instantiate()
-	get_root().add_child(root)
+	var map_root: Node3D = (load("user://resources/maps/ww_monoliths.scn") as PackedScene).instantiate()
+	get_root().add_child(map_root)
 	for i in 10:
 		await physics_frame
 
 	var gates: Array[Node3D] = []
-	for n in root.find_children("*", "AnimatableBody3D", true, false):
+	for n in map_root.find_children("*", "AnimatableBody3D", true, false):
 		var e: Dictionary = n.get_meta("entity", {})
 		if String(e.get("targetname", "")) == "gate_1":
 			gates.append(n)
@@ -40,14 +40,14 @@ func _initialize() -> void:
 	shape.shape = cap
 	shape.position = Vector3(0, 0.9, 0)
 	player.add_child(shape)
-	root.add_child(player)
+	map_root.add_child(player)
 
 	var params := PhysicsTestMotionParameters3D.new()
 	params.margin = player.safe_margin
 	params.recovery_as_collision = true
 	params.max_collisions = 4
 	var res := PhysicsTestMotionResult3D.new()
-	var space := root.get_world_3d().direct_space_state
+	var space := map_root.get_world_3d().direct_space_state
 
 	for gate in gates:
 		var ent: Dictionary = gate.get_meta("entity", {})
@@ -113,7 +113,7 @@ func _initialize() -> void:
 				for i in res.get_collision_count():
 					man += " n=%v d=%.3f" % [res.get_collision_normal(i), res.get_collision_depth(i)]
 				print("    dir=%v ray hits %s at %.3f m | capsule stops at %.3f m -> standoff %.3f m (%.1f GS units)%s" % [
-					dir, who.name if who else "?", ray_d, travel, ray_d - travel,
+					dir, str(who.name) if who else "?", ray_d, travel, ray_d - travel,
 					(ray_d - travel) / S, man])
 
 	# Control: the same measurement against ordinary world geometry near the gate.
@@ -136,6 +136,6 @@ func _initialize() -> void:
 		var travel: float = res.get_travel().length()
 		print("  dir=%v ray %.3f m | capsule %.3f m -> standoff %.3f m (%.1f GS units) hit=%s" % [
 			dir, ray_d, travel, ray_d - travel, (ray_d - travel) / S,
-			(hit.collider as Node).name if hit.collider else "?"])
+			str((hit.collider as Node).name) if hit.collider else "?"])
 
 	quit(0)

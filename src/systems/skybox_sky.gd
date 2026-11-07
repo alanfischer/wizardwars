@@ -1,3 +1,4 @@
+@tool
 class_name SkyboxSky
 extends OvercastSky
 ## The procedural sky Skybox draws on the sky brushes under dynamic weather. The weather talks to

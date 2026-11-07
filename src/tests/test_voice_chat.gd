@@ -11,6 +11,7 @@ extends "res://src/tests/test_base.gd"
 
 const ServerRequests = preload("res://src/systems/server_requests.gd")
 const VoiceSettings = preload("res://src/systems/voice_settings.gd")
+const VoiceChatScript = preload("res://src/systems/voice_chat.gd")  # pick_channel is static; VoiceChat is the autoload
 
 const NONE := VoiceChat.Channel.NONE
 const ALL := VoiceChat.Channel.ALL
@@ -41,11 +42,11 @@ func _player_on(peer_id: int, team: int) -> Player:
 # --- The channel latch ---
 
 func test_each_key_opens_its_own_channel() -> void:
-	assert_eq(VoiceChat.pick_channel(NONE, false, true, true), ALL,
+	assert_eq(VoiceChatScript.pick_channel(NONE, false, true, true), ALL,
 		"the all-talk key opens the everyone channel")
-	assert_eq(VoiceChat.pick_channel(NONE, true, false, true), TEAM,
+	assert_eq(VoiceChatScript.pick_channel(NONE, true, false, true), TEAM,
 		"the team key opens the team channel")
-	assert_eq(VoiceChat.pick_channel(NONE, false, false, true), NONE,
+	assert_eq(VoiceChatScript.pick_channel(NONE, false, false, true), NONE,
 		"no key held is no channel")
 
 
@@ -53,31 +54,31 @@ func test_each_key_opens_its_own_channel() -> void:
 ## addressed to. Grabbing the other key mid-sentence must not hand the rest of it to the enemy
 ## team, nor silently promote team talk to everyone.
 func test_a_held_channel_is_not_redirected_by_the_other_key() -> void:
-	assert_eq(VoiceChat.pick_channel(TEAM, true, true, true), TEAM,
+	assert_eq(VoiceChatScript.pick_channel(TEAM, true, true, true), TEAM,
 		"an open team stream stays on the team while its own key is held")
-	assert_eq(VoiceChat.pick_channel(ALL, true, true, true), ALL,
+	assert_eq(VoiceChatScript.pick_channel(ALL, true, true, true), ALL,
 		"an open all-talk stream is not pulled onto the team channel")
 
 
 func test_the_team_key_wins_when_both_are_pressed_from_silence() -> void:
-	assert_eq(VoiceChat.pick_channel(NONE, true, true, true), TEAM,
+	assert_eq(VoiceChatScript.pick_channel(NONE, true, true, true), TEAM,
 		"both keys at once from silence is the narrower channel, not the wider one")
 
 
 func test_releasing_the_key_closes_the_channel() -> void:
-	assert_eq(VoiceChat.pick_channel(TEAM, false, false, true), NONE, "team key released")
-	assert_eq(VoiceChat.pick_channel(ALL, false, false, true), NONE, "all-talk key released")
+	assert_eq(VoiceChatScript.pick_channel(TEAM, false, false, true), NONE, "team key released")
+	assert_eq(VoiceChatScript.pick_channel(ALL, false, false, true), NONE, "all-talk key released")
 
 
 ## A spectator (or anyone between teams) pressing team-talk has no recipients. It opens nothing,
 ## the way ServerRequests drops team text from a team-less sender — the alternative is a stream
 ## the player believes is private going out to the whole server.
 func test_team_voice_needs_a_team() -> void:
-	assert_eq(VoiceChat.pick_channel(NONE, true, false, false), NONE,
+	assert_eq(VoiceChatScript.pick_channel(NONE, true, false, false), NONE,
 		"team voice with no team opens nothing")
-	assert_eq(VoiceChat.pick_channel(NONE, true, true, false), ALL,
+	assert_eq(VoiceChatScript.pick_channel(NONE, true, true, false), ALL,
 		"with no team the team key is not in the way of all-talk")
-	assert_eq(VoiceChat.pick_channel(TEAM, true, false, false), NONE,
+	assert_eq(VoiceChatScript.pick_channel(TEAM, true, false, false), NONE,
 		"losing your team mid-sentence closes the stream rather than widening it")
 
 
@@ -149,11 +150,13 @@ func test_the_budget_refuses_a_flood_then_refills() -> void:
 	while spent < ceiling and VoiceChat.budget_allows(peer, 256):
 		spent += 256
 	assert_lt(spent, ceiling, "a client spraying voice is cut off rather than relayed")
+	@warning_ignore("integer_division")
 	assert_gt(spent, VoiceChat.BUDGET_BURST / 2, "a burst of real speech is not cut off early")
 	# A second of silence, without making the suite sit through one: the bucket refills off the
 	# clock, so winding its last-spend stamp back is the same thing — and unlike a few awaited
 	# frames (which headless runs through in no time at all) it measures the refill rate itself.
 	VoiceChat._budgets[peer]["ms"] = int(VoiceChat._budgets[peer]["ms"]) - 1000
+	@warning_ignore("integer_division")
 	assert_true(VoiceChat.budget_allows(peer, VoiceChat.BUDGET_BYTES_PER_S / 2),
 		"a second of quiet refills about a second's worth of talking")
 	VoiceChat._budgets.erase(peer)

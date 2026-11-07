@@ -75,9 +75,9 @@ func _offset_of(conveyor) -> Vector2:
 
 
 ## PROCESS frames, not the base _tick's physics frames: the scroll is a material uv1_offset
-## written in _process, so a physics-only wait would never advance it. `conveyor` is unused and
+## written in _process, so a physics-only wait would never advance it. `_belt` is unused and
 ## kept for the call sites, which read as "let this belt scroll".
-func _scroll_frames(_conveyor, frames := 3) -> void:
+func _scroll_frames(_belt, frames := 3) -> void:
 	var tree := Engine.get_main_loop() as SceneTree
 	for _i in frames:
 		await tree.process_frame

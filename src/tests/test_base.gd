@@ -116,8 +116,10 @@ func _run_tests() -> void:
 		if not n.begins_with("test_"):
 			continue
 		_current_test = n
+		@warning_ignore("redundant_await")
 		await _setup_test(n)
 		await call(n)
+		@warning_ignore("redundant_await")
 		await _teardown_test()
 
 

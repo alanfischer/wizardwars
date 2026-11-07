@@ -24,6 +24,16 @@ fi
 
 cd "$(dirname "$0")"
 
+# Warnings as errors for this run only: Godot reads override.cfg over project.godot at startup.
+# A headless run prints no warnings, so this is the only way the suite sees them.
+if [ -e override.cfg ]; then
+    echo "override.cfg already exists; move it aside to run the tests." >&2
+    exit 1
+fi
+trap 'rm -f override.cfg' EXIT
+"$GODOT" --headless --path . -s tools/warnings_as_errors.gd 2>/dev/null \
+    | grep -E '^\[debug\]$|=2$' > override.cfg
+
 status=0
 log="$(mktemp)"
 if ! "$GODOT" --headless --path . res://src/tests/run_tests.tscn 2>&1 | tee "$log"; then

@@ -52,9 +52,9 @@ static func parse(text: String) -> String:
 
 
 ## "18:30".
-static func format(hours: float) -> String:
-	var minutes := roundi(hours * 60.0) % (24 * 60)
-	return "%d:%02d" % [minutes / 60, minutes % 60]
+static func format(h: float) -> String:
+	var minutes := roundi(h * 60.0) % (24 * 60)
+	return "%d:%02d" % [floori(minutes / 60.0), minutes % 60]
 
 
 ## The `time` server var, hours.
