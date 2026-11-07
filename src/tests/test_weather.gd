@@ -20,6 +20,34 @@ func test_the_rain_var_reaches_overcast_unchanged() -> void:
 	weather.free()
 
 
+func test_dynamic_weather_leaves_the_maps_weather_unused() -> void:
+	var weather := WeatherSystem.new()
+	weather._current_type = 1
+	weather._current_intensity = 9
+	ServerVars.set_from_string("dynamic_weather", "on")
+	ServerVars.set_from_string("rain", "0")
+	assert_eq(weather.rain_amount(), 0.0, "a dry spell is dry whatever the map asked for")
+	ServerVars.set_from_string("rain", "0.2")
+	assert_almost_eq(weather.rain_amount(), 0.2, 1e-6, "and a shower is the cycle's")
+	ServerVars.set_from_string("dynamic_weather", "off")
+	ServerVars.set_from_string("rain", "0")
+	assert_almost_eq(weather.rain_amount(), 1.0, 1e-6, "off again, the map's weather is back")
+	weather.free()
+
+
+func test_the_wind_vars_blow_overcast_wind() -> void:
+	var weather := WeatherSystem.new()
+	ServerVars.set_from_string("wind", "4")
+	ServerVars.set_from_string("wind_dir", "90")
+	weather._apply_wind()
+	assert_vec3_almost_eq(weather.wind, Vector3(4.0, 0.0, 0.0), 1e-5, "4 m/s toward +X")
+	ServerVars.set_from_string("wind", "0")
+	ServerVars.set_from_string("wind_dir", "0")
+	weather._apply_wind()
+	assert_eq(weather.wind, Vector3.ZERO, "calm")
+	weather.free()
+
+
 func test_every_hour_lights_the_rain_with_a_number() -> void:
 	for t in ["0", "6", "12", "18", "18:30", "23.75"]:
 		ServerVars.set_from_string("time", NightMode.parse(t))

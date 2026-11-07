@@ -257,13 +257,6 @@ common/physics_interpolation=true
 textures/vram_compression/import_etc2_astc=true
 renderer/rendering_method.pc="gl_compatibility"
 
-[xr]
-
-openxr/extensions/hand_tracking=true
-shaders/enabled=true
-openxr/enabled.android=true
-openxr/extensions/meta/passthrough=true
-
 [shader_globals]
 
 overcast_noise={
@@ -366,3 +359,10 @@ overcast_rain_sky={
 "type": "vec3",
 "value": Vector3(0, 0, 0)
 }
+
+[xr]
+
+openxr/extensions/hand_tracking=true
+shaders/enabled=true
+openxr/enabled.android=true
+openxr/extensions/meta/passthrough=true

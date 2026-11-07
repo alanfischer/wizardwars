@@ -193,6 +193,8 @@ func _fn_res_sg(arg1: String, _arg2: String) -> int:
 	return 0
 
 func _fn_set_weather(arg1: String, arg2: String) -> int:
+	if bool(ServerVars.get_value("dynamic_weather", false)):
+		Log.info("potatoc '%s': SetWeather(%s, %s) ignored under dynamic weather" % [name, arg1, arg2])
 	if Game.weather_system:
 		Game.weather_system.set_weather(int(arg1), int(arg2))
 	return 0

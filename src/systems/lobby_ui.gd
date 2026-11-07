@@ -310,7 +310,7 @@ func _build_match_rows(vbox: VBoxContainer) -> void:
 	weather.add_child(_lightning_check)
 	_dynamic_weather_check = _make_check("Dynamic", false, func(on: bool) -> void:
 		NetworkManager.send_request_command("dynamicweather %s" % ("on" if on else "off")))
-	_dynamic_weather_check.tooltip_text = "Showers come and go on their own. Moving Rain turns it off. (/dynamicweather)"
+	_dynamic_weather_check.tooltip_text = "Showers come and go on their own, in a shifting wind. Moving Rain turns it off. (/dynamicweather)"
 	weather.add_child(_dynamic_weather_check)
 
 	_sync_match_rows()
