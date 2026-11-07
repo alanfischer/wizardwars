@@ -55,14 +55,16 @@ func _register_defaults() -> void:
 	# client draws. See NightMode.
 	register("time", 12.0, Type.FLOAT)
 	# Rain 0.01 (light) … 1 (downpour) on any map; values above 1 increase drop density proportionally.
-	# 0 leaves the weather to the map (ww_chasm's
-	# PotatoC). Lightning strikes while it rains unless turned off. Both replicated: they are what
+	# 0 leaves the weather to the map (ww_chasm's PotatoC), but for under dynamic weather. Lightning strikes while it rains unless turned off. Both replicated: they are what
 	# every client sees, and the host times the strikes. See WeatherSystem.
 	register("rain", 0.0, Type.FLOAT)
 	register("lightning", true, Type.BOOL)
-	# Showers that come and go on their own, by writing `rain` (WeatherCycle). Replicated so the
-	# pause panel shows it on clients too.
+	# Showers that come and go on their own, by writing `rain` and the wind (WeatherCycle); the map's
+	# own weather is ignored while on. Replicated so the pause panel shows it on clients too.
 	register("dynamic_weather", false, Type.BOOL)
+	# Wind across the ground, m/s, blowing toward wind_dir (degrees round from +Z toward +X).
+	register("wind", 0.0, Type.FLOAT)
+	register("wind_dir", 0.0, Type.FLOAT)
 
 
 func register(key: String, default_value, type: int, replicate: bool = true) -> void:

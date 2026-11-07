@@ -12,7 +12,8 @@ const PUDDLE_DEFAULT := 0.5
 
 ## The map, handed over before the system enters the tree. None on a test or tool that has no map.
 var map_root: Node
-## What the map asked for (PotatoC SetWeather). The `rain` server var overrides it while non-zero.
+## What the map asked for (PotatoC SetWeather). The `rain` server var overrides it while non-zero,
+## and dynamic weather throughout.
 var _current_type: int = 0
 var _current_intensity: int = 0
 
@@ -43,6 +44,7 @@ func _ready() -> void:
 		# _ready has said whether they are solid.
 		get_tree().node_added.connect(_on_node_added)
 	_apply_rain()
+	_apply_wind()
 
 
 ## The map's rain floor (MapConverter, GoldSrcBSP.bake_rain_floor), so no drop is drawn under a
@@ -136,11 +138,11 @@ func set_weather(type: int, intensity: int) -> void:
 	_apply_rain()
 
 
-## How hard it is raining, Overcast's way (0 dry, 1 a downpour): the `rain` server var while set,
-## the map's own 1–9 otherwise.
+## How hard it is raining, Overcast's way (0 dry, 1 a downpour): the `rain` server var while set
+## or under dynamic weather, the map's own 1–9 otherwise.
 func rain_amount() -> float:
 	var forced := float(ServerVars.get_value("rain", 0.0))
-	if forced > 0.0:
+	if forced > 0.0 or bool(ServerVars.get_value("dynamic_weather", false)):
 		return forced
 	if _current_type != 1 or _current_intensity <= 0:
 		return 0.0
@@ -152,9 +154,16 @@ func _apply_rain() -> void:
 	lightning = bool(ServerVars.get_value("lightning", true))
 
 
+func _apply_wind() -> void:
+	var dir := deg_to_rad(float(ServerVars.get_value("wind_dir", 0.0)))
+	wind = Vector3(sin(dir), 0.0, cos(dir)) * float(ServerVars.get_value("wind", 0.0))
+
+
 func _on_server_var_changed(key: String, _value: Variant) -> void:
-	if key == "rain" or key == "lightning":
+	if key == "rain" or key == "lightning" or key == "dynamic_weather":
 		_apply_rain()
+	elif key == "wind" or key == "wind_dir":
+		_apply_wind()
 	elif key == "time":
 		_apply_night()
 
