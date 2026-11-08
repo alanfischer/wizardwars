@@ -137,6 +137,13 @@ const _ACUBE_PARAMS := [
 ]
 
 
+## Binds the grid to one material of WW's own that takes the ambient cube
+## (shaders/ambient_cube.gdshaderinc), as apply_textures_to_node does a model's.
+func bind(mat: ShaderMaterial) -> void:
+	if _valid:
+		_set_grid_on_material(mat)
+
+
 ## Call once when the model is created (not per-frame).
 func apply_textures_to_node(node: Node) -> void:
 	if not _valid:
