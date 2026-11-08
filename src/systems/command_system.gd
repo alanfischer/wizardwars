@@ -20,6 +20,8 @@ const SPAWN_THROW_SPEED := 12.0
 const LIST_CHUNK := 12
 ## What a kicked player is told when the admin gave no reason.
 const DEFAULT_KICK_REASON := "Kicked by an admin."
+## The fall /snow starts when it is asked for with nothing falling.
+const SNOW_START := 0.5
 
 var _admin_password := ""  # empty => /auth always fails
 var _commands: Dictionary = {}  # name -> {callable, perm, usage, help}
@@ -136,6 +138,7 @@ func _register_builtins() -> void:
 	_register("time", _cmd_time, Perm.ADMIN, "/time [hours|h:mm|noon|dusk|night|dawn]", "Time of day on sky-lit maps: warm light toward dusk (18:00), moonlight at night. The map's own lights stay lit.")
 	_register("rain", _cmd_rain, Perm.ADMIN, "/rain [amount]", "Rain on any map, 0.01 light to 1 a downpour; values above 1 add drop density. 0 leaves the weather to the map.")
 	_register("dynamicweather", _cmd_dynamic_weather, Perm.ADMIN, "/dynamicweather [on|off]", "Showers come and go on their own, light to heavy, in a shifting wind; the map's own weather is ignored. Setting /rain turns it off.")
+	_register("snow", _cmd_snow, Perm.ADMIN, "/snow [share] [amount]", "How much of what falls is snow: 1 all of it, 0 back to rain, between sleet. With nothing falling it starts a fall of 0.5; an amount sets how much falls, as /rain does.")
 	_register("lightning", _cmd_lightning, Perm.ADMIN, "/lightning [on|off]", "Lightning strikes while it rains.")
 	_register("allow_combos", _cmd_allow_combos, Perm.ADMIN, "/allow_combos [on|off]", "Whether two allied wizards can clash staves to earn a combo spell.")
 	_register("siege", _cmd_siege, Perm.ADMIN, "/siege [on|off]", "Co-op: waves of monsters against an altar everyone defends together. Works on any map.")
@@ -774,6 +777,43 @@ func _cmd_dynamic_weather(sender_id: int, args: String) -> void:
 func _rain_text() -> String:
 	var v := float(ServerVars.get_value("rain", 0.0))
 	return "the map's own" if is_zero_approx(v) else ("%.2f (%.1fx drops)" % [v, v] if v > 1.0 else "%.2f" % v)
+
+
+func _cmd_snow(sender_id: int, args: String) -> void:
+	var parts := args.strip_edges().split(" ", false)
+	if parts.is_empty():
+		_reply_ok(sender_id, "snow: %s" % _snow_text())
+		return
+	var share_ok := parts[0].is_valid_float() and float(parts[0]) >= 0.0 and float(parts[0]) <= 1.0
+	var amount_ok := parts.size() == 1 or (parts[1].is_valid_float() and float(parts[1]) >= 0.0)
+	if parts.size() > 2 or not share_ok or not amount_ok:
+		_reply_err(sender_id, "Usage: /snow [share 0..1] [amount]")
+		return
+	ServerVars.set_from_string("snow", parts[0])
+	if parts.size() == 2:
+		ServerVars.set_from_string("rain", parts[1])
+	elif float(parts[0]) > 0.0 and not _anything_falls():
+		ServerVars.set_from_string("rain", str(SNOW_START))
+	_reply_ok(sender_id, "snow: %s" % _snow_text())
+
+
+## Whether rain or snow falls now, or dynamic weather will bring it: its dry spells count, as
+## setting `rain` would take the weather off it.
+func _anything_falls() -> bool:
+	if bool(ServerVars.get_value("dynamic_weather", false)):
+		return true
+	if Game.weather_system:
+		return Game.weather_system.rain_amount() > 0.0
+	return float(ServerVars.get_value("rain", 0.0)) > 0.0
+
+
+func _snow_text() -> String:
+	var share := float(ServerVars.get_value("snow", 0.0))
+	var text := "none" if is_zero_approx(share) else ("all of what falls" if share >= 1.0
+		else "%.2f of what falls (sleet)" % share)
+	if share > 0.0 and not _anything_falls():
+		text += ", but nothing is falling (/rain sets how much)"
+	return text
 
 
 func _cmd_lightning(sender_id: int, args: String) -> void:

@@ -1,8 +1,8 @@
 @tool
 class_name WeatherSystem
 extends "res://addons/overcast/overcast_weather.gd"
-## Overcast's rain and lightning, wired into the game: the map's own weather (PotatoC SetWeather)
-## and the `rain` / `lightning` server vars drive it, the host times the strikes for every peer,
+## Overcast's rain, snow and lightning, wired into the game: the map's own weather (PotatoC
+## SetWeather) and the `rain` / `snow` / `lightning` server vars drive it, the host times the strikes for every peer,
 ## and the flash lights the map through NightMode.
 
 const TopDownFrame = preload("res://src/systems/top_down_frame.gd")
@@ -156,6 +156,7 @@ func rain_amount() -> float:
 
 func _apply_rain() -> void:
 	rain = rain_amount()
+	snow = float(ServerVars.get_value("snow", 0.0))
 	lightning = bool(ServerVars.get_value("lightning", true))
 
 
@@ -165,7 +166,7 @@ func _apply_wind() -> void:
 
 
 func _on_server_var_changed(key: String, _value: Variant) -> void:
-	if key == "rain" or key == "lightning" or key == "dynamic_weather":
+	if key in ["rain", "snow", "lightning", "dynamic_weather"]:
 		_apply_rain()
 	elif key == "wind" or key == "wind_dir":
 		_apply_wind()

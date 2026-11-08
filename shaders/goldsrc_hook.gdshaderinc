@@ -9,9 +9,10 @@
 // that shares style 0 with the lights, and lightning on top.
 uniform vec3 sky_light = vec3(1.0);
 
-// WeatherSystem (overcast-godot): wet ground and where rain reaches, and the clouds' shadows on
-// open ground — the same clouds the sky draws.
+// WeatherSystem (overcast-godot): wet ground and where rain reaches, lying snow, and the clouds'
+// shadows on open ground — the same clouds the sky draws.
 #include "res://addons/overcast/shaders/wet.gdshaderinc"
+#include "res://addons/overcast/shaders/snow.gdshaderinc"
 #include "res://addons/overcast/shaders/clouds.gdshaderinc"
 
 vec3 goldsrc_lightmap(vec3 lm, float sun_share, vec3 world_pos) {
@@ -29,6 +30,7 @@ vec3 goldsrc_lightmap(vec3 lm, float sun_share, vec3 world_pos) {
 void goldsrc_surface(inout vec3 lit_srgb, inout vec3 albedo, vec3 world_pos, vec3 world_normal,
 		vec3 normal_view, vec3 view) {
 	overcast_wet(lit_srgb, albedo, world_pos, world_normal, normal_view, view);
+	overcast_snow(lit_srgb, albedo, world_pos, world_normal, normal_view, view);
 }
 #endif
 

@@ -252,6 +252,16 @@ next to the time slider:
 ./run.sh --map ww_2fort --rain 0.6 --time night
 ```
 
+Snow is the `snow` server var, how much of what falls is snow: `1` all of it, `0` rain, sleet
+between. How much falls is still `rain` (or the map's, or dynamic weather's showers). `/snow 1`
+with nothing falling starts a fall of 0.5; `/snow 1 0.3` sets the amount too. Snow lies on open
+ground and drifts in the wind, and melts once it stops.
+
+```
+/snow 1
+./run.sh --map ww_2fort --rain 0.6 --snow 1
+```
+
 The host times each strike and sends a seed, so every player sees the same bolt. The bolt is drawn
 above the map, past its sky brushes, so it shows wherever the sky does. Its flash lights the sky
 around it and the sky's share of the world's light (the same baked share the time of day turns down), so the
@@ -260,9 +270,13 @@ at the first surface under the sky, so it does not fall indoors (GoldSrc traced 
 conversion bakes that trace per column, `bake_rain_floor`). The same floor says how much rain is
 around you, which sets how loud and how muffled the rain sounds, and how much rain-filled air each
 view ray crosses, which hazes the distance out in a downpour (`shaders/rain_haze.gdshader`) while a
-room under a roof stays clear. On the
-High quality level the procedural sky closes over as the rain sets in — a grey overcast in light
-rain, a dark storm deck in a downpour, black at night until the lightning lights it from inside.
+room under a roof stays clear. Under dynamic weather the procedural sky closes over as the rain
+sets in — a grey overcast in light rain, a dark storm deck in a downpour, black at night until the
+lightning lights it from inside.
+
+Rain-soaked ground out in the open is a little slick: up to 15% less ground friction, by the
+`wet_friction` server var (`1` turns it off). The server sends how wet the ground is, so a client
+predicts the same slide.
 
 ## BSP hull collision
 
