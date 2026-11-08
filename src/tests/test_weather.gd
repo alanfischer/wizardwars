@@ -287,3 +287,19 @@ func test_fire_melts_the_lying_snow_where_it_lands() -> void:
 		"and snowed over past its reach")
 	Game.weather_system = was
 	weather.free()
+
+
+func test_wind_set_by_hand_and_handed_back() -> void:
+	var was := _offline_host()
+	var me: int = CommandSystem.multiplayer.get_unique_id()
+	CommandSystem._cmd_wind(me, "8 450")
+	assert_eq(float(ServerVars.get_value("wind")), 8.0, "8 m/s")
+	assert_eq(float(ServerVars.get_value("wind_dir")), 90.0, "toward +X, however many times round")
+	assert_false(bool(ServerVars.get_value("dynamic_wind")), "set by hand, it no longer varies")
+	CommandSystem._cmd_wind(me, "-1")
+	assert_eq(float(ServerVars.get_value("wind")), 8.0, "a wind below calm is refused")
+	CommandSystem._cmd_wind(me, "auto")
+	assert_true(bool(ServerVars.get_value("dynamic_wind")), "auto hands it back")
+	ServerVars.set_from_string("wind", "0")
+	ServerVars.set_from_string("wind_dir", "0")
+	CommandSystem.multiplayer.multiplayer_peer = was

@@ -262,6 +262,11 @@ ground and drifts in the wind, and melts once it stops.
 ./run.sh --map ww_2fort --rain 0.6 --snow 1
 ```
 
+The wind (`wind` m/s, toward `wind_dir` degrees) rises, falls and turns on its own, a breeze at
+most, while `dynamic_wind` is on (the default), and blows harder in dynamic weather's showers. It
+slants the rain, drifts lying snow into the lee of walls, and is heard once it blows hard. `/wind 8
+90` sets it by hand, which turns `dynamic_wind` off; `/wind auto` hands it back.
+
 The host times each strike and sends a seed, so every player sees the same bolt. The bolt is drawn
 above the map, past its sky brushes, so it shows wherever the sky does. Its flash lights the sky
 around it and the sky's share of the world's light (the same baked share the time of day turns down), so the
