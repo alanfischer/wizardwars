@@ -15,7 +15,7 @@ varying vec3 world_pos;
 varying vec3 world_normal;
 
 void vertex() {
-	thick = overcast_drift(VERTEX, NORMAL, UV);
+	thick = overcast_drift(VERTEX, NORMAL, UV, CUSTOM0, UV2.x);
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	world_normal = (MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz;
 }
