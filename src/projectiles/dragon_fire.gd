@@ -3,6 +3,7 @@ extends Projectile
 
 const DRAGONFIRE_DAMAGE := 10.0
 const DRAGONFIRE_RADIUS := 4.5
+const SNOW_MELT := 2.0  # metres of lying snow a blast melts round it
 const DRAGONFIRE_SPEED := 30.0
 const DRAGONFIRE_LIFETIME := 1.0
 
@@ -61,6 +62,7 @@ func _spawn_explosion(pos: Vector3) -> void:
 	if _exploded:
 		return
 	_exploded = true
+	WeatherSystem.melt_snow(pos, SNOW_MELT)
 	if not is_instance_valid(_scene_root):
 		return
 	ExplosionEffect.spawn(_scene_root, pos)

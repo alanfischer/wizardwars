@@ -267,3 +267,23 @@ void fragment() {
 		declared[u["name"]] = true
 	assert_true(declared.has("puddle_scale"), "the hook wets the ground")
 	assert_true(declared.has("snow_scale"), "and lays snow on it")
+
+
+func test_fire_melts_the_lying_snow_where_it_lands() -> void:
+	var img := Image.create_empty(10, 6, false, Image.FORMAT_RF)
+	var weather := WeatherSystem.new()
+	weather.presenting = true  # the snow is only drawn, so only a drawing peer keeps any
+	weather.rain_floor = OvercastRainFloor.create(img, Vector3.ZERO, Vector2(10, 6), 10.0)
+	weather.rain = 1.0
+	weather.snow = 1.0
+	weather.settle()
+	var was: WeatherSystem = Game.weather_system
+	Game.weather_system = weather
+	var at := Vector3(5.5, 0.0, 3.5)
+	assert_almost_eq(weather._field.depth_at(at), WeatherSystem.DRIFT_LAYER, 1e-4, "snowed over")
+	WeatherSystem.melt_snow(at, 2.0)
+	assert_eq(weather._field.depth_at(at), 0.0, "bare where the fire landed")
+	assert_almost_eq(weather._field.depth_at(Vector3(9.5, 0.0, 3.5)), WeatherSystem.DRIFT_LAYER, 1e-4,
+		"and snowed over past its reach")
+	Game.weather_system = was
+	weather.free()

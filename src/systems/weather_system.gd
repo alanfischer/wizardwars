@@ -196,6 +196,13 @@ func set_ground_wetness(w: float) -> void:
 		wetness = w
 
 
+## Melts the lying snow round where fire lands. Each peer melts its own from the blast it draws:
+## the snow is only drawn, never played on.
+static func melt_snow(at: Vector3, radius: float) -> void:
+	if Game.weather_system:
+		Game.weather_system.melt(at, radius)
+
+
 ## How wet the ground at `feet` is for slick footing, 0 to 1, alike on every peer.
 func wet_at(feet: Vector3) -> float:
 	if ground_wetness <= 0.0:

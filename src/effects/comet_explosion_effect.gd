@@ -10,6 +10,7 @@ const SHAKE_RANGE := 30.0
 const SHAKE_AMPLITUDE := 120.0   # GoldSrc shake units, as big as a meteor's
 const SHAKE_DURATION := 0.4
 const SHAKE_FREQUENCY := 20.0    # shakes per second
+const SNOW_MELT := 3.5  # metres of lying snow it melts round it
 
 var _effect := EffectBehavior.new()
 
@@ -36,6 +37,7 @@ func _build() -> void:
 
 func _ready() -> void:
 	_effect.start()
+	WeatherSystem.melt_snow(global_position, SNOW_MELT)
 
 	# Every peer spawns its own copy of this effect, so the shake is local and needs no RPC.
 	Game.shake_view_local(global_position, SHAKE_AMPLITUDE, SHAKE_RANGE,

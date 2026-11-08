@@ -3,6 +3,7 @@ extends Projectile
 
 const FIREBALL_DAMAGE := 40.0
 const FIREBALL_RADIUS := 4.0    # 128 * 0.025 scale
+const SNOW_MELT := 2.0  # metres of lying snow a blast melts round it
 const FIREBALL_KNOCKBACK := 12.0  # 480 GS u/s at the blast centre — enough to rocket jump
 const FIREBALL_SPEED := 18.00
 const FIREBALL_LIFETIME := 5.0
@@ -77,6 +78,7 @@ func _spawn_explosion(pos: Vector3) -> void:
 	if _exploded:
 		return
 	_exploded = true
+	WeatherSystem.melt_snow(pos, SNOW_MELT)
 	if not is_instance_valid(_scene_root):
 		return
 	ExplosionEffect.spawn(_scene_root, pos)
