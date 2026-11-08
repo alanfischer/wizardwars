@@ -50,6 +50,7 @@ func _ready() -> void:
 			area = box
 		_take_rain_floor(map_root)
 		_keep_snow_off_liquids(map_root)
+		drift_ground = map_root.get_node_or_null("worldspawn")
 		# Brush entities spawned later (/spawn, a round reset's respawns) cover too, once their own
 		# _ready has said whether they are solid.
 		get_tree().node_added.connect(_on_node_added)
@@ -89,6 +90,11 @@ func _light_drifts() -> void:
 	drift_material.set_shader_parameter("linear_output", EntityRender.renderer_is_linear())
 	if AssetLoader.light_grid:
 		AssetLoader.light_grid.bind(drift_material)
+
+
+## Drifts lie on the world's own faces, not its liquids' surfaces or its sky.
+func _drifts_on(mesh: MeshInstance3D) -> bool:
+	return not mesh.has_meta("is_water_surface") and not mesh.has_meta("is_sky_surface")
 
 
 ## No snow on a liquid's bed, which is all the rain floor sees under it: each liquid volume's

@@ -33,6 +33,20 @@ func test_the_rain_var_reaches_overcast_unchanged() -> void:
 	weather.free()
 
 
+func test_drifts_lie_on_neither_the_maps_liquids_nor_its_sky() -> void:
+	var weather := WeatherSystem.new()
+	var floor_mesh := MeshInstance3D.new()
+	var water := MeshInstance3D.new()
+	water.set_meta("is_water_surface", true)
+	var sky := MeshInstance3D.new()
+	sky.set_meta("is_sky_surface", true)
+	assert_true(weather._drifts_on(floor_mesh), "the world's own faces")
+	assert_false(weather._drifts_on(water), "not a liquid's surface")
+	assert_false(weather._drifts_on(sky), "nor the sky")
+	for n: Node in [weather, floor_mesh, water, sky]:
+		n.free()
+
+
 func test_dynamic_weather_leaves_the_maps_weather_unused() -> void:
 	var weather := WeatherSystem.new()
 	weather._current_type = 1
