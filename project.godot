@@ -331,6 +331,14 @@ overcast_snow_cover={
 "type": "float",
 "value": 0.0
 }
+overcast_has_snow_field={
+"type": "bool",
+"value": false
+}
+overcast_snow_field={
+"type": "sampler2D",
+"value": ""
+}
 overcast_rainfall={
 "type": "float",
 "value": 0.0

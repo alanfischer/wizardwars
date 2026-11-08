@@ -1,6 +1,8 @@
 extends Node3D
 ## Renders the procedural sky's clouds from a map's spawn. OUT=dir, MAPS=a,b, STORM=0, VOL=1 for
-## the volumetric (High quality) clouds, RAIN=0.8 for rain. PERF=1 instead prints the GPU frame time looking up, with
+## the volumetric (High quality) clouds, RAIN=0.8 for rain, SNOW=1 for it to fall as snow, WIND=8 for a wind
+## to drift it (m/s, toward WIND_DIR degrees), MELT=1 to
+## melt holes in it every 6 m, as fireballs would. PERF=1 instead prints the GPU frame time looking up, with
 ## the volumetric clouds off and on.
 
 func _ready() -> void:
@@ -28,11 +30,17 @@ func _ready() -> void:
 		var weather: WeatherSystem = null
 		if OS.get_environment("RAIN") != "":
 			ServerVars.set_from_string("rain", OS.get_environment("RAIN"))
+			if OS.get_environment("SNOW") != "":
+				ServerVars.set_from_string("snow", OS.get_environment("SNOW"))
+			if OS.get_environment("WIND") != "":
+				ServerVars.set_from_string("wind", OS.get_environment("WIND"))
+				ServerVars.set_from_string("wind_dir", OS.get_environment("WIND_DIR") if OS.get_environment("WIND_DIR") != "" else "0")
 			weather = WeatherSystem.new()
 			weather.map_root = map
 			add_child(weather)
 			Game.weather_system = weather
 			weather.settle()
+			weather.bake_drifts()
 		var spawn := {}
 		for cls in ["info_player_deathmatch", "info_player_start", "info_player_teamspawn"]:
 			spawn = _find(map, cls)
@@ -46,6 +54,15 @@ func _ready() -> void:
 		cam.current = true
 		var sun: Vector3 = sky._params.get("sun_dir", Vector3.UP)
 		var sun_yaw := rad_to_deg(atan2(-sun.x, -sun.z))
+		if weather and OS.get_environment("MELT") == "1" and weather.rain_floor:
+			# A hole every 6 m over the whole rain floor, wherever the views end up looking.
+			var f := weather.rain_floor
+			var dims := f.image.get_size()
+			var cell := f.size / Vector2(dims)
+			for j in range(0, dims.y, ceili(6.0 / cell.y)):
+				for i in range(0, dims.x, ceili(6.0 / cell.x)):
+					weather.melt(Vector3(f.origin.x + (i + 0.5) * cell.x, f.image.get_pixel(i, j).r,
+						f.origin.z + (j + 0.5) * cell.y), 1.5)
 		if OS.get_environment("PERF") == "1":
 			cam.rotation_degrees = Vector3(50.0, sun_yaw + 180.0, 0)
 			DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
