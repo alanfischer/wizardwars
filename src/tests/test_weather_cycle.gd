@@ -63,7 +63,7 @@ func test_showers_blow_harder_and_leave_the_breeze_when_they_stop() -> void:
 	var harder := 0.0  # most a shower's wind has blown over the breeze it would have been
 	for i in 36000:  # an hour of showers
 		cycle._process(0.1)
-		var breeze := Vector2(cycle._cycle.wind_at(cycle._t, false).x, cycle._cycle.wind_at(cycle._t, false).z).length()
+		var breeze := cycle._cycle.breeze_at(cycle._t).length()
 		harder = maxf(harder, float(ServerVars.get_value("wind")) - breeze)
 	assert_gt(harder, 0.5, "a shower blows harder than the breeze (by %.1f m/s)" % harder)
 	ServerVars.set_from_string("dynamic_weather", "off")

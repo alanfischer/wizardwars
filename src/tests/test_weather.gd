@@ -152,21 +152,19 @@ func test_the_server_sends_the_grounds_wetness_in_steps() -> void:
 	var weather := _roofed_weather()
 	weather.wetness = 0.51
 	weather._share_wetness()
-	assert_eq(weather.ground_wetness, 0.5, "to the nearest step")
+	assert_eq(weather._wet_sent, 0.5, "to the nearest step")
 	assert_eq(weather.wet_at(Vector3(1, 0, 0)), 0.5, "out in the rain the ground is that wet")
 	assert_eq(weather.wet_at(Vector3(-1, 0, 0)), 0.0, "under the roof it is dry")
 	weather.free()
 
 
-func test_a_client_takes_the_servers_wetness_only_when_far_from_it() -> void:
+## Holding it between sends is Overcast's `soaks` (tested there); WW turns it off on a client.
+func test_a_client_draws_and_goes_by_the_servers_wetness() -> void:
 	var weather := _roofed_weather()
 	weather.wetness = 0.2
 	weather.set_ground_wetness(0.5)
-	assert_eq(weather.wetness, 0.5, "a client that joined into rain is set to the server's ground")
-	weather.wetness = 0.49
-	weather.set_ground_wetness(0.5)
-	assert_eq(weather.wetness, 0.49, "one close to it soaks on smoothly")
-	assert_eq(weather.wet_at(Vector3(1, 0, 0)), 0.5, "while footing goes by the server's")
+	assert_eq(weather.wetness, 0.5, "it draws the server's ground")
+	assert_eq(weather.wet_at(Vector3(1, 0, 0)), 0.5, "and its footing is the server's")
 	weather.free()
 
 
@@ -280,10 +278,10 @@ func test_fire_melts_the_lying_snow_where_it_lands() -> void:
 	var was: WeatherSystem = Game.weather_system
 	Game.weather_system = weather
 	var at := Vector3(5.5, 0.0, 3.5)
-	assert_almost_eq(weather._field.depth_at(at), WeatherSystem.DRIFT_LAYER, 1e-4, "snowed over")
+	assert_almost_eq(weather.snow_depth_at(at), WeatherSystem.DRIFT_LAYER, 1e-4, "snowed over")
 	WeatherSystem.melt_snow(at, 2.0)
-	assert_eq(weather._field.depth_at(at), 0.0, "bare where the fire landed")
-	assert_almost_eq(weather._field.depth_at(Vector3(9.5, 0.0, 3.5)), WeatherSystem.DRIFT_LAYER, 1e-4,
+	assert_eq(weather.snow_depth_at(at), 0.0, "bare where the fire landed")
+	assert_almost_eq(weather.snow_depth_at(Vector3(9.5, 0.0, 3.5)), WeatherSystem.DRIFT_LAYER, 1e-4,
 		"and snowed over past its reach")
 	Game.weather_system = was
 	weather.free()
@@ -351,8 +349,8 @@ func test_liquids_keep_the_snow_off_their_beds() -> void:
 	weather.rain = 1.0
 	weather.snow = 1.0
 	weather.settle()
-	assert_eq(weather._field.depth_at(Vector3(2.5, -1, 3.5)), 0.0, "none on the pool's bed")
-	assert_eq(weather._field.depth_at(Vector3(7.5, -1, 3.5)), 0.0, "nor the func_water's")
-	assert_gt(weather._field.depth_at(Vector3(4.5, 0, 3.5)), 0.0, "the ground between keeps its snow")
+	assert_eq(weather.snow_depth_at(Vector3(2.5, -1, 3.5)), 0.0, "none on the pool's bed")
+	assert_eq(weather.snow_depth_at(Vector3(7.5, -1, 3.5)), 0.0, "nor the func_water's")
+	assert_gt(weather.snow_depth_at(Vector3(4.5, 0, 3.5)), 0.0, "the ground between keeps its snow")
 	weather.free()
 	map.queue_free()

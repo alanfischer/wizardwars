@@ -68,7 +68,7 @@ func _send_wind(delta: float) -> void:
 	if _since_wind < SEND_INTERVAL:
 		return
 	_since_wind = 0.0
-	var w := _cycle.wind_at(_t, _showers())
+	var w := _cycle.wind_at(_t) if _showers() else _cycle.breeze_at(_t)
 	var speed := snappedf(Vector2(w.x, w.z).length(), WIND_STEP)
 	var dir := snappedf(fposmod(rad_to_deg(atan2(w.x, w.z)), 360.0), DIR_STEP)
 	if speed != float(ServerVars.get_value("wind")):
