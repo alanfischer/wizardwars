@@ -227,7 +227,7 @@ func _flag_handlers() -> Dictionary:
 		"--time": func(v: String) -> void: _limit_args["time"] = NightMode.parse(v),
 		"--rain": func(v: String) -> void: _limit_args["rain"] = v.strip_edges(),
 		"--lightning": func(v: String) -> void: _limit_args["lightning"] = v.strip_edges(),
-		"--snow": func(v: String) -> void: _limit_args["snow"] = v.strip_edges(),
+		"--temperature": func(v: String) -> void: _limit_args["temperature"] = v.strip_edges(),
 		"--wind": func(v: String) -> void: _limit_args["wind"] = v.strip_edges(),
 		"--dynamic-weather": func() -> void: _limit_args["dynamic_weather"] = "on",
 		"--http-downloads-dir": func(v: String) -> void: MapTransfer.http_downloads_dir = v,

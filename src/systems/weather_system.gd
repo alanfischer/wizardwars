@@ -202,7 +202,7 @@ func rain_amount() -> float:
 
 func _apply_rain() -> void:
 	rain = rain_amount()
-	snow = float(ServerVars.get_value("snow", 0.0))
+	temperature = float(ServerVars.get_value("temperature", 10.0))
 	lightning = bool(ServerVars.get_value("lightning", true))
 
 
@@ -212,7 +212,7 @@ func _apply_wind() -> void:
 
 
 func _on_server_var_changed(key: String, _value: Variant) -> void:
-	if key in ["rain", "snow", "lightning", "dynamic_weather"]:
+	if key in ["rain", "temperature", "lightning", "dynamic_weather"]:
 		_apply_rain()
 	elif key == "wind" or key == "wind_dir":
 		_apply_wind()

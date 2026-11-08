@@ -32,8 +32,8 @@ func _ready() -> void:
 		var weather: WeatherSystem = null
 		if OS.get_environment("RAIN") != "":
 			ServerVars.set_from_string("rain", OS.get_environment("RAIN"))
-			if OS.get_environment("SNOW") != "":
-				ServerVars.set_from_string("snow", OS.get_environment("SNOW"))
+			if OS.get_environment("TEMP") != "":
+				ServerVars.set_from_string("temperature", OS.get_environment("TEMP"))
 			if OS.get_environment("WIND") != "":
 				ServerVars.set_from_string("wind", OS.get_environment("WIND"))
 				ServerVars.set_from_string("wind_dir", OS.get_environment("WIND_DIR") if OS.get_environment("WIND_DIR") != "" else "0")
