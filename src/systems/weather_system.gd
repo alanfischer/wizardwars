@@ -21,9 +21,7 @@ var map_root: Node
 ## and dynamic weather throughout.
 var _current_type: int = 0
 var _current_intensity: int = 0
-## The ground's wetness as the server has it, in WET_STEPS: what slick ground goes by, so every
-## peer predicts the same slide.
-var ground_wetness := 0.0
+var _wet_sent := -1.0  # the ground's wetness, in WET_STEPS, as last sent to the clients
 
 
 func _ready() -> void:
@@ -34,6 +32,7 @@ func _ready() -> void:
 	bolt_drawer = _draw_beam_bolt
 	light_from_sky = false  # NightMode's light, which knows the map's lightmaps
 	wet_ground = false  # until the map turns out to have a rain floor
+	soaks = not NetworkManager.is_online() or NetworkManager.is_host()  # a client draws its server's
 	drift_deepest = DRIFT_DEEPEST
 	flash_changed.connect(func(k: float) -> void: NightMode.set_flash(FLASH * k))
 	struck.connect(_on_struck)
@@ -221,20 +220,18 @@ func _apply_night() -> void:
 
 
 ## Join snapshot. Default weather is "none", which every peer already starts at, so a dry map
-## sends nothing. The `rain` override is a server var and reaches the client with the rest of them.
+## sends no weather. The `rain` override is a server var and reaches the client with the rest of
+## them. The ground's wetness always goes: a client may have soaked its own before it knew it was one.
 func send_state_to(peer_id: int) -> void:
 	if _current_type != 0 or _current_intensity != 0:
 		set_weather.rpc_id(peer_id, _current_type, _current_intensity)
-	if ground_wetness > 0.0:
-		set_ground_wetness.rpc_id(peer_id, ground_wetness)
+	set_ground_wetness.rpc_id(peer_id, _ground_wetness())
 
 
+## The server's ground, which a client draws and goes by: it soaks none of its own (`soaks`).
 @rpc("authority", "call_remote", "reliable")
 func set_ground_wetness(w: float) -> void:
-	ground_wetness = w
-	# Each peer soaks its own ground from when it joined; one far from the server's is set to it.
-	if absf(wetness - w) > 1.0 / WET_STEPS:
-		wetness = w
+	wetness = w
 
 
 ## Melts the lying snow round where fire lands. Each peer melts its own from the blast it draws:
@@ -244,18 +241,22 @@ static func melt_snow(at: Vector3, radius: float) -> void:
 		Game.weather_system.melt(at, radius)
 
 
-## How wet the ground at `feet` is for slick footing, 0 to 1, alike on every peer.
+## How wet the ground at `feet` is for slick footing, 0 to 1, alike on every peer: the wetness in
+## the steps the server sends it in, which a client has already.
 func wet_at(feet: Vector3) -> float:
-	if ground_wetness <= 0.0:
-		return 0.0
-	return ground_wetness if rains_on(feet) else 0.0
+	var w := _ground_wetness()
+	return w if w > 0.0 and rains_on(feet) else 0.0
+
+
+func _ground_wetness() -> float:
+	return snappedf(wetness, 1.0 / WET_STEPS)
 
 
 func _share_wetness() -> void:
-	var w := snappedf(wetness, 1.0 / WET_STEPS)
-	if w == ground_wetness:
+	var w := _ground_wetness()
+	if w == _wet_sent:
 		return
-	ground_wetness = w
+	_wet_sent = w
 	if NetworkManager.is_online():
 		set_ground_wetness.rpc(w)
 
@@ -272,6 +273,7 @@ func _process(delta: float) -> void:
 	# connection, so asked each frame.
 	var server := not NetworkManager.is_online() or NetworkManager.is_host()
 	times_strikes = server
+	soaks = server
 	# GoldSrc drew no rain with the view underwater (v_waterlevel 3); the sound carries on.
 	underwater = listener != null and listener.has_method("head_underwater") and listener.head_underwater()
 	super._process(delta)

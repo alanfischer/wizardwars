@@ -78,7 +78,7 @@ func _ready() -> void:
 			for k in 400:
 				var p := cam.global_position + look * (k * 0.25)
 				var ground: float = weather.floor_at(p)
-				var depth: float = weather._field.depth_at(p)
+				var depth := weather.snow_depth_at(p)
 				if ground >= p.y - 3.0 and depth > deepest:
 					deepest = depth
 					at = Vector3(p.x, ground, p.z)
