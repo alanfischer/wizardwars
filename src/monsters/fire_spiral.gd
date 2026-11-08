@@ -14,6 +14,7 @@ const DAMAGE := 12.0
 const DAMAGE_RADIUS := 1.25    # AoE around each sampled arm point
 const DAMAGE_TYPE := GameConsts.DamageType.FIRE
 const SOUND := "spells/satchels/pyro_spiral.wav"
+const SNOW_MELT := 0.9  # metres of lying snow each arm melts round it, every DAMAGE_INTERVAL
 
 var owner_node: Node3D
 var team := 0
@@ -77,10 +78,13 @@ func _physics_process(delta: float) -> void:
 			FireSpiralEffect.spawn_trail(_scene_root, _origin, angle, radius, SPIN)
 			FireSpiralEffect.spawn_trail(_scene_root, _origin, angle + PI, radius, SPIN)
 
-	if _entity.is_host:
-		_damage_timer += delta
-		if _damage_timer >= DAMAGE_INTERVAL:
-			_damage_timer -= DAMAGE_INTERVAL
+	_damage_timer += delta
+	if _damage_timer >= DAMAGE_INTERVAL:
+		_damage_timer -= DAMAGE_INTERVAL
+		# Every peer melts its own snow from the spiral it draws; only the host deals damage.
+		WeatherSystem.melt_snow(arm1_pos, SNOW_MELT)
+		WeatherSystem.melt_snow(arm2_pos, SNOW_MELT)
+		if _entity.is_host:
 			_damage_arms(arm2_pos, arm1_pos)
 
 

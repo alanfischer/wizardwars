@@ -9,9 +9,9 @@ const TopDownFrame = preload("res://src/systems/top_down_frame.gd")
 ## How readily each WorldMaterials class pools; anything it leaves unclassified takes the default.
 const PUDDLE_BY_CLASS := {"ground": 1.0, "mineral": 0.6, "wood": 0.0}
 const PUDDLE_DEFAULT := 0.5
-## The deepest a drift starts against a wall: about a wizard's knee, where Overcast's own would
+## The deepest a drift starts against a wall: about a wizard's waist, where Overcast's own would
 ## bury one to the chest.
-const DRIFT_DEEPEST := 0.6
+const DRIFT_DEEPEST := 1.0
 ## Steps the server sends the ground's wetness in.
 const WET_STEPS := 32.0
 

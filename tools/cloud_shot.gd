@@ -1,9 +1,10 @@
 extends Node3D
 ## Renders the procedural sky's clouds from a map's spawn. OUT=dir, MAPS=a,b, STORM=0, VOL=1 for
-## the volumetric (High quality) clouds, RAIN=0.8 for rain, SNOW=1 for it to fall as snow, WIND=8 for a wind
-## to drift it (m/s, toward WIND_DIR degrees), MELT=1 to
-## melt holes in it every 6 m, as fireballs would. PERF=1 instead prints the GPU frame time looking up, with
-## the volumetric clouds off and on.
+## the volumetric (High quality) clouds, RAIN=0.8 for rain, SNOW=1 for it to fall as snow, WIND=8
+## for a wind to drift it (m/s, toward WIND_DIR degrees), MELT=1 to melt holes in it every 6 m as
+## fireballs would, FIRE=1 to light a fire satchel's spiral where the snow lies deepest under the
+## "ground" view and shoot it before and after. PERF=1 instead prints the GPU frame time looking
+## up, with the volumetric clouds off and on.
 
 func _ready() -> void:
 	ServerVars.set_from_string("dynamic_weather", "1")
@@ -64,6 +65,36 @@ func _ready() -> void:
 				for i in range(0, dims.x, ceili(6.0 / cell.x)):
 					weather.melt(Vector3(f.origin.x + (i + 0.5) * cell.x, f.image.get_pixel(i, j).r,
 						f.origin.z + (j + 0.5) * cell.y), 1.5)
+		var views := [[sun_yaw + 180.0, 20.0, "away"], [sun_yaw, 15.0, "sun"],
+			[sun_yaw + 90.0, 55.0, "up"], [sun_yaw + 90.0, 8.0, "horizon"],
+			[sun_yaw + 180.0, -30.0, "ground"]]
+		if weather and OS.get_environment("FIRE") == "1":
+			# Where the snow lies deepest under the "ground" view's middle, in steps of 0.25 m.
+			var ground_view: Array = views[-1]
+			cam.rotation_degrees = Vector3(ground_view[1], ground_view[0], 0)
+			var look := -cam.global_basis.z
+			var at := Vector3.INF
+			var deepest := 0.1
+			for k in 400:
+				var p := cam.global_position + look * (k * 0.25)
+				var ground: float = weather.floor_at(p)
+				var depth: float = weather._field.depth_at(p)
+				if ground >= p.y - 3.0 and depth > deepest:
+					deepest = depth
+					at = Vector3(p.x, ground, p.z)
+			if at != Vector3.INF:
+				# Shot from 6 m back toward the spawn and 4 m up, before and after.
+				var spawn_at := cam.global_position
+				var back := Vector3(spawn_at.x - at.x, 0.0, spawn_at.z - at.z).normalized()
+				cam.global_position = at + back * 6.0 + Vector3.UP * 4.0
+				cam.look_at(at)
+				await _shoot("%s/%s_fire_before.png" % [out, map_name])
+				var spiral := FireSpiral.new()
+				spiral.setup({"position": at + Vector3(0, 0.5, 0), "team": 0, "start_angle": 0.0})
+				add_child(spiral)
+				await spiral.tree_exited
+				await _shoot("%s/%s_fire.png" % [out, map_name], 30)  # its last flames burning out
+				cam.global_position = spawn_at
 		if OS.get_environment("PERF") == "1":
 			cam.rotation_degrees = Vector3(50.0, sun_yaw + 180.0, 0)
 			DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
@@ -79,15 +110,9 @@ func _ready() -> void:
 				print("PERF %s %v %s %.2f ms/frame" % [map_name, DisplayServer.window_get_size(), "volumetric" if vol else "flat", ms])
 			get_tree().quit()
 			return
-		var views := [[sun_yaw + 180.0, 20.0, "away"], [sun_yaw, 15.0, "sun"],
-			[sun_yaw + 90.0, 55.0, "up"], [sun_yaw + 90.0, 8.0, "horizon"],
-			[sun_yaw + 180.0, -30.0, "ground"]]
 		for v in views:
 			cam.rotation_degrees = Vector3(v[1], v[0], 0)
-			for i in 6:
-				await get_tree().process_frame
-			await RenderingServer.frame_post_draw
-			get_viewport().get_texture().get_image().save_png("%s/%s_%s.png" % [out, map_name, v[2]])
+			await _shoot("%s/%s_%s.png" % [out, map_name, v[2]])
 		map.queue_free()
 		sky.queue_free()
 		if weather:
@@ -95,6 +120,13 @@ func _ready() -> void:
 		cam.queue_free()
 		await get_tree().process_frame
 	get_tree().quit()
+
+## The view as drawn once it has had `frames` to settle, saved to `path`.
+func _shoot(path: String, frames := 6) -> void:
+	for i in frames:
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(path)
 
 func _find(root: Node, cls: String) -> Dictionary:
 	for c in root.get_children():

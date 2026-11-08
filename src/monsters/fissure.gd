@@ -60,6 +60,7 @@ func _physics_process(delta: float) -> void:
 		1:
 			if _age >= PHASE_WIDE_DURATION:
 				_phase = 2
+				WeatherSystem.melt_snow(global_position, RADIUS)  # on every peer, as it draws it
 				if _entity.is_host:
 					_detonate()
 
