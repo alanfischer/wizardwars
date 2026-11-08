@@ -9,6 +9,9 @@ const TopDownFrame = preload("res://src/systems/top_down_frame.gd")
 ## How readily each WorldMaterials class pools; anything it leaves unclassified takes the default.
 const PUDDLE_BY_CLASS := {"ground": 1.0, "mineral": 0.6, "wood": 0.0}
 const PUDDLE_DEFAULT := 0.5
+## The deepest a drift starts against a wall: about a wizard's knee, where Overcast's own would
+## bury one to the chest.
+const DRIFT_DEEPEST := 0.6
 ## Steps the server sends the ground's wetness in.
 const WET_STEPS := 32.0
 
@@ -31,12 +34,11 @@ func _ready() -> void:
 	bolt_drawer = _draw_beam_bolt
 	light_from_sky = false  # NightMode's light, which knows the map's lightmaps
 	wet_ground = false  # until the map turns out to have a rain floor
-	# Not fit for the maps yet: the rain floor takes no liquid, so snow drifts across a moat's bed
-	# and shows over its water, and the drifts are lit by scene lights, not the lightmaps.
-	snow_drifts = false
+	drift_deepest = DRIFT_DEEPEST
 	flash_changed.connect(func(k: float) -> void: NightMode.set_flash(FLASH * k))
 	struck.connect(_on_struck)
 	super._ready()
+	_light_drifts()
 	ServerVars.value_changed.connect(_on_server_var_changed)
 	# main hands over each new sky as night rebuilds it (main._build_skybox); this is the one the
 	# map started with, if it was built first.
@@ -48,6 +50,7 @@ func _ready() -> void:
 		if box.size != Vector3.ZERO:
 			area = box
 		_take_rain_floor(map_root)
+		_keep_snow_off_liquids(map_root)
 		# Brush entities spawned later (/spawn, a round reset's respawns) cover too, once their own
 		# _ready has said whether they are solid.
 		get_tree().node_added.connect(_on_node_added)
@@ -77,6 +80,41 @@ func _take_rain_floor(root: Node) -> void:
 	wet_ground = true
 	_set_puddle_scales(root)
 	_cover_movers(root)
+
+
+## Drifts lit as the models are, by the light grid, to meet the lightmapped snow beside them.
+func _light_drifts() -> void:
+	if drift_material == null:
+		return  # drawing nothing
+	drift_material.shader = preload("res://shaders/snow_drift.gdshader")
+	drift_material.set_shader_parameter("linear_output", EntityRender.renderer_is_linear())
+	if AssetLoader.light_grid:
+		AssetLoader.light_grid.bind(drift_material)
+
+
+## No snow on a liquid's bed, which is all the rain floor sees under it: each liquid volume's
+## convex pieces, world water and func_water (slime, lava) alike.
+func _keep_snow_off_liquids(root: Node) -> void:
+	for liquid: Area3D in root.find_children("*", "Area3D", true, false):
+		if not liquid.is_inside_tree() or not _is_liquid(liquid):
+			continue
+		for piece: CollisionShape3D in liquid.find_children("*", "CollisionShape3D", false, false):
+			var convex := piece.shape as ConvexPolygonShape3D
+			if convex == null or convex.points.is_empty():
+				continue
+			var box := AABB(convex.points[0], Vector3.ZERO)
+			for p in convex.points:
+				box = box.expand(p)
+			add_snowless(piece.global_transform * box)
+
+
+## A liquid volume: on MASK_WATER, or a func_water's Volume before FuncWater has put it there.
+static func _is_liquid(volume: Area3D) -> bool:
+	if volume.collision_layer & GameConsts.MASK_WATER:
+		return true
+	var owner_node := volume.get_parent()
+	return volume.name == &"Volume" and owner_node and owner_node.has_meta("entity") \
+		and owner_node.get_meta("entity").get("classname", "") == "func_water"
 
 
 var _pools_by_shader := {}  # Shader -> whether it takes puddle_scale

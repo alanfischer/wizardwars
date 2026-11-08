@@ -15,6 +15,7 @@ func _ready() -> void:
 		var map: Node3D = load(scn if ResourceLoader.exists(scn) else "res://maps/%s.bsp" % map_name).instantiate()
 		EntityRender.apply_color_space(map)
 		add_child(map)
+		AssetLoader.light_grid = LightGrid.from_meta(map)  # as main loads it, for what it lights
 		var sky := Skybox.new()
 		add_child(sky)
 		Game.skybox = sky

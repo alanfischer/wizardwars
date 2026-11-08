@@ -303,3 +303,56 @@ func test_wind_set_by_hand_and_handed_back() -> void:
 	ServerVars.set_from_string("wind", "0")
 	ServerVars.set_from_string("wind_dir", "0")
 	CommandSystem.multiplayer.multiplayer_peer = was
+
+
+## Drifts are lit as the models are: their shader takes the light grid's uniforms.
+func test_drifts_take_the_light_grid() -> void:
+	var shader: Shader = load("res://shaders/snow_drift.gdshader")
+	var names := {}
+	for u in shader.get_shader_uniform_list():
+		names[u["name"]] = true
+	for n in ["acube_pos_y", "acube_sun", "grid_origin", "sky_light", "linear_output"]:
+		assert_true(names.has(n), "it compiles, and takes %s" % n)
+	var model: Shader = load("res://shaders/mdl_ambient_cube.gdshader")
+	assert_false(model.get_shader_uniform_list().is_empty(), "and the models still compile around the same light")
+
+
+## A liquid's bed, which is all the rain floor sees under it, keeps no snow: world water on its
+## layer, and a func_water before FuncWater has put its Volume there.
+func test_liquids_keep_the_snow_off_their_beds() -> void:
+	var map := Node3D.new()
+	_root().add_child(map)
+	var pool := Area3D.new()
+	pool.collision_layer = GameConsts.MASK_WATER
+	map.add_child(pool)
+	var shape := CollisionShape3D.new()
+	var convex := ConvexPolygonShape3D.new()
+	convex.points = PackedVector3Array([Vector3(1, -1, 1), Vector3(3, -1, 1), Vector3(3, 0, 5), Vector3(1, 0, 5)])
+	shape.shape = convex
+	pool.add_child(shape)
+	var water := Node3D.new()
+	water.set_meta("entity", {"classname": "func_water"})
+	map.add_child(water)
+	var volume := Area3D.new()
+	volume.name = "Volume"
+	water.add_child(volume)
+	var shape2 := CollisionShape3D.new()
+	var convex2 := ConvexPolygonShape3D.new()
+	convex2.points = PackedVector3Array([Vector3(6, -1, 1), Vector3(8, -1, 1), Vector3(8, 0, 5), Vector3(6, 0, 5)])
+	shape2.shape = convex2
+	volume.add_child(shape2)
+	var img := Image.create_empty(10, 6, false, Image.FORMAT_RF)
+	img.fill_rect(Rect2i(1, 1, 2, 4), Color(-1.0, 0, 0))
+	img.fill_rect(Rect2i(6, 1, 2, 4), Color(-1.0, 0, 0))
+	var weather := WeatherSystem.new()
+	weather.presenting = true
+	weather.rain_floor = OvercastRainFloor.create(img, Vector3.ZERO, Vector2(10, 6), 10.0)
+	weather._keep_snow_off_liquids(map)
+	weather.rain = 1.0
+	weather.snow = 1.0
+	weather.settle()
+	assert_eq(weather._field.depth_at(Vector3(2.5, -1, 3.5)), 0.0, "none on the pool's bed")
+	assert_eq(weather._field.depth_at(Vector3(7.5, -1, 3.5)), 0.0, "nor the func_water's")
+	assert_gt(weather._field.depth_at(Vector3(4.5, 0, 3.5)), 0.0, "the ground between keeps its snow")
+	weather.free()
+	map.queue_free()
