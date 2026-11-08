@@ -252,14 +252,14 @@ next to the time slider:
 ./run.sh --map ww_2fort --rain 0.6 --time night
 ```
 
-Snow is the `snow` server var, how much of what falls is snow: `1` all of it, `0` rain, sleet
-between. How much falls is still `rain` (or the map's, or dynamic weather's showers). `/snow 1`
-with nothing falling starts a fall of 0.5; `/snow 1 0.3` sets the amount too. Snow lies on open
-ground and drifts in the wind, and melts once it stops.
+Snow comes with the cold: the `temperature` server var is degrees C at the ground (10 by
+default). What falls is snow below -1, rain above 3, sleet between; how much falls is still `rain`
+(or the map's, or dynamic weather's showers). Snow lies on open ground and drifts in the wind
+while it is freezing (0 and below), stays when the fall stops, and melts once it is warmer.
 
 ```
-/snow 1
-./run.sh --map ww_2fort --rain 0.6 --snow 1
+/temperature -5
+./run.sh --map ww_2fort --rain 0.6 --temperature -5
 ```
 
 The wind (`wind` m/s, toward `wind_dir` degrees) rises, falls and turns on its own, a breeze at

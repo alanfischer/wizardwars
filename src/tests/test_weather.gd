@@ -207,15 +207,17 @@ func test_soaked_ground_is_slick_and_stacks_with_frost() -> void:
 	weather.free()
 
 
-func test_the_snow_var_is_the_share_of_the_fall_that_is_snow() -> void:
+func test_the_temperature_var_turns_the_fall_to_snow() -> void:
 	var weather := WeatherSystem.new()
 	ServerVars.set_from_string("rain", "0.6")
-	ServerVars.set_from_string("snow", "1")
+	ServerVars.set_from_string("temperature", "-5")
 	weather._apply_rain()
 	assert_almost_eq(weather.rain, 0.6, 1e-6, "how much falls is still the rain var")
-	assert_almost_eq(weather.snowfall(), 0.6, 1e-6, "and all of it is snow")
+	assert_almost_eq(weather.snowfall(), 0.6, 1e-6, "and below freezing all of it is snow")
 	assert_eq(weather.rainfall(), 0.0, "none of it rain")
-	ServerVars.set_from_string("snow", "0")
+	ServerVars.set_from_string("temperature", "10")
+	weather._apply_rain()
+	assert_eq(weather.snowfall(), 0.0, "warm, it is rain again")
 	ServerVars.set_from_string("rain", "0")
 	weather.free()
 
@@ -227,35 +229,15 @@ func _offline_host() -> MultiplayerPeer:
 	return was
 
 
-func test_snow_with_nothing_falling_starts_a_fall() -> void:
+func test_temperature_sets_the_var_and_refuses_what_is_not_a_number() -> void:
 	var was := _offline_host()
 	var me: int = CommandSystem.multiplayer.get_unique_id()
-	ServerVars.set_from_string("rain", "0")
-	CommandSystem._cmd_snow(me, "1")
-	assert_eq(float(ServerVars.get_value("snow")), 1.0, "all of it snow")
-	assert_eq(float(ServerVars.get_value("rain")), CommandSystem.SNOW_START, "and some of it falls")
-	CommandSystem._cmd_snow(me, "0.5 0.2")
-	assert_eq(float(ServerVars.get_value("snow")), 0.5, "sleet")
-	assert_almost_eq(float(ServerVars.get_value("rain")), 0.2, 1e-6, "as much as was asked for")
-	CommandSystem._cmd_snow(me, "1")
-	assert_almost_eq(float(ServerVars.get_value("rain")), 0.2, 1e-6, "what is falling keeps falling")
-	CommandSystem._cmd_snow(me, "2")
-	assert_eq(float(ServerVars.get_value("snow")), 1.0, "a share past 1 is refused")
-	ServerVars.set_from_string("snow", "0")
-	ServerVars.set_from_string("rain", "0")
+	CommandSystem._cmd_temperature(me, "-3.5")
+	assert_eq(float(ServerVars.get_value("temperature")), -3.5, "set")
+	CommandSystem._cmd_temperature(me, "cold")
+	assert_eq(float(ServerVars.get_value("temperature")), -3.5, "a word is refused")
+	ServerVars.set_from_string("temperature", "10")
 	CommandSystem.multiplayer.multiplayer_peer = was
-
-
-func test_snow_leaves_dynamic_weather_running() -> void:
-	ServerVars.set_from_string("rain", "0")
-	ServerVars.set_from_string("dynamic_weather", "on")
-	var was := _offline_host()
-	CommandSystem._cmd_snow(CommandSystem.multiplayer.get_unique_id(), "1")
-	CommandSystem.multiplayer.multiplayer_peer = was
-	assert_eq(float(ServerVars.get_value("rain")), 0.0, "a dry spell is left to the showers")
-	assert_eq(bool(ServerVars.get_value("dynamic_weather")), true, "which then come as snow")
-	ServerVars.set_from_string("dynamic_weather", "off")
-	ServerVars.set_from_string("snow", "0")
 
 
 ## The map's world shaders take Overcast's wet ground and lying snow through the hook.
@@ -287,7 +269,7 @@ func test_fire_melts_the_lying_snow_where_it_lands() -> void:
 	weather.presenting = true  # the snow is only drawn, so only a drawing peer keeps any
 	weather.rain_floor = OvercastRainFloor.create(img, Vector3.ZERO, Vector2(10, 6), 10.0)
 	weather.rain = 1.0
-	weather.snow = 1.0
+	weather.temperature = -5.0
 	weather.settle()
 	var was: WeatherSystem = Game.weather_system
 	Game.weather_system = weather
@@ -361,7 +343,7 @@ func test_liquids_keep_the_snow_off_their_beds() -> void:
 	weather.rain_floor = OvercastRainFloor.create(img, Vector3.ZERO, Vector2(10, 6), 10.0)
 	weather._keep_snow_off_liquids(map)
 	weather.rain = 1.0
-	weather.snow = 1.0
+	weather.temperature = -5.0
 	weather.settle()
 	assert_eq(weather.snow_depth_at(Vector3(2.5, -1, 3.5)), 0.0, "none on the pool's bed")
 	assert_eq(weather.snow_depth_at(Vector3(7.5, -1, 3.5)), 0.0, "nor the func_water's")
