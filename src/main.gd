@@ -117,8 +117,8 @@ var _auto_team := 0  # --team <1-4>: auto-join team on game start
 var _auto_class := 0  # --class <name>: auto-pick class on game start
 var _auto_name := ""  # --name <name>: set player name from command line
 var _auto_bots := 0  # --bots <n>: dedicated server fills with this many AI bots on startup
-## --timelimit/--scorelimit/--fraglimit <n>, --time <hours|h:mm|name>, --rain <0-1>, --snow <0-1>
-## and --lightning <on|off>, applied to the matching server var
+## --timelimit/--scorelimit/--fraglimit <n>, --time <hours|h:mm|name>, --rain <0-1>, --snow <0-1>,
+## --wind <m/s> and --lightning <on|off>, applied to the matching server var
 ## in _ready. A dedicated server has no console, so these have to be reachable as flags.
 var _weather_cycle: WeatherCycle
 var _limit_args: Dictionary = {}  # server var name -> unparsed value
@@ -228,6 +228,7 @@ func _flag_handlers() -> Dictionary:
 		"--rain": func(v: String) -> void: _limit_args["rain"] = v.strip_edges(),
 		"--lightning": func(v: String) -> void: _limit_args["lightning"] = v.strip_edges(),
 		"--snow": func(v: String) -> void: _limit_args["snow"] = v.strip_edges(),
+		"--wind": func(v: String) -> void: _limit_args["wind"] = v.strip_edges(),
 		"--dynamic-weather": func() -> void: _limit_args["dynamic_weather"] = "on",
 		"--http-downloads-dir": func(v: String) -> void: MapTransfer.http_downloads_dir = v,
 		"--http-base-url": func(v: String) -> void:

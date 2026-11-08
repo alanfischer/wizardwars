@@ -139,6 +139,7 @@ func _register_builtins() -> void:
 	_register("rain", _cmd_rain, Perm.ADMIN, "/rain [amount]", "Rain on any map, 0.01 light to 1 a downpour; values above 1 add drop density. 0 leaves the weather to the map.")
 	_register("dynamicweather", _cmd_dynamic_weather, Perm.ADMIN, "/dynamicweather [on|off]", "Showers come and go on their own, light to heavy, in a shifting wind; the map's own weather is ignored. Setting /rain turns it off.")
 	_register("snow", _cmd_snow, Perm.ADMIN, "/snow [share] [amount]", "How much of what falls is snow: 1 all of it, 0 back to rain, between sleet. With nothing falling it starts a fall of 0.5; an amount sets how much falls, as /rain does.")
+	_register("wind", _cmd_wind, Perm.ADMIN, "/wind [m/s|auto] [degrees]", "Wind across the ground, blowing toward a direction (0 = +Z, 90 = +X); it drifts the snow and slants the rain. auto (the default) lets it rise, fall and turn on its own.")
 	_register("lightning", _cmd_lightning, Perm.ADMIN, "/lightning [on|off]", "Lightning strikes while it rains.")
 	_register("allow_combos", _cmd_allow_combos, Perm.ADMIN, "/allow_combos [on|off]", "Whether two allied wizards can clash staves to earn a combo spell.")
 	_register("siege", _cmd_siege, Perm.ADMIN, "/siege [on|off]", "Co-op: waves of monsters against an altar everyone defends together. Works on any map.")
@@ -814,6 +815,32 @@ func _snow_text() -> String:
 	if share > 0.0 and not _anything_falls():
 		text += ", but nothing is falling (/rain sets how much)"
 	return text
+
+
+func _cmd_wind(sender_id: int, args: String) -> void:
+	var parts := args.strip_edges().split(" ", false)
+	if parts.is_empty():
+		_reply_ok(sender_id, "wind: %s" % _wind_text())
+		return
+	if parts.size() == 1 and parts[0].to_lower() == "auto":
+		ServerVars.set_from_string("dynamic_wind", "on")
+		_reply_ok(sender_id, "wind: on its own")
+		return
+	var speed_ok := parts[0].is_valid_float() and float(parts[0]) >= 0.0
+	if parts.size() > 2 or not speed_ok or (parts.size() == 2 and not parts[1].is_valid_float()):
+		_reply_err(sender_id, "Usage: /wind [m/s|auto] [degrees]")
+		return
+	ServerVars.set_from_string("dynamic_wind", "off")
+	if parts.size() == 2:
+		ServerVars.set_from_string("wind_dir", str(fposmod(float(parts[1]), 360.0)))
+	ServerVars.set_from_string("wind", parts[0])
+	_reply_ok(sender_id, "wind: %s" % _wind_text())
+
+
+func _wind_text() -> String:
+	var text := "%.1f m/s toward %d°" % [float(ServerVars.get_value("wind", 0.0)),
+		roundi(float(ServerVars.get_value("wind_dir", 0.0)))]
+	return text + (", rising, falling and turning on its own" if bool(ServerVars.get_value("dynamic_wind", true)) else "")
 
 
 func _cmd_lightning(sender_id: int, args: String) -> void:

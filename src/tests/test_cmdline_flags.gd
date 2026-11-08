@@ -18,7 +18,7 @@ const EXPECTED_ARITY := {
 	"--map": 1, "--connect": 1, "--team": 1, "--class": 1, "--name": 1,
 	"--cl-updaterate": 1, "--sv-updaterate": 1, "--interp-diag": 0, "--view-diag": 0, "--nudge-players": 1, "--rate": 1, "--cl-cmdrate": 1, "--net-profile": 1,
 	"--bots": 1, "--botskill": 1, "--mapcycle": 1,
-	"--timelimit": 1, "--scorelimit": 1, "--fraglimit": 1, "--time": 1, "--rain": 1, "--lightning": 1, "--snow": 1, "--dynamic-weather": 0,
+	"--timelimit": 1, "--scorelimit": 1, "--fraglimit": 1, "--time": 1, "--rain": 1, "--lightning": 1, "--snow": 1, "--wind": 1, "--dynamic-weather": 0,
 	"--http-downloads-dir": 1, "--http-base-url": 1, "--admin-password": 1,
 	"--renderer-applied": 0, "--goldnet": 0, "--stock": 0,
 }

@@ -31,6 +31,9 @@ func _ready() -> void:
 	bolt_drawer = _draw_beam_bolt
 	light_from_sky = false  # NightMode's light, which knows the map's lightmaps
 	wet_ground = false  # until the map turns out to have a rain floor
+	# Not fit for the maps yet: the rain floor takes no liquid, so snow drifts across a moat's bed
+	# and shows over its water, and the drifts are lit by scene lights, not the lightmaps.
+	snow_drifts = false
 	flash_changed.connect(func(k: float) -> void: NightMode.set_flash(FLASH * k))
 	struck.connect(_on_struck)
 	super._ready()
