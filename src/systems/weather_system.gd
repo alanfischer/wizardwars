@@ -9,6 +9,8 @@ const TopDownFrame = preload("res://src/systems/top_down_frame.gd")
 ## How readily each WorldMaterials class pools; anything it leaves unclassified takes the default.
 const PUDDLE_BY_CLASS := {"ground": 1.0, "mineral": 0.6, "wood": 0.0}
 const PUDDLE_DEFAULT := 0.5
+## Steps the server sends the ground's wetness in.
+const WET_STEPS := 32.0
 
 ## The map, handed over before the system enters the tree. None on a test or tool that has no map.
 var map_root: Node
@@ -16,6 +18,9 @@ var map_root: Node
 ## and dynamic weather throughout.
 var _current_type: int = 0
 var _current_intensity: int = 0
+## The ground's wetness as the server has it, in WET_STEPS: what slick ground goes by, so every
+## peer predicts the same slide.
+var ground_wetness := 0.0
 
 
 func _ready() -> void:
@@ -178,6 +183,32 @@ func _apply_night() -> void:
 func send_state_to(peer_id: int) -> void:
 	if _current_type != 0 or _current_intensity != 0:
 		set_weather.rpc_id(peer_id, _current_type, _current_intensity)
+	if ground_wetness > 0.0:
+		set_ground_wetness.rpc_id(peer_id, ground_wetness)
+
+
+@rpc("authority", "call_remote", "reliable")
+func set_ground_wetness(w: float) -> void:
+	ground_wetness = w
+	# Each peer soaks its own ground from when it joined; one far from the server's is set to it.
+	if absf(wetness - w) > 1.0 / WET_STEPS:
+		wetness = w
+
+
+## How wet the ground at `feet` is for slick footing, 0 to 1, alike on every peer.
+func wet_at(feet: Vector3) -> float:
+	if ground_wetness <= 0.0:
+		return 0.0
+	return ground_wetness if rains_on(feet) else 0.0
+
+
+func _share_wetness() -> void:
+	var w := snappedf(wetness, 1.0 / WET_STEPS)
+	if w == ground_wetness:
+		return
+	ground_wetness = w
+	if NetworkManager.is_online():
+		set_ground_wetness.rpc(w)
 
 
 ## The night darkens the rain and the haze the way it darkens the sky's light (NightMode).
@@ -190,10 +221,13 @@ static func sky_light_now() -> Color:
 func _process(delta: float) -> void:
 	# The host times the strikes so every peer sees the same one. A role that can change with a
 	# connection, so asked each frame.
-	times_strikes = not NetworkManager.is_online() or NetworkManager.is_host()
+	var server := not NetworkManager.is_online() or NetworkManager.is_host()
+	times_strikes = server
 	# GoldSrc drew no rain with the view underwater (v_waterlevel 3); the sound carries on.
 	underwater = listener != null and listener.has_method("head_underwater") and listener.head_underwater()
 	super._process(delta)
+	if server:
+		_share_wetness()
 
 
 ## The host's strikes reach every client, which draws the same one from the seed.

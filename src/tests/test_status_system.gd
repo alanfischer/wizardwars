@@ -266,6 +266,16 @@ func test_modifiers_frosted_reduces_scales() -> void:
 		"frost reduces accel_scale")
 
 
+func test_frost_stacks_with_other_modifiers() -> void:
+	var t := _make_target()
+	_logic.apply_frost(t, 2.0)
+	var mods := Movement.MovementModifiers.new()
+	mods.friction_scale = 0.5
+	_logic.contribute_movement_modifiers(t, mods)
+	assert_almost_eq(mods.friction_scale, 0.5 * StatusLogic.FROST_FRICTION_MULT, 0.001,
+		"frost multiplies what is already there")
+
+
 func test_modifiers_not_frosted_scales_are_one() -> void:
 	var t := _make_target()
 	var mods := Movement.MovementModifiers.new()

@@ -65,6 +65,8 @@ func _register_defaults() -> void:
 	# Wind across the ground, m/s, blowing toward wind_dir (degrees round from +Z toward +X).
 	register("wind", 0.0, Type.FLOAT)
 	register("wind_dir", 0.0, Type.FLOAT)
+	# Ground friction on soaked ground, as a fraction of dry (1 = off); damp ground is between.
+	register("wet_friction", 0.85, Type.FLOAT)
 
 
 func register(key: String, default_value, type: int, replicate: bool = true) -> void:

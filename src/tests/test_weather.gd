@@ -4,6 +4,19 @@ extends "res://src/tests/test_base.gd"
 ##
 ## Scene-run only (needs the ServerVars autoload): res://src/tests/run_tests.tscn.
 
+const Movement = preload("res://addons/pmove/movement.gd")
+
+
+## A floor 4 m by 2 m from (-2, -1): the west half roofed at 3 m, the east half open to 0.
+func _roofed_weather() -> WeatherSystem:
+	var img := Image.create_empty(4, 2, false, Image.FORMAT_RF)
+	for y in 2:
+		for x in 4:
+			img.set_pixel(x, y, Color(3.0 if x < 2 else 0.0, 0, 0))
+	var weather := WeatherSystem.new()
+	weather.rain_floor = OvercastRainFloor.create(img, Vector3(-2, 0, -1), Vector2(4, 2), 10.0)
+	return weather
+
 
 func test_the_rain_var_reaches_overcast_unchanged() -> void:
 	var weather := WeatherSystem.new()
@@ -133,3 +146,50 @@ func test_the_maps_surfaces_pool_by_their_material() -> void:
 		"and the rest pool as their class does")
 	weather.free()
 	map_root.free()
+
+
+func test_the_server_sends_the_grounds_wetness_in_steps() -> void:
+	var weather := _roofed_weather()
+	weather.wetness = 0.51
+	weather._share_wetness()
+	assert_eq(weather.ground_wetness, 0.5, "to the nearest step")
+	assert_eq(weather.wet_at(Vector3(1, 0, 0)), 0.5, "out in the rain the ground is that wet")
+	assert_eq(weather.wet_at(Vector3(-1, 0, 0)), 0.0, "under the roof it is dry")
+	weather.free()
+
+
+func test_a_client_takes_the_servers_wetness_only_when_far_from_it() -> void:
+	var weather := _roofed_weather()
+	weather.wetness = 0.2
+	weather.set_ground_wetness(0.5)
+	assert_eq(weather.wetness, 0.5, "a client that joined into rain is set to the server's ground")
+	weather.wetness = 0.49
+	weather.set_ground_wetness(0.5)
+	assert_eq(weather.wetness, 0.49, "one close to it soaks on smoothly")
+	assert_eq(weather.wet_at(Vector3(1, 0, 0)), 0.5, "while footing goes by the server's")
+	weather.free()
+
+
+func test_soaked_ground_is_slick_and_stacks_with_frost() -> void:
+	var weather := _roofed_weather()
+	weather.set_ground_wetness(1.0)
+	var was: WeatherSystem = Game.weather_system
+	Game.weather_system = weather
+	var body := Node3D.new()
+	var ctx := PlayerMovementContext.new(body, null, null)
+	var state := Movement.MovementState.new()
+	var slick := float(ServerVars.get_value("wet_friction", 1.0))
+	assert_lt(slick, 1.0, "soaked ground is slicker than dry")
+	assert_gt(slick, 0.5, "but only a little")
+	state.position = Vector3(1, 0, 0)
+	var mods := Movement.MovementModifiers.new()
+	mods.friction_scale = 0.15
+	ctx._slick_when_wet(mods, state)
+	assert_almost_eq(mods.friction_scale, 0.15 * slick, 1e-6, "out in the rain, on top of frost")
+	state.position = Vector3(-1, 0, 0)
+	mods = Movement.MovementModifiers.new()
+	ctx._slick_when_wet(mods, state)
+	assert_eq(mods.friction_scale, 1.0, "under the roof the footing is dry")
+	Game.weather_system = was
+	body.free()
+	weather.free()
