@@ -74,15 +74,10 @@
   SentenceSystem, BeamSystem, VisibilitySystem and SpatialQuery are platform the library can take by
   injection or ship itself, while Teams, Game and GoalSystem are gameplay that stays with the host.
 
-## Library releases
+## Library promotion
 
-Tag every library once, so each first or next release carries its final API (the 2026-11-09
-API review's changes are in): overcast-godot, pmove-godot, the hop core and the goldnet core have
-never been tagged; goldsrc-godot, hop-godot and goldnet-godot have moved past their last tags.
-Hold overcast's API a week or two without breaking changes before its tag (its last break: the
-ground split, 2026-11-09). Pin WW at the tags.
-
-Promotion, once tagged:
+Every library is tagged (2026-11-09: goldsrc-godot v0.4.0, hop-godot v0.2.0, goldnet-godot v0.2.0,
+overcast-godot v0.1.0, pmove-godot v0.1.0, hop and goldnet cores v0.1.0) and WW is pinned at the tags.
 
 - goldnet-godot: Godot Asset Library, a write-up around the 25%-loss table, and each "What we
   wish Godot had" item filed as a godot-proposals issue linking back.
