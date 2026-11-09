@@ -1,7 +1,6 @@
 extends "res://src/tests/test_base.gd"
-## Texture-name classification for the world detail pass. The pass itself is pixels and cannot be
-## checked headless; what is testable is the part that actually decides anything — which GoldSrc
-## texture name lands in which material class.
+## Texture-name classification for world surfaces: which GoldSrc texture name lands in which
+## material class.
 ##
 ## The named textures below are real, taken from the shipped maps by surface area.
 ##
@@ -56,16 +55,16 @@ func test_unknown_names_are_left_alone() -> void:
 		assert_eq(WorldMaterials.classify(name), "", name)
 
 
-## Every class the tables can produce must have detail settings, or apply() would fault on a name
-## somebody adds to OVERRIDES without adding the class.
-func test_every_class_has_parameters() -> void:
+## Every class the tables can produce must say how it pools, or a class misspelled in OVERRIDES
+## would quietly take the default.
+func test_every_class_has_a_puddle_scale() -> void:
 	var classes := {}
 	for rule in WorldMaterials.KEYWORDS:
 		classes[rule[0]] = true
 	for name in WorldMaterials.OVERRIDES:
 		classes[WorldMaterials.OVERRIDES[name]] = true
 	for cls in classes:
-		assert_true(WorldMaterials.CLASS_PARAMS.has(cls), "no detail params for class '%s'" % cls)
+		assert_true(WeatherSystem.PUDDLE_BY_CLASS.has(cls), "no puddle scale for class '%s'" % cls)
 
 
 ## Overrides are matched against the normalized (lowercased) name, so an entry typed with capitals

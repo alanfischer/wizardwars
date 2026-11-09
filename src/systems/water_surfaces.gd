@@ -3,8 +3,7 @@ extends Object
 ## Turns the liquid shader's depth-driven half on and off.
 ##
 ## Depth absorption, shoreline foam and the wave's own shading are the parts of the water that
-## cost something per pixel, so they ride the picture-quality preset rather than the renderer —
-## the same division WorldMaterials uses for the detail pass. A fast machine on Compatibility
+## cost something per pixel, so they ride the picture-quality preset rather than the renderer. A fast machine on Compatibility
 ## gets them; a weak one on Forward+ does not. What decides it is the level, not the backend:
 ## the depth texture these need works on both (shaders/decal_projector.gdshader has shipped on
 ## the Compatibility default for as long as decals have).
@@ -45,7 +44,7 @@ const PRIORITY_SUBMERGED := PRIORITY_BEFORE - 1
 
 
 ## Push `enabled` onto every liquid material under `map_root`. Returns how many surfaces were
-## touched, so a caller can log it the way the detail pass does.
+## touched, so a caller can log it.
 ##
 ## Also pins the depth-prepass twins ahead of the colour pass and sets their depth push for this
 ## renderer. The converter already emits them at that priority, so the pinning is belt and braces

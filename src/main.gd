@@ -459,7 +459,6 @@ func _ready() -> void:
 	_lobby.renderer_restart_requested.connect(_on_lobby_renderer_restart)
 	_lobby.quality_changed.connect(func(level: String) -> void:
 		RenderQuality.apply(level, get_viewport(), _current_environment())
-		WorldMaterials.apply(_map_root, RenderQuality.detail_enabled(level))
 		WaterSurfaces.apply(_map_root, RenderQuality.water_depth_enabled(level)))
 	MapTransfer.map_already_cached.connect(_on_map_ready)
 	MapTransfer.map_transfer_complete.connect(_on_map_ready)
@@ -760,10 +759,6 @@ func _load_map(map_name: String) -> void:
 	add_child(weather_system)
 
 	_build_skybox(map_root)
-	# Detail needs the map itself, and the map's own sky/water surfaces are flagged by now.
-	var detailed := WorldMaterials.apply(map_root, RenderQuality.detail_enabled())
-	if detailed > 0:
-		Log.info("Surface detail applied to %d world surfaces" % detailed)
 	var watered := WaterSurfaces.apply(map_root, RenderQuality.water_depth_enabled())
 	if watered > 0:
 		Log.info("Water depth effects %s on %d liquid surfaces" % [

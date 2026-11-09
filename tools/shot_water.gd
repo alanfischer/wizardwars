@@ -87,11 +87,11 @@ func _ready() -> void:
 	var ws_node := map_root.get_node_or_null("worldspawn")
 	var world_ent: Dictionary = ws_node.get_meta("entity", {}) if ws_node and ws_node.has_meta("entity") else {}
 	sky.setup(str(world_ent.get("skyname", "")), map_root, _light_environment(map_root))
-	# --quality low|medium|high applies a REAL preset — MSAA, glow, the world detail pass, the sky
-	# and liquid's depth half together — the way main.gd does on load and on a lobby change. The
-	# individual --sky/--water flags only ever moved two of those five, so a capture taken with
-	# them was never any preset a player can actually select, and the three the tool was silently
-	# leaving at project defaults included MSAA.
+	# --quality low|medium|high applies a REAL preset — MSAA, glow, the sky and liquid's depth half
+	# together — the way main.gd does on load and on a lobby change. The individual --sky/--water
+	# flags only ever moved two of those four, so a capture taken with them was never any preset a
+	# player can actually select, and the two the tool was silently leaving at project defaults
+	# included MSAA.
 	var quality := str(args.get("quality", ""))
 	if quality:
 		if not RenderQuality.LEVELS.has(quality):
@@ -100,10 +100,8 @@ func _ready() -> void:
 			return
 		RenderQuality.apply(quality, get_viewport(), sky.get_node_or_null("WorldEnvironment").environment
 				if sky.get_node_or_null("WorldEnvironment") else null)
-		WorldMaterials.apply(map_root, RenderQuality.detail_enabled(quality))
 		water_on = RenderQuality.water_depth_enabled(quality)
-		print("quality %s: msaa_3d=%d detail=%s water_depth=%s" % [quality,
-				get_viewport().msaa_3d, RenderQuality.detail_enabled(quality), water_on])
+		print("quality %s: msaa_3d=%d water_depth=%s" % [quality, get_viewport().msaa_3d, water_on])
 	sky.apply_enhanced(args.get("sky", "on") == "on")
 	# --skyprio <n> rewrites every sky surface's render_priority, override included. The sky and
 	# the liquid depth twin both ship at -1, which is the same rung: whichever the renderer puts
