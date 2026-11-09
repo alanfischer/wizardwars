@@ -115,7 +115,6 @@ func test_render_flags_drive_invisibility_and_status_sprites() -> void:
 	_spawned.append(p)
 	var sink := StatusSink.new()
 	_keep(sink)
-	var prev_handler: Node = NetworkManager._sync_handler
 	NetworkManager.register_sync_handler(sink)
 
 	var burning := NetworkManager.PLAYER_FLAG_BURNING
@@ -132,7 +131,6 @@ func test_render_flags_drive_invisibility_and_status_sprites() -> void:
 	assert_eq(sink.calls, [[5, GameConsts.StatusType.BURNING, false]], "and the sprite came down")
 
 	NetworkManager.unregister_sync_handler(sink)
-	NetworkManager._sync_handler = prev_handler
 
 
 func test_every_status_sprite_has_a_flag() -> void:

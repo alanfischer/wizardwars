@@ -1,9 +1,9 @@
 extends "res://src/tests/test_base.gd"
 ## NetworkManager._dispatch_to_scene's routing. Every "the server told the client something" event
 ## arrives by NAME through that one function, so where it looks matters: the sync handlers live on
-## the node the scene registered (main.gd's ClientSync child), while the join/spawn handlers are
-## still main's own methods. Both have to keep working, including on a scene (a tool or probe
-## harness) that registers no handler at all.
+## the nodes the scene registered (main.gd's ClientSync and ClientJoin children), while the spawn
+## handlers are still main's own methods. Both have to keep working, including on a scene (a tool
+## or probe harness) that registers no handler at all.
 
 
 class SyncChild extends Node:
@@ -79,3 +79,31 @@ func test_an_unknown_method_is_dropped_quietly() -> void:
 	NetworkManager._dispatch_to_scene(&"_on_sync_nothing_implements_this", [1, 2])
 	assert_eq(_child.got, [], "nothing on the handler")
 	assert_eq(_scene.got, [], "nothing on the scene")
+
+
+
+class OtherChild extends Node:
+	var got: Array = []
+
+	func _on_sync_other(value: int) -> void:
+		got.append(value)
+
+
+func test_the_newest_handler_with_the_method_wins() -> void:
+	var newer := SyncChild.new()
+	_scene.add_child(newer)
+	NetworkManager.register_sync_handler(newer)
+	NetworkManager._dispatch_to_scene(&"_on_sync_probe", [4])
+	assert_eq(newer.got, [4], "the later registrant shadows")
+	assert_eq(_child.got, [], "the earlier one is not also called")
+
+
+func test_a_handler_without_the_method_falls_through() -> void:
+	var other := OtherChild.new()
+	_scene.add_child(other)
+	NetworkManager.register_sync_handler(other)
+	NetworkManager._dispatch_to_scene(&"_on_sync_probe", [5])
+	NetworkManager._dispatch_to_scene(&"_on_sync_other", [6])
+	assert_eq(_child.got, [5], "the newer handler has no _on_sync_probe, so the older one answers")
+	assert_eq(other.got, [6], "and each answers its own")
+	assert_eq(_scene.got, [], "the scene is not reached")

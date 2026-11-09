@@ -11,20 +11,13 @@
   `Game.hud`) and node references come by injection, so ClientSync and ClientPerf each bind main for
   one specific node and ClientJoin, needing none, binds nothing.
 
-  Two seams the ClientJoin review named, both worth doing before or with the next peel:
+  One seam the ClientJoin review named is done: sync handlers are a list now, newest first, and
+  `_on_reject_team_join` lives in `client_join.gd`, so `abandon` went private. The other, worth
+  doing before or with the next peel:
 
-  - `_on_reject_team_join` is a pure forwarder (`main.gd` 1007) only because
-    `network_manager.gd`'s `_sync_handler` is a single slot that ClientSync already holds. Make it
-    an `Array[Node]` with first-match-wins (register to the FRONT, so a later registrant shadows
-    and today's replace semantics survive) and the handler moves into `client_join.gd` verbatim,
-    with every future peel owning its own RPCs. `test_sync_dispatch.gd` passes unchanged — none of
-    its four cases encode "exactly one handler"; `test_sync_name_rule.gd` needs `client_join.gd`
-    appended to `HANDLER_SOURCES`. `_on_assign_spawn` should NOT move either way: it drives
-    `spawn_at_transform` and clears main's `_recent_cmds`, so it is genuinely main's and its
-    `clear_watchdog()` call is a real notification, not a workaround.
   - ClientJoin should own the class menu's lifecycle, not just borrow the reference. Main creates
     `_team_select_ui` in `_load_map` (VR branch included) and frees it in `_unload_map`, so the
-    node holds a second copy nobody nulls — which is the only reason `abandon()` needs
+    node holds a second copy nobody nulls — which is the only reason `_abandon()` needs
     `is_instance_valid`, and `game.gd` already states the one-copy rule. `build_menu(parent)` /
     `teardown_menu()` would retire the guard. It is five more call sites than the signal, though:
     `main.gd` 993 (`show_ui` on spectating), 1185-1191 (`team_menu`/`class_menu` actions) and

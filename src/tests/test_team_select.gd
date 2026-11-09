@@ -24,7 +24,7 @@ class FakeNoPending:
 	var team: int = 0
 
 
-# Catches the refusal. The message itself is main's job now (main._on_reject_team_join), so
+# Catches the refusal. The message itself is ClientJoin's job (client_join._on_reject_team_join), so
 # what the transport owes a rejected joiner is this dispatch, with the team and the reason on it.
 class RejectSpy:
 	extends Node
