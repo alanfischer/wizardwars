@@ -106,9 +106,10 @@ func test_empty_line_is_clean() -> void:
 
 
 func test_real_handlers_write_their_fields() -> void:
-	# Only the handlers that write main's own fields — the ones reaching NetworkManager/MatchSystem
-	# would mutate autoloads the rest of the suite shares.
+	# Only the handlers that write main's own fields, or ClientJoin's — the ones reaching
+	# NetworkManager/MatchSystem would mutate autoloads the rest of the suite shares.
 	var m := _new_main()
+	m._client_join = _keep(load("res://src/systems/client_join.gd").new())  # main builds it in _ready
 	var handlers: Dictionary = m._flag_handlers()
 	var subset := {}
 	for flag in ["--server", "--host", "--map", "--team", "--class", "--bots", "--bsp-hulls",
@@ -122,8 +123,8 @@ func test_real_handlers_write_their_fields() -> void:
 	assert_true(m._is_dedicated_server, "--server")
 	assert_true(m._is_listen_host, "--host")
 	assert_eq(m._current_map_name, "ww_hunt", "--map")
-	assert_eq(m._auto_team, 2, "--team")
-	assert_eq(m._auto_class, GameConsts.element_from_name("ice"), "--class resolves a name")
+	assert_eq(m._client_join._auto_team, 2, "--team")
+	assert_eq(m._client_join._auto_class, GameConsts.element_from_name("ice"), "--class resolves a name")
 	assert_eq(m._auto_bots, 4, "--bots")
 	assert_eq(m._bsp_hulls_arg, "on", "--bsp-hulls trimmed and lowercased")
 	assert_false(m._use_goldnet, "--stock opts out of the default transport")

@@ -26,14 +26,66 @@ var _local_class_change_waiting := false
 var _pending_join_seq := 0
 var _pending_join_tries := 0
 
-## The class menu, rebuilt by main on every map load — hence the reconnect here and the
-## is_instance_valid() guard: a refused join has to put back a menu that may already be freed.
-var _team_select_ui: CanvasLayer
+## The role a scripted launch (--team/--class) comes back on every map, menu skipped. 0 = none.
+var _auto_team := 0
+var _auto_class := 0
+
+## The class menu, built on every map load and freed on unload.
+var _menu: TeamSelectUI
 
 
-func bind_menu(ui: CanvasLayer) -> void:
-	_team_select_ui = ui
-	ui.selection_made.connect(select_team_class)
+func set_auto_team(team: int) -> void:
+	_auto_team = team
+
+
+func set_auto_class(element: int) -> void:
+	_auto_class = element
+
+
+## A new map's class menu, for the caller to parent (main, or the VR lobby panel).
+func build_menu() -> TeamSelectUI:
+	teardown_menu()
+	_menu = TeamSelectUI.new()
+	_menu.name = "TeamSelectUI"
+	_menu.selection_made.connect(select_team_class)
+	return _menu
+
+
+func teardown_menu() -> void:
+	if _menu:
+		_menu.queue_free()
+		_menu = null
+
+
+## The game went live: come back on the scripted role, else put the menu up for a spectator.
+## Deferred — on a listen host the map change registers the host puppet after this call, and the
+## join request needs that puppet. True when the menu went up.
+func start_game() -> bool:
+	var lp := Game.local_player
+	if _auto_team > 0 and lp and lp.spectating:
+		select_team_class.call_deferred(_auto_team,
+				_auto_class if _auto_class > 0 else GameConsts.Element.FIRE)
+		return false
+	if _menu and lp and lp.spectating:
+		_menu.show_ui()
+		return true
+	return false
+
+
+func open_team_menu() -> bool:
+	if not _menu:
+		return false
+	_menu.show_ui()
+	return true
+
+
+## Only once there is a team to pick a class on.
+func open_class_menu() -> bool:
+	var lp := Game.local_player
+	if not _menu or not lp or lp.team == GameConsts.Team.NONE:
+		return false
+	_menu.show_class_only(lp.team)
+	return true
 
 
 func select_team_class(team: int, element: int) -> void:
@@ -152,8 +204,8 @@ func _abandon(message: String) -> void:
 	if Game.hud:
 		Game.hud.show_center_message(message, Color(1.0, 0.3, 0.3), 3.0)
 	var lp := Game.local_player
-	if is_instance_valid(_team_select_ui) and not _team_select_ui.visible and lp and lp.spectating:
-		_team_select_ui.show_ui()
+	if _menu and not _menu.visible and lp and lp.spectating:
+		_menu.show_ui()
 
 
 ## Track an outstanding join so a dropped request_join_team can't strand us as a spectator with
