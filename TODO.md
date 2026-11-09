@@ -130,10 +130,6 @@ goldnet-godot's Usage first with `GoldNetMultiplayer.new()`, hop's pipeline priv
 classes prefixed (goldsrc-godot #74, goldnet-godot #52, hop #110, hop-godot #83,
 pmove-godot #16, WW #48).
 
-- Tag releases once those merge. overcast-godot, pmove-godot, the hop core and the goldnet core
-  have no tags on their remotes; WW pins overcast at `main`, and goldsrc-godot has moved past
-  v0.3.0.
-
 goldsrc-godot:
 
 - `GoldSrcBSP` and `GoldSrcMDL` are `Node3D`s used as loaders (`GoldSrcBSP.new() … bsp.free()`;
@@ -156,7 +152,11 @@ overcast-godot:
 
 - Split the ground state (snow, ice and wetness fields, and their net sync: three values, heat
   events, the late-join cell grids) out of `OvercastWeather` into its own object.
-- Hold the API a week or two without breaking changes, then tag v0.1.0.
+
+Then tag every library once, after the changes above, so each first or next release carries
+its final API: overcast-godot, pmove-godot, the hop core and the goldnet core have never been
+tagged; goldsrc-godot, hop-godot and goldnet-godot have moved past their last tags. Hold
+overcast's API a week or two without breaking changes before its tag. Pin WW at the tags.
 
 Promotion, once tagged:
 
