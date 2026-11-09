@@ -278,8 +278,8 @@ func _run() -> void:
 	# --- the REAL movement context and server simulation ---
 	var ctx := PlayerMovementContext.new(player, ladder, water)
 	var cfg := MovementConfig.new()
-	var server := ServerMovement.new(cfg)
-	var gbody := GodotBody.new(player)
+	var server := PmoveServerMovement.new(cfg)
+	var gbody := PmoveGodotBody.new(player)
 	server.bind_body(gbody)
 	gbody.force_sync_physics()
 	await get_tree().physics_frame

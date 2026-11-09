@@ -24,7 +24,7 @@ const Movement = preload("res://addons/pmove/movement.gd")
 const SAMPLE := 0.25
 const BOT_RESCUE_T := 12.0      # BotBrain.WEDGE_T, for reporting what a human would NOT get
 
-## One adapter per bot, kept because GodotBody pools its query params — and because asking
+## One adapter per bot, kept because PmoveGodotBody pools its query params — and because asking
 ## Movement.is_pinned is the point: the probe has to measure the predicate the game acts on, not
 ## a second copy of it that can drift.
 var _bodies := {}
@@ -107,5 +107,5 @@ func _close(bot, t: float) -> void:
 func _is_live(body: CharacterBody3D) -> bool:
 	var id: int = body.get_instance_id()
 	if not _bodies.has(id):
-		_bodies[id] = GodotBody.new(body)
+		_bodies[id] = PmoveGodotBody.new(body)
 	return not Movement.is_pinned(_bodies[id])

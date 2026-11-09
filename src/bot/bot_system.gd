@@ -1,7 +1,7 @@
 extends Node
 ## Self-contained AI bot module (autoload).
 ##
-## A bot is a host-side RemotePlayer puppet with a ServerMovement queue, identical to a
+## A bot is a host-side RemotePlayer puppet with a PmoveServerMovement queue, identical to a
 ## connected client's puppet, except its InputCommands come from a BotBrain each tick instead
 ## of the network. Everything downstream is reused unchanged.
 ##

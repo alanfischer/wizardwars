@@ -172,7 +172,7 @@ func _initialize() -> void:
 
 	var cfg := MovementConfig.new()
 	var sim := Movement.Simulation.new(cfg)
-	var gbody := GodotBody.new(player)
+	var gbody := PmoveGodotBody.new(player)
 	var state := Movement.MovementState.new()
 	state.bind_body(gbody)
 

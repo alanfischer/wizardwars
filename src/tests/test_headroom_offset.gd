@@ -1,5 +1,5 @@
 extends "res://src/tests/test_base.gd"
-## GodotBody.has_headroom must refuse a pose already inside geometry. An upward-only sweep from
+## PmoveGodotBody.has_headroom must refuse a pose already inside geometry. An upward-only sweep from
 ## the dropped pose is wrong: body_test_motion depenetrates before it casts, so from a start
 ## buried in a floor it recovers up out of the floor first and reports the space above as clear —
 ## this ejected riders standing up while briefly off-floor on ww_golem's bobbing deck. Needs real
@@ -16,7 +16,7 @@ const SLAB_HALF := 2.0       # deep enough that the dropped pose is well inside 
 
 
 ## A thick static slab with its top face at FLOOR_TOP, and a crouched body resting on it.
-func _make_body() -> GodotBody:
+func _make_body() -> PmoveGodotBody:
 	var slab := StaticBody3D.new()
 	slab.collision_layer = GameConsts.MASK_WORLD
 	var slab_shape := CollisionShape3D.new()
@@ -45,20 +45,20 @@ func _make_body() -> GodotBody:
 	_spawned.append(player)
 	player.global_position = Vector3(0.0, FLOOR_TOP, 0.0)
 
-	var body := GodotBody.new(player)
+	var body := PmoveGodotBody.new(player)
 	body.force_sync_physics()
 	await (Engine.get_main_loop() as SceneTree).physics_frame
 	return body
 
 
 func test_clear_above_is_still_clear() -> void:
-	var body: GodotBody = await _make_body()
+	var body: PmoveGodotBody = await _make_body()
 	assert_true(body.has_headroom(GROW),
 		"nothing overhead, so the grounded stand-up must be allowed")
 
 
 func test_offset_into_the_floor_is_refused() -> void:
-	var body: GodotBody = await _make_body()
+	var body: PmoveGodotBody = await _make_body()
 	# Half a hull below the deck is solid slab. The space above it is wide open, which
 	# is exactly why the upward sweep alone said yes.
 	assert_false(body.has_headroom(GROW, Vector3.DOWN * (GROW * 0.5)),
@@ -66,7 +66,7 @@ func test_offset_into_the_floor_is_refused() -> void:
 
 
 func test_offset_into_open_air_is_allowed() -> void:
-	var body: GodotBody = await _make_body()
+	var body: PmoveGodotBody = await _make_body()
 	# The same offset test from a genuinely free pose still passes, so the new check
 	# rejects penetration rather than rejecting offsets.
 	body.global_position = Vector3(0.0, FLOOR_TOP + 5.0, 0.0)

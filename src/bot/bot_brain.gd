@@ -5,7 +5,7 @@ extends Node
 ## then steer waypoint-to-waypoint, honoring baked jump/crouch flags. Maps with no waypoint file
 ## fall back to local steering — whisker raycasts plus wall-follow (see _local_steer). Combat is
 ## opportunistic: fires at any enemy in range/LOS while moving, without abandoning the objective.
-## Each tick enqueues one InputCommand into the bot puppet's ServerMovement. Attached as a child
+## Each tick enqueues one InputCommand into the bot puppet's PmoveServerMovement. Attached as a child
 ## of the puppet by BotSystem.add_bot; BotSystem.tick() drives it.
 
 const InputCommand = preload("res://addons/pmove/input_command.gd")
