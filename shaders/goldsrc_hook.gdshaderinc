@@ -27,10 +27,10 @@ vec3 goldsrc_lightmap(vec3 lm, float sun_share, vec3 world_pos) {
 	return lm * pow(max(mix(vec3(1.0), sky, sun_share), vec3(0.0)), vec3(0.55));
 }
 
-void goldsrc_surface(inout vec3 lit_srgb, inout vec3 albedo, vec3 world_pos, vec3 world_normal,
-		vec3 normal_view, vec3 view) {
-	overcast_wet(lit_srgb, albedo, world_pos, world_normal, normal_view, view);
-	overcast_snow(lit_srgb, albedo, world_pos, world_normal, normal_view, view);
+void goldsrc_surface(inout vec3 lit_srgb, inout vec3 albedo, vec3 light, vec3 world_pos,
+		vec3 world_normal, vec3 normal_view, vec3 view) {
+	overcast_wet(lit_srgb, albedo, light, world_pos, world_normal, normal_view, view);
+	overcast_snow(lit_srgb, albedo, light, world_pos, world_normal, normal_view, view);
 }
 #endif
 
