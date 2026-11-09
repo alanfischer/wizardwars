@@ -83,19 +83,12 @@ func convert(bsp_name: String) -> bool:
 	for wad in _load_wads(bsp):
 		bsp.add_wad(wad)
 
-	bsp.build_mesh()
-	EntityRender.apply_overbright(bsp, OVERBRIGHT)
-
-	# Reparent children to a plain Node3D (GDExtension-independent)
-	var root := Node3D.new()
+	# A plain Node3D (GDExtension-independent) that already carries the lightstyle image and
+	# texture and the stripped BSP (bsp_data) that VisibilityManager and hop's hull collision
+	# run from, since clients only ever receive the .scn.
+	var root: Node3D = bsp.build_scene()
 	root.name = bsp_name
-
-	if bsp.has_method("get_lightstyle_image"):
-		var ls_image = bsp.get_lightstyle_image()
-		var ls_texture = bsp.get_lightstyle_texture()
-		if ls_image and ls_texture:
-			root.set_meta("lightstyle_image", ls_image)
-			root.set_meta("lightstyle_texture", ls_texture)
+	EntityRender.apply_overbright(root, OVERBRIGHT)
 
 	if bsp.has_method("bake_light_grid"):
 		var light_grid: Dictionary = bsp.bake_light_grid(32.0)
@@ -106,17 +99,6 @@ func convert(bsp_name: String) -> bool:
 		var rain_floor: Dictionary = bsp.bake_rain_floor(16.0)
 		if not rain_floor.is_empty():
 			root.set_meta("rain_floor", rain_floor)
-
-	# Bake the stripped BSP (PLANES/NODES/CLIPNODES/LEAFS/VISIBILITY/MODELS) so
-	# both VisibilityManager (PVS) and hop's hull collision can run from the .scn
-	# without the original .bsp — clients only ever receive the .scn. Collision
-	# bodies carry just a "bsp_model" index and find this by walking up the tree.
-	# build_mesh() already parked the blob on the BSP node; read it back rather than
-	# calling get_bsp_blob() again, which would rebuild the whole multi-MB payload.
-	# PackedByteArray is copy-on-write, so this is a refcount.
-	var bsp_blob: PackedByteArray = bsp.get_meta("bsp_data", PackedByteArray())
-	if not bsp_blob.is_empty():
-		root.set_meta("bsp_data", bsp_blob)
 
 	# Bake the map's sidecar text files into the scene so clients never need to
 	# fetch maps/<name>.txt / _readme.txt / .ww separately — they ride inside
@@ -133,13 +115,6 @@ func convert(bsp_name: String) -> bool:
 
 	root.set_meta(VERSION_META, CACHE_VERSION)
 	root.set_meta(PIPELINE_META, pipeline_id())
-
-	var children = bsp.get_children()
-	for child in children:
-		bsp.remove_child(child)
-		root.add_child(child)
-	bsp.free()
-	_set_owner_recursive(root, root)
 
 	# Save .scn — entity nodes (both brush and point) are included in the scene
 	var scene := PackedScene.new()
@@ -256,7 +231,6 @@ func _load_wads(bsp) -> Array:
 		var wad = ClassDB.instantiate(&"GoldSrcWAD")
 		if wad.load_wad(full_path) != OK:
 			push_warning("Failed to load WAD: %s" % full_path)
-			wad.free()
 			continue
 		wads.append(wad)
 		loaded_names[wad_name] = true
@@ -335,9 +309,3 @@ static func map_exists(map_name: String) -> bool:
 	if FileAccess.file_exists(_resolve_res_file("maps/%s.bsp" % map_name)):
 		return true
 	return FileAccess.file_exists(_resolve_res_file("maps/%s.glb" % map_name))
-
-
-func _set_owner_recursive(node: Node, p_owner: Node) -> void:
-	for child in node.get_children():
-		child.owner = p_owner
-		_set_owner_recursive(child, p_owner)

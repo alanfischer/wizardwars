@@ -19,7 +19,6 @@ func _init() -> void:
 		bsp.set_scale_factor(0.025)
 		bsp.shader_lightstyles = true
 		bsp.load_bsp(path)
-		bsp.build_mesh()
 		var grid: Dictionary = bsp.bake_light_grid(32.0)
 		if grid.is_empty():
 			print("%-12s NO GRID (empty dict)" % name)
@@ -27,5 +26,4 @@ func _init() -> void:
 			var dims = grid.get("grid_dims", Vector3i.ZERO)
 			var slices = grid.get("dir_slices", [])
 			print("%-12s GRID OK  dims=%s dir_slices=%d" % [name, str(dims), slices.size()])
-		bsp.free()
 	quit(0)
