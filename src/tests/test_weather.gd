@@ -301,7 +301,7 @@ void vertex() { world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
 void fragment() {
 	vec3 lit = goldsrc_lightmap(vec3(0.5), 1.0, world_pos);
 	vec3 albedo = vec3(0.5);
-	goldsrc_surface(lit, albedo, world_pos, vec3(0.0, 1.0, 0.0), NORMAL, VIEW);
+	goldsrc_surface(lit, albedo, vec3(1.0), world_pos, vec3(0.0, 1.0, 0.0), NORMAL, VIEW);
 	ALBEDO = albedo + lit;
 }
 """
