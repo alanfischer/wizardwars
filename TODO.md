@@ -85,14 +85,6 @@ goldsrc-godot:
 - The rain floor is weather in an asset loader. It is a "first solid surface going down" query;
   name it that.
 
-hop (core):
-
-- Replace the tuning setter/getter pairs on `simulator` with a `simulator_config` struct with
-  documented defaults; point the README at the handful people change.
-- Header comments narrate history ("used to phrase it differently…"); make them say what is.
-- Reconcile "zero-allocation simulation" with `std::shared_ptr` being required for every solid and
-  shape.
-
 overcast-godot:
 
 - Split the ground state (snow, ice and wetness fields, and their net sync: three values, heat
