@@ -121,3 +121,62 @@
   big maps (PVS is per leaf, so PAS is leaves² bits before compression); whether it belongs in
   goldsrc-godot next to the PVS; and whether sounds should be PAS-filtered at all, given the port
   attenuates by `max_dist` already and a far sound costs a little bandwidth, not a wrong result.
+
+## Library APIs (review 2026-11-09)
+
+Each item is a branch + PR in its own submodule, then a pin bump here.
+
+Across the libraries:
+
+- Tag releases. overcast-godot, pmove-godot, the hop core and the goldnet core have no tags on
+  their remotes; WW pins overcast and pmove at `main`, and goldsrc-godot is 4 commits past v0.3.0.
+- Fix `compatibility_minimum`. All three GDExtensions build against godot-cpp's 4.7 API, but hop
+  and goldnet declare 4.1, and goldsrc declares 4.6 while its README says 4.3+.
+- Take WW internals out of the READMEs: goldnet-godot (`NetworkManager.push_pvs_visibility`,
+  `_on_entity_relevance_lost`), hop-godot ("WizardWars replicates it as…"), goldsrc-godot
+  (`tools/tag_mdl_head_hitboxes.py`). One "Origin" line, as overcast has, is fine.
+- Write one spec for the `bsp_data` / `bsp_model` / `bsp_scale` / `bsp_blocking` metadata that
+  goldsrc-godot writes and hop-godot reads, and link it from both READMEs.
+
+goldsrc-godot (most API work):
+
+- `GoldSrcBSP` and `GoldSrcMDL` are `Node3D`s used as loaders (`GoldSrcBSP.new() … bsp.free()`;
+  forget the `free()` and it leaks), while `GoldSrcSPR` / `GoldSrcWAD` are `Resource`s. Make the
+  loaders `RefCounted`; only the built scene is nodes.
+- Split `GoldSrcBSP` (4,335 lines, 34 bound methods): the light grid, sun fraction and rain floor
+  bakers into their own classes or files.
+- The rain floor is weather in an asset loader. It is a "first solid surface going down" query;
+  name it that.
+
+hop (core):
+
+- Make the pipeline steps private in `simulator.h`: `update_solid`, `integrate_and_discover`,
+  `commit_solid`, `integrate_angular`, `correct_positions`, `correction_quat`, `project_joints`,
+  `try_deactivate`. hop-godot calls none of them.
+- Replace the ~35 tuning setter/getter pairs on `simulator` with a `simulator_config` struct with
+  documented defaults; point the README at the handful people change.
+- Header comments narrate history ("used to phrase it differently…"); make them say what is.
+- Reconcile "zero-allocation simulation" with `std::shared_ptr` being required for every solid and
+  shape.
+
+goldnet / goldnet-godot (promote first):
+
+- Move Usage up; it starts at line 396 of 642.
+- Say why setup is `ClassDB.instantiate(&"GoldNetMultiplayer")` rather than
+  `GoldNetMultiplayer.new()`, or switch.
+- Then: Godot Asset Library, a write-up around the 25%-loss table, and each "What we wish Godot
+  had" item filed as a godot-proposals issue linking back.
+
+pmove-godot:
+
+- Prefix `ClientMovement`, `ServerMovement` and `GodotBody`: unprefixed global class names collide
+  in a host project, the reason `PmoveConfig` already is. Fix the README's "No class_name on most
+  files" (5 of 10 have one).
+- Then: Asset Library, with a GIF of the demo.
+
+overcast-godot (promote once stable):
+
+- Split the ground state (snow, ice and wetness fields, and their net sync: three values, heat
+  events, the late-join cell grids) out of `OvercastWeather` (1,650 lines, 58 exports, 22 public
+  methods) into its own object.
+- Hold the API a week or two without breaking changes, tag v0.1.0, then post the screenshots.
