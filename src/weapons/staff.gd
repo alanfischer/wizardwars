@@ -29,7 +29,8 @@ func fire(attacker: Node3D, aim_from: Vector3 = Vector3.INF, aim_dir: Vector3 = 
 			var target := Combat.find_damageable(ray.result.collider)
 			if target != null and not _combo_swing(attacker, target):
 				target.take_damage(melee_damage, GameConsts.DamageType.PHYSICAL, attacker)
-	# authority-only decal to avoid each peer spawning its own copy
+	# Port-only, by choice: 1.2.9 commented out CStaff::Smack's DecalGunshot, but WW leaves a mark.
+	# Authority-only, to avoid each peer spawning its own copy.
 	if hit and not ray.result.is_empty() and NetworkManager.is_authoritative_fire(attacker):
 		var collider = ray.result.collider
 		if collider is StaticBody3D:

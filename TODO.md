@@ -113,9 +113,6 @@
   are platform the library can take by injection or ship itself, while Teams, Game and GoalSystem
   are gameplay that stays with the host.
 
-- The staff's wall decal is port-only: 1.2.9's `CStaff::Smack` has its `DecalGunshot` commented
-  out, so the original staff left no mark. Keep it with a reason, or drop it.
-
 ## Library APIs (review 2026-11-09)
 
 Each item is a branch + PR in its own submodule, then a pin bump here. Done so far: Godot 4.7
