@@ -121,3 +121,46 @@
   big maps (PVS is per leaf, so PAS is leaves² bits before compression); whether it belongs in
   goldsrc-godot next to the PVS; and whether sounds should be PAS-filtered at all, given the port
   attenuates by `max_dist` already and a far sound costs a little bandwidth, not a wrong result.
+
+## Library APIs (review 2026-11-09)
+
+Each item is a branch + PR in its own submodule, then a pin bump here. Done so far: Godot 4.7
+minimums, WW internals out of the READMEs, goldsrc-godot's metadata table as the one hull spec,
+goldnet-godot's Usage first with `GoldNetMultiplayer.new()`, hop's pipeline private, pmove's
+classes prefixed (goldsrc-godot #74, goldnet-godot #52, hop #110, hop-godot #83,
+pmove-godot #16, WW #48).
+
+- Tag releases once those merge. overcast-godot, pmove-godot, the hop core and the goldnet core
+  have no tags on their remotes; WW pins overcast at `main`, and goldsrc-godot has moved past
+  v0.3.0.
+
+goldsrc-godot:
+
+- `GoldSrcBSP` and `GoldSrcMDL` are `Node3D`s used as loaders (`GoldSrcBSP.new() … bsp.free()`;
+  forget the `free()` and it leaks), while `GoldSrcSPR` / `GoldSrcWAD` are `Resource`s. Make the
+  loaders `RefCounted`; only the built scene is nodes. Breaks WW's map conversion.
+- Split `GoldSrcBSP`: the light grid, sun fraction and rain floor bakers into their own classes
+  or files.
+- The rain floor is weather in an asset loader. It is a "first solid surface going down" query;
+  name it that.
+
+hop (core):
+
+- Replace the tuning setter/getter pairs on `simulator` with a `simulator_config` struct with
+  documented defaults; point the README at the handful people change.
+- Header comments narrate history ("used to phrase it differently…"); make them say what is.
+- Reconcile "zero-allocation simulation" with `std::shared_ptr` being required for every solid and
+  shape.
+
+overcast-godot:
+
+- Split the ground state (snow, ice and wetness fields, and their net sync: three values, heat
+  events, the late-join cell grids) out of `OvercastWeather` into its own object.
+- Hold the API a week or two without breaking changes, then tag v0.1.0.
+
+Promotion, once tagged:
+
+- goldnet-godot: Godot Asset Library, a write-up around the 25%-loss table, and each "What we
+  wish Godot had" item filed as a godot-proposals issue linking back.
+- pmove-godot: Asset Library, with a GIF of the demo.
+- overcast-godot: the screenshots, in a showcase thread.
