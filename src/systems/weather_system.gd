@@ -34,6 +34,7 @@ func _ready() -> void:
 	wet_ground = false  # until the map turns out to have a rain floor
 	soaks = not NetworkManager.is_online() or NetworkManager.is_host()  # a client draws its server's
 	drift_deepest = DRIFT_DEEPEST
+	snow_drifts = false  # off until they look right; the even layer still lies
 	flash_changed.connect(func(k: float) -> void: NightMode.set_flash(FLASH * k))
 	struck.connect(_on_struck)
 	super._ready()
