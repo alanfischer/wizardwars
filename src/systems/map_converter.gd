@@ -95,8 +95,9 @@ func convert(bsp_name: String) -> bool:
 		if not light_grid.is_empty():
 			root.set_meta("light_grid", light_grid)
 
-	if bsp.has_method("bake_rain_floor"):
-		var rain_floor: Dictionary = bsp.bake_rain_floor(16.0)
+	# Where rain lands: the first surface under the sky, per column.
+	if bsp.has_method("bake_surface_below_sky"):
+		var rain_floor: Dictionary = bsp.bake_surface_below_sky(16.0)
 		if not rain_floor.is_empty():
 			root.set_meta("rain_floor", rain_floor)
 

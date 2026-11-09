@@ -43,7 +43,7 @@ func _ready() -> void:
 			add_child(weather)
 			Game.weather_system = weather
 			if OS.get_environment("ICE") == "1":
-				weather.wetness = 1.0  # frozen hard, if TEMP is below freezing
+				weather.ground.wetness = 1.0  # frozen hard, if TEMP is below freezing
 			weather.settle()
 			weather.bake_drifts()
 		var spawn := {}
@@ -81,7 +81,7 @@ func _ready() -> void:
 			for k in 400:
 				var p := cam.global_position + look * (k * 0.25)
 				var ground: float = weather.floor_at(p)
-				var depth := weather.snow_depth_at(p)
+				var depth := weather.ground.snow_depth_at(p)
 				if ground >= p.y - 3.0 and depth > deepest:
 					deepest = depth
 					at = Vector3(p.x, ground, p.z)

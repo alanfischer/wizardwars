@@ -32,7 +32,7 @@ func _ready() -> void:
 	bolt_drawer = _draw_beam_bolt
 	light_from_sky = false  # NightMode's light, which knows the map's lightmaps
 	wet_ground = false  # until the map turns out to have a rain floor
-	soaks = not NetworkManager.is_online() or NetworkManager.is_host()  # a client draws its server's
+	ground.soaks = not NetworkManager.is_online() or NetworkManager.is_host()  # a client draws its server's
 	drift_deepest = DRIFT_DEEPEST
 	snow_drifts = false  # off until they look right; the even layer still lies
 	flash_changed.connect(func(light: Color) -> void: NightMode.set_flash(Vector3(light.r, light.g, light.b)))
@@ -59,7 +59,7 @@ func _ready() -> void:
 	_apply_wind()
 
 
-## The map's rain floor (MapConverter, GoldSrcBSP.bake_rain_floor), so no drop is drawn under a
+## The map's rain floor (MapConverter, GoldSrcBSP.bake_surface_below_sky), so no drop is drawn under a
 ## roof. A map converted before it existed has none: it rains everywhere and nothing gets wet.
 func _take_rain_floor(root: Node) -> void:
 	var data: Dictionary = root.get_meta("rain_floor", {})
@@ -111,7 +111,7 @@ func _keep_snow_off_liquids(root: Node) -> void:
 			var box := AABB(convex.points[0], Vector3.ZERO)
 			for p in convex.points:
 				box = box.expand(p)
-			add_snowless(piece.global_transform * box)
+			ground.add_snowless(piece.global_transform * box)
 
 
 ## A liquid volume: on MASK_WATER, or a func_water's Volume before FuncWater has put it there.
@@ -233,33 +233,33 @@ func _apply_night() -> void:
 func send_state_to(peer_id: int) -> void:
 	if _current_type != 0 or _current_intensity != 0:
 		set_weather.rpc_id(peer_id, _current_type, _current_intensity)
-	var ground := _shared_ground()
-	set_ground.rpc_id(peer_id, ground.x, ground.y, ground.z)
-	var cells := ice_cells()
+	var shared := _shared_ground()
+	set_ground.rpc_id(peer_id, shared.x, shared.y, shared.z)
+	var cells := ground.ice_cells()
 	if cells.size() > 0:
 		set_ice.rpc_id(peer_id, cells.size(), cells.compress(FileAccess.COMPRESSION_ZSTD))
-	cells = snow_cells()
+	cells = ground.snow_cells()
 	if cells.size() > 0:
 		set_snow.rpc_id(peer_id, cells.size(), cells.compress(FileAccess.COMPRESSION_ZSTD))
 
 
 ## The server's ground, which a client draws and goes by: it soaks, freezes and snows over none of
-## its own (`soaks`).
+## its own (`ground.soaks`).
 @rpc("authority", "call_remote", "reliable")
 func set_ground(w: float, frozen: float, snow: float) -> void:
-	wetness = w
-	ice = frozen
-	snow_cover = snow
+	ground.wetness = w
+	ground.ice = frozen
+	ground.snow_cover = snow
 
 
 @rpc("authority", "call_remote", "reliable")
 func set_ice(size: int, packed: PackedByteArray) -> void:
-	set_ice_cells(packed.decompress(size, FileAccess.COMPRESSION_ZSTD))
+	ground.set_ice_cells(packed.decompress(size, FileAccess.COMPRESSION_ZSTD))
 
 
 @rpc("authority", "call_remote", "reliable")
 func set_snow(size: int, packed: PackedByteArray) -> void:
-	set_snow_cells(packed.decompress(size, FileAccess.COMPRESSION_ZSTD))
+	ground.set_snow_cells(packed.decompress(size, FileAccess.COMPRESSION_ZSTD))
 
 
 ## Fire melts the snow and thaws the ice where it lands (`amount` > 0), cold freezes what is wet
@@ -268,33 +268,33 @@ static func heat_ground(at: Vector3, radius: float, amount := 1.0) -> void:
 	var weather := Game.weather_system
 	if weather == null or not NetworkManager.is_authority():
 		return
-	if weather.heat(at, radius, amount) and NetworkManager.is_online():
-		weather.heat.rpc(at, radius, amount)
+	if weather.ground.heat(at, radius, amount) and NetworkManager.is_online():
+		weather.take_heat.rpc(at, radius, amount)
 
 
 @rpc("authority", "call_remote", "reliable")
-func heat(at: Vector3, radius: float, amount := 1.0) -> bool:
-	return super.heat(at, radius, amount)
+func take_heat(at: Vector3, radius: float, amount: float) -> void:
+	ground.heat(at, radius, amount)
 
 
 ## The ground at `feet` for footing, alike on every peer: how wet and how icy, in the steps the
 ## server sends them in.
 func footing(feet: Vector3) -> Vector2:
-	return Vector2(wetness_at(feet), ice_at(feet)).snapped(Vector2.ONE / WET_STEPS)
+	return Vector2(ground.wetness_at(feet), ground.ice_at(feet)).snapped(Vector2.ONE / WET_STEPS)
 
 
 ## The ground's wetness, ice and snow cover, in the steps the server sends them in.
 func _shared_ground() -> Vector3:
-	return Vector3(wetness, ice, snow_cover).snapped(Vector3.ONE / WET_STEPS)
+	return Vector3(ground.wetness, ground.ice, ground.snow_cover).snapped(Vector3.ONE / WET_STEPS)
 
 
 func _share_ground() -> void:
-	var ground := _shared_ground()
-	if ground == _ground_sent:
+	var shared := _shared_ground()
+	if shared == _ground_sent:
 		return
-	_ground_sent = ground
+	_ground_sent = shared
 	if NetworkManager.is_online():
-		set_ground.rpc(ground.x, ground.y, ground.z)
+		set_ground.rpc(shared.x, shared.y, shared.z)
 
 
 ## The night darkens the rain and the haze the way it darkens the sky's light (NightMode).
@@ -309,7 +309,7 @@ func _process(delta: float) -> void:
 	# connection, so asked each frame.
 	var server := not NetworkManager.is_online() or NetworkManager.is_host()
 	times_strikes = server
-	soaks = server
+	ground.soaks = server
 	# GoldSrc drew no rain with the view underwater (v_waterlevel 3); the sound carries on.
 	underwater = listener != null and listener.has_method("head_underwater") and listener.head_underwater()
 	super._process(delta)
