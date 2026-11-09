@@ -352,6 +352,7 @@ func _ready() -> void:
 	_client_join = ClientJoinScript.new()
 	_client_join.name = "ClientJoin"
 	add_child(_client_join)
+	NetworkManager.register_sync_handler(_client_join)
 	_renderer_trial.log_active_renderer()
 	_parse_cmdline_args()
 	ClientCommandSystem.register("scale", _cmd_scale, "/scale [0.25-1.0]",
@@ -1038,11 +1039,6 @@ func _set_game_active(active: bool) -> void:
 			_vr_lobby_panel.reparent(_xr_rig_camera, false)
 			_vr_lobby_panel.position = Vector3(0.0, 0.0, -2.0)
 			_vr_lobby_panel.rotation = Vector3.ZERO
-
-
-## The server refused a team (full, no active spawn, class restricted).
-func _on_reject_team_join(team: int, reason: String) -> void:
-	_client_join.abandon("%s %s" % [GoalSystem.get_team_name(team), reason])
 
 
 func _on_disconnected(reason: String) -> void:

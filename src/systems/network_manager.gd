@@ -403,29 +403,27 @@ func is_authoritative_fire(attacker: Node3D) -> bool:
 	return not (is_online() and attacker is LocalPlayer)
 
 
-## Call a method on the current scene if it exists. Used to dispatch reliable RPCs.
-## The node answering the client-side sync events, registered by the scene that owns it
-## (src/systems/client_sync.gd, main.gd's child). A scene that registers nothing — a tool or a
-## probe harness — is dispatched to directly, exactly as before there was a handler to register.
-var _sync_handler: Node = null
+## The nodes answering the client-side sync events by name, each registered by the scene that owns
+## it (main.gd's ClientSync and ClientJoin). The first one with the method wins, newest first, so a
+## later registrant shadows an earlier one; one that has none falls through. A scene that registers
+## nothing — a tool or a probe harness — is dispatched to directly.
+var _sync_handlers: Array[Node] = []
 
 
 func register_sync_handler(node: Node) -> void:
-	_sync_handler = node
+	_sync_handlers.push_front(node)
 	node.tree_exiting.connect(unregister_sync_handler.bind(node), CONNECT_ONE_SHOT)
 
 
 func unregister_sync_handler(node: Node) -> void:
-	if _sync_handler == node:
-		_sync_handler = null
+	_sync_handlers.erase(node)
 
 
 func _dispatch_to_scene(method: StringName, args: Array = []) -> void:
-	# The sync handlers live on the registered handler; the rest of what is dispatched by name —
-	# the join and spawn handlers — is still the scene's own.
-	if is_instance_valid(_sync_handler) and _sync_handler.has_method(method):
-		_sync_handler.callv(method, args)
-		return
+	for h in _sync_handlers:
+		if is_instance_valid(h) and h.has_method(method):
+			h.callv(method, args)
+			return
 	var s := get_tree().current_scene
 	if s != null and s.has_method(method):
 		s.callv(method, args)

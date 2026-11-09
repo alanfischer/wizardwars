@@ -13,9 +13,11 @@ extends "res://src/tests/test_base.gd"
 ## by definition produces no call to observe. Only reading the text can see it.
 
 const NM_PATH := "res://src/systems/network_manager.gd"
-## Where handlers may live: client_sync owns the sync events, main still owns join/spawn/teleport.
+## Where handlers may live: client_sync owns the sync events, client_join the join refusal, and main
+## still owns spawn/teleport.
 const HANDLER_SOURCES: Array[String] = [
 	"res://src/systems/client_sync.gd",
+	"res://src/systems/client_join.gd",
 	"res://src/main.gd",
 ]
 

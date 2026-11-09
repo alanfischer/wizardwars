@@ -12,8 +12,9 @@ extends Node
 ## Offline is the same sequence with the round-trip removed: no server to ask, so the death,
 ## cleanup and respawn all apply locally.
 ##
-## Parented to main.gd as "ClientJoin". The RPC answers still arrive on main (_dispatch_to_scene
-## reaches the scene by name) and come back here through clear_watchdog() and abandon().
+## Parented to main.gd as "ClientJoin" and registered as a sync handler, so reject_team_join lands
+## here. assign_spawn still arrives on main, which owns the spawn, and comes back through
+## clear_watchdog().
 
 ## Outstanding request_join_team, so a lost one doesn't strand us (see _join_watchdog).
 const JOIN_WATCHDOG_DELAY := 4.0
@@ -138,10 +139,15 @@ func _join_team(lp: LocalPlayer, team: int) -> void:
 		push_warning("No active spawn point found for team %d" % team)
 
 
+## The server refused a team (full, no active spawn, class restricted).
+func _on_reject_team_join(team: int, reason: String) -> void:
+	_abandon("%s %s" % [GoalSystem.get_team_name(team), reason])
+
+
 ## The join didn't take — the server refused it, or never answered (_join_watchdog). Either way
 ## whoever asked is a spectator with the menu already dismissed and nothing on screen, so say why
 ## and put the menu back up behind the message.
-func abandon(message: String) -> void:
+func _abandon(message: String) -> void:
 	clear_watchdog()  # answered, or given up on; resending would only repeat it
 	if Game.hud:
 		Game.hud.show_center_message(message, Color(1.0, 0.3, 0.3), 3.0)
@@ -176,7 +182,7 @@ func _join_watchdog(seq: int, team: int, element: int) -> void:
 	if _pending_join_tries >= JOIN_MAX_RETRIES:
 		Log.warn("[Join] no answer for team %d (element=%d) after %d tries — reopening the menu (%s)"
 			% [team, element, _pending_join_tries, _link_report()])
-		abandon("Join failed — pick again")
+		_abandon("Join failed — pick again")
 		return
 	_pending_join_tries += 1
 	Log.warn("[Join] no answer for team %d (element=%d) after %.0fs — resending (try %d/%d) (%s)"
