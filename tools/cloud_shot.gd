@@ -4,7 +4,8 @@ extends Node3D
 ## for a wind to drift it (m/s, toward WIND_DIR degrees), MELT=1 to melt holes in it every 6 m as
 ## fireballs would (ICE=1 glazes the wet ground over first, so they thaw holes in it), FIRE=1 to light a fire satchel's spiral where the snow lies deepest under the
 ## "ground" view and shoot it before and after. PERF=1 instead prints the GPU frame time looking
-## up, with the volumetric clouds off and on.
+## up, with the volumetric clouds off and on. LOOK="yaw pitch [rise]" shoots one view instead, yaw
+## from the sun's, from rise metres over the spawn.
 
 func _ready() -> void:
 	ServerVars.set_from_string("dynamic_weather", "1")
@@ -112,6 +113,10 @@ func _ready() -> void:
 				print("PERF %s %v %s %.2f ms/frame" % [map_name, DisplayServer.window_get_size(), "volumetric" if vol else "flat", ms])
 			get_tree().quit()
 			return
+		if OS.get_environment("LOOK") != "":
+			var look := OS.get_environment("LOOK").split(" ")
+			cam.global_position.y += float(look[2]) if look.size() > 2 else 0.0
+			views = [[sun_yaw + float(look[0]), float(look[1]), "look"]]
 		for v in views:
 			cam.rotation_degrees = Vector3(v[1], v[0], 0)
 			await _shoot("%s/%s_%s.png" % [out, map_name, v[2]])
