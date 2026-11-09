@@ -113,19 +113,6 @@
   are platform the library can take by injection or ship itself, while Teams, Game and GoalSystem
   are gameplay that stays with the host.
 
-- Send sounds and `MSG_PAS` temp entities to the PAS. `VisibilityManager` has it now
-  (`is_position_audible_to_observer`, goldsrc-godot #77) and `VisibilitySystem.peers_hearing` picks
-  the peers, but nothing calls it yet. The original sent every non-static sound to the PAS
-  (`SV_StartSound`); the port has no occlusion, so today they play through walls: within
-  320u, 15% of sound pairs on ravine and ~6% on hunt and roc2 sit outside the PAS. Wire
-  `SoundSystem.play_3d`, the lightning cloud's zap (`send_entity_event`) and the staff's gunshot decal
-  (`DecalSystem.place_rpc`, a `call_local` broadcast today). Check how the original made the golem's
-  clap and steps before filtering them; the port carries them 40 m and 20 m on purpose. The
-  original's other `MSG_PAS` sends — spirit wizard beam, `env_bubbles`, `env_explosion`, the
-  earthquake satchel's torus — need their port paths checked too.
-- `VisibilitySystem` does two jobs: client render culling, and choosing which peers get a send
-  (`peers_seeing`, `peers_hearing`, the epochs). The second could be its own autoload.
-
 ## Library APIs (review 2026-11-09)
 
 Each item is a branch + PR in its own submodule, then a pin bump here. Done so far: Godot 4.7

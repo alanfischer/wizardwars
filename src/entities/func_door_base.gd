@@ -460,10 +460,15 @@ func _fire_target() -> void:
 		TriggerSystem.fire(target_key, self, TriggerSystem.Type.TOGGLE)
 
 
-func _play_door_sound(stream: AudioStream) -> void:
+## The original played a door's sounds and a plat or train's moving sound on CHAN_STATIC, to every
+## client; a plat or train stopping went on an ordinary channel, to the PAS.
+func _play_door_sound(stream: AudioStream, static_channel := true) -> void:
 	if not stream:
 		return
-	SoundSystem.play_3d(stream.resource_path, global_position)
+	if static_channel:
+		SoundSystem.play_3d_static(stream.resource_path, global_position)
+	else:
+		SoundSystem.play_3d(stream.resource_path, global_position)
 
 
 ## CBaseDoor::Blocked fires when the pushed entity couldn't be moved, which netmove already
