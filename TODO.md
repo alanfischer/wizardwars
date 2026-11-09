@@ -74,26 +74,13 @@
   SentenceSystem, BeamSystem, VisibilitySystem and SpatialQuery are platform the library can take by
   injection or ship itself, while Teams, Game and GoalSystem are gameplay that stays with the host.
 
-## Library APIs (review 2026-11-09)
+## Library releases
 
-Each item is a branch + PR in its own submodule, then a pin bump here.
-
-goldsrc-godot:
-
-- Split `GoldSrcBSP`: the light grid, sun fraction and rain floor bakers into their own classes
-  or files.
-- The rain floor is weather in an asset loader. It is a "first solid surface going down" query;
-  name it that.
-
-overcast-godot:
-
-- Split the ground state (snow, ice and wetness fields, and their net sync: three values, heat
-  events, the late-join cell grids) out of `OvercastWeather` into its own object.
-
-Then tag every library once, after the changes above, so each first or next release carries
-its final API: overcast-godot, pmove-godot, the hop core and the goldnet core have never been
-tagged; goldsrc-godot, hop-godot and goldnet-godot have moved past their last tags. Hold
-overcast's API a week or two without breaking changes before its tag. Pin WW at the tags.
+Tag every library once, so each first or next release carries its final API (the 2026-11-09
+API review's changes are in): overcast-godot, pmove-godot, the hop core and the goldnet core have
+never been tagged; goldsrc-godot, hop-godot and goldnet-godot have moved past their last tags.
+Hold overcast's API a week or two without breaking changes before its tag (its last break: the
+ground split, 2026-11-09). Pin WW at the tags.
 
 Promotion, once tagged:
 
