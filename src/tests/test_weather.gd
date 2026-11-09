@@ -262,7 +262,7 @@ func test_a_joining_client_takes_up_the_servers_snow() -> void:
 	server.temperature = -5.0
 	server.settle()
 	var at := Vector3(1.5, 0, 0.5)
-	assert_true(server.melt(at, 0.6), "the server melts its own snow")
+	assert_true(server.heat(at, 0.6), "the server melts its own snow")
 	var ground := server._shared_ground()
 	assert_eq(ground.z, 1.0, "and sends how far it has snowed over")
 	var cells := server.snow_cells()

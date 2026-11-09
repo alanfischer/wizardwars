@@ -35,7 +35,7 @@ func _ready() -> void:
 	soaks = not NetworkManager.is_online() or NetworkManager.is_host()  # a client draws its server's
 	drift_deepest = DRIFT_DEEPEST
 	snow_drifts = false  # off until they look right; the even layer still lies
-	flash_changed.connect(func(k: float) -> void: NightMode.set_flash(FLASH * k))
+	flash_changed.connect(func(light: Color) -> void: NightMode.set_flash(Vector3(light.r, light.g, light.b)))
 	struck.connect(_on_struck)
 	super._ready()
 	_light_drifts()
@@ -263,25 +263,17 @@ func set_snow(size: int, packed: PackedByteArray) -> void:
 
 
 ## Fire melts the snow and thaws the ice where it lands (`amount` > 0), cold freezes what is wet
-## there. Both are played on, so the server melts and heats and sends the ones that changed any.
+## there. Played on, so the server heats and sends the heats that changed any.
 static func heat_ground(at: Vector3, radius: float, amount := 1.0) -> void:
 	var weather := Game.weather_system
 	if weather == null or not NetworkManager.is_authority():
 		return
-	var online := NetworkManager.is_online()
-	if amount > 0.0 and weather.melt(at, radius, amount) and online:
-		weather.melt.rpc(at, radius, amount)
-	if weather.heat(at, radius, amount) and online:
+	if weather.heat(at, radius, amount) and NetworkManager.is_online():
 		weather.heat.rpc(at, radius, amount)
 
 
 @rpc("authority", "call_remote", "reliable")
-func melt(at: Vector3, radius: float, amount := 1.0) -> bool:
-	return super.melt(at, radius, amount)
-
-
-@rpc("authority", "call_remote", "reliable")
-func heat(at: Vector3, radius: float, amount: float) -> bool:
+func heat(at: Vector3, radius: float, amount := 1.0) -> bool:
 	return super.heat(at, radius, amount)
 
 
