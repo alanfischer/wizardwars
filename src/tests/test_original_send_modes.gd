@@ -97,6 +97,40 @@ func test_pas_send_without_a_map_reaches_everyone() -> void:
 	vs.free()
 
 
+func test_own_ear_is_held_to_the_pas() -> void:
+	var vs = load("res://src/systems/visibility_system.gd").new()
+	assert_true(vs.is_audible_locally(Vector3.ZERO), "no map: heard")
+	var stub := StubVM.new()
+	vs._vm = stub
+	vs._local_observer = 5
+	assert_true(vs.is_audible_locally(Vector3.ZERO), "no camera yet: heard")
+	vs._local_position_valid = true
+	assert_false(vs.is_audible_locally(Vector3.ZERO), "outside the camera's PAS: not heard")
+	stub.heard_by = {5: true}
+	assert_true(vs.is_audible_locally(Vector3.ZERO), "inside it: heard")
+	vs._vm = null
+	vs.free()
+
+
+## CHAN_STATIC went to every client, reliably; every other channel went to the PAS, unreliably.
+func test_static_channel_sounds_reach_everyone_reliably() -> void:
+	var ss: Script = SoundSystem.get_script()
+	assert_eq(_transfer_mode(ss, "_sync_sound_3d_static"), MultiplayerPeer.TRANSFER_MODE_RELIABLE, "CHAN_STATIC")
+	assert_eq(_transfer_mode(ss, "_sync_sound_3d"), MultiplayerPeer.TRANSFER_MODE_UNRELIABLE_ORDERED, "the rest")
+
+
+## Doors moved and stopped on CHAN_STATIC; plats and trains moved on it but stopped on
+## CHAN_WEAPON / CHAN_VOICE (CFuncPlat::HitTop and HitBottom, CFuncTrain::Wait).
+func test_mover_sounds_pick_the_original_channel() -> void:
+	for f in ["func_plat", "func_platrot", "func_train"]:
+		var src := FileAccess.get_file_as_string("res://src/entities/%s.gd" % f)
+		assert_false(src.contains("_play_door_sound(_stop_sound)"), "%s stops to the PAS" % f)
+		assert_true(src.contains("_play_door_sound(_stop_sound, false)"), "%s stops to the PAS" % f)
+		assert_false(src.contains("_play_door_sound(_move_sound, false)"), "%s moves on CHAN_STATIC" % f)
+	var base := FileAccess.get_file_as_string("res://src/entities/func_door_base.gd")
+	assert_false(base.contains("_play_door_sound(_stop_sound, false)"), "a door stops on CHAN_STATIC")
+
+
 func test_shake_picks_like_util_screenshake() -> void:
 	var origin := Vector3.ZERO
 	assert_true(NetworkManager.shakes(Vector3(5, 0, 0), true, origin, 10.0), "inside the radius")
@@ -163,7 +197,7 @@ func test_a_death_rides_the_unreliable_event() -> void:
 	assert_false(body.contains("publish(state)"), "not the reliable, parked push")
 
 
-## A sound reaches every peer through SoundSystem's broadcast, as GoldSrc sounds reached the PAS.
+## A sound reaches its PAS through SoundSystem, as GoldSrc sounds did, entity or not.
 ## Played from an entity event instead, it would go silent for a client that never had the entity.
 func test_event_handlers_leave_sound_to_the_broadcast() -> void:
 	for f in ["skeleton", "dragon", "wombat", "thornplant", "giant_plant", "lightning_cloud", "sheep", "spirit_wiz"]:
@@ -173,3 +207,25 @@ func test_event_handlers_leave_sound_to_the_broadcast() -> void:
 				continue
 			var body := src.split(handler)[1].split("\nfunc ")[0]
 			assert_false(body.contains("SoundSystem.play_3d"), "%s %s plays no sound of its own" % [f, handler])
+
+
+## Against the real VisibilityManager on ww_ravine: a spawn, the space under its floor (outside its
+## PAS), and a spot it cannot see but can hear.
+func test_pas_on_a_real_map() -> void:
+	var vs = load("res://src/systems/visibility_system.gd").new()
+	vs._vm = ClassDB.instantiate(&"VisibilityManager")
+	assert_true(vs._vm.setup("res://maps/ww_ravine.bsp", GameConsts.SCALE_FACTOR) > 0, "map loads")
+	vs._local_observer = vs._vm.add_observer(0, Vector3.ZERO)
+	var spawn := Vector3(-26.4, 49.6, 36.4)
+	var below := Vector3(-28.0, 45.0, 36.0)
+	var around := Vector3(-24.0, 45.0, 28.0)
+	vs.set_peer_position(2, spawn)
+	var peers := PackedInt32Array([2])
+	assert_eq(Array(vs.peers_hearing(spawn, peers)), [2], "a sound at the listener")
+	assert_eq(Array(vs.peers_hearing(below, peers)), [], "through the floor")
+	assert_eq(Array(vs.peers_hearing(around, peers)), [2], "around a corner")
+	assert_eq(Array(vs.peers_seeing(AABB(around, Vector3.ZERO), peers)), [], "which the PVS would drop")
+	vs.set_local_position(spawn)
+	assert_false(vs.is_audible_locally(below), "the local ear too")
+	vs.teardown()
+	vs.free()

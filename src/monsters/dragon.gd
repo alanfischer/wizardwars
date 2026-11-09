@@ -280,7 +280,7 @@ func _dragon_die() -> void:
 	if not gibbed and not _spawn_corpse(_model.global_position if _model else global_position):
 		gibbed = true  # no model, so no rig and no body: it bursts after all
 	_death_effect(pos, gibbed)
-	SoundSystem.play_3d("monster/dragon/dragon_die1.wav", pos)  # to every peer, event or not
+	SoundSystem.play_3d("monster/dragon/dragon_die1.wav", pos)  # to the PAS, event or not
 	# The corpse is replicated as its own entity, but the burst is a one-shot the clients have to
 	# be told about — so which of the two deaths it was rides with death_pos.
 	_entity.die_at(pos, {"gibbed": gibbed})
@@ -313,8 +313,8 @@ func _apply_sync_state(state: Dictionary) -> void:
 		_death_effect(state.death_pos, bool(state.get("gibbed", false)))
 
 
-## It comes apart, or it just stops. The cry isn't here: _dragon_die broadcasts it, so it reaches
-## every peer whether or not the death event does.
+## It comes apart, or it just stops. The cry isn't here: _dragon_die sends it, so it reaches
+## every peer in its PAS whether or not the death event does.
 func _death_effect(pos: Vector3, gibbed: bool) -> void:
 	var scene_root := get_tree().current_scene
 	if scene_root == null:

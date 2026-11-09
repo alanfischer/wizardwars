@@ -48,7 +48,7 @@ func _ready() -> void:
 
 func _door_hit_top() -> void:
 	state = State.AT_TOP
-	_play_door_sound(_stop_sound)
+	_play_door_sound(_stop_sound, false)
 	_fire_target()
 	if not _has_targetname and wait_time >= 0.0:
 		get_tree().create_timer(wait_time).timeout.connect(
@@ -60,7 +60,7 @@ func _door_hit_top() -> void:
 
 func _door_hit_bottom() -> void:
 	state = State.AT_BOTTOM
-	_play_door_sound(_stop_sound)
+	_play_door_sound(_stop_sound, false)
 	_fire_target()
 	_retouch()   # whoever it just landed under is still asking for it
 

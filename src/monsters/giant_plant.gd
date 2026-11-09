@@ -176,7 +176,7 @@ func _on_bite_finished(_anim_name: StringName) -> void:
 	_biting = false
 
 
-## Clients drive the model from NetInterp:net_anim, and the bite noise is a broadcast sound.
+## Clients drive the model from NetInterp:net_anim, and the bite noise is a PAS sound.
 func _apply_sync_state(state: Dictionary) -> void:
 	if "death_pos" in state:
 		_death_effect(state.death_pos)

@@ -2187,12 +2187,16 @@ func sync_entity_event(entity_id: int, event: Dictionary) -> void:
 		node._apply_sync_state(event)
 
 
-## sync_entity_event to the peers whose PVS reaches `near`, or to everyone when it is INF.
-func send_entity_event(entity_id: int, event: Dictionary, near := Vector3.INF) -> void:
+## sync_entity_event to the peers whose PVS reaches `near` (MSG_PVS), or whose PAS does when
+## `audible` (MSG_PAS), or to everyone when `near` is INF.
+func send_entity_event(entity_id: int, event: Dictionary, near := Vector3.INF, audible := false) -> void:
 	if not near.is_finite():
 		sync_entity_event.rpc(entity_id, event)
 		return
-	for peer_id in VisibilitySystem.peers_seeing(AABB(near, Vector3.ZERO), multiplayer.get_peers()):
+	var peers := multiplayer.get_peers()
+	peers = VisibilitySystem.peers_hearing(near, peers) if audible \
+			else VisibilitySystem.peers_seeing(AABB(near, Vector3.ZERO), peers)
+	for peer_id in peers:
 		sync_entity_event.rpc_id(peer_id, entity_id, event)
 
 

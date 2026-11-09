@@ -56,8 +56,8 @@ func publish(state: Dictionary) -> void:
 
 
 ## A one-shot effect — a bite, an attack. The original sent these as temp entities and sounds:
-## unreliable, to the PVS around `near` (MSG_PVS), or to everyone when `near` is INF (MSG_BROADCAST,
-## and MSG_PAS, which the port has no set for). A client without the entity drops it.
+## unreliable, to the PVS around `near` (MSG_PVS), or to everyone when `near` is INF (MSG_BROADCAST);
+## MSG_PAS is NetworkManager.send_entity_event's `audible`. A client without the entity drops it.
 func publish_event(event: Dictionary, near := Vector3.INF) -> void:
 	if entity_id >= 0 and NetworkManager.is_online():
 		NetworkManager.send_entity_event(entity_id, event, near)

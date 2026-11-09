@@ -393,6 +393,13 @@ func peers_hearing(pos: Vector3, peers: PackedInt32Array) -> PackedInt32Array:
 	return out
 
 
+## Whether this peer's own camera is in the PAS of `pos`. Fail-open before a map or a camera.
+func is_audible_locally(pos: Vector3) -> bool:
+	if not _vm or not _local_position_valid:
+		return true
+	return _vm.is_position_audible_to_observer(pos, _local_observer)
+
+
 ## Register a worldspawn spatial group using its pre-baked BSP leaf set.
 func track_node_by_leaves(node_id: int, node: Node3D, leaves: PackedInt32Array) -> void:
 	var handle := -1

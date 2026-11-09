@@ -120,11 +120,11 @@ func _arrive(was_sliding: bool) -> void:
 	if (corner_flags & SF_CORNER_WAIT_RETRIGGER) or (spawn_flags & SF_TRAIN_WAIT_RETRIGGER):
 		spawn_flags |= SF_TRAIN_WAIT_RETRIGGER
 		if was_sliding:
-			_play_door_sound(_stop_sound)
+			_play_door_sound(_stop_sound, false)
 		return
 	if _corner_wait > 0.0:
 		if was_sliding:
-			_play_door_sound(_stop_sound)
+			_play_door_sound(_stop_sound, false)
 		get_tree().create_timer(_corner_wait).timeout.connect(
 			func():
 				if is_instance_valid(self):
@@ -141,7 +141,7 @@ func _stop() -> void:
 		# Stopped mid-leg: re-target the corner we were heading for so a later
 		# trigger resumes toward it instead of skipping it (GoldSrc's pev->enemy).
 		_next_corner_name = _corner.ent.get("targetname", "")
-		_play_door_sound(_stop_sound)
+		_play_door_sound(_stop_sound, false)
 	state = State.AT_BOTTOM
 
 

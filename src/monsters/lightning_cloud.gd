@@ -109,7 +109,7 @@ func _zap() -> void:
 	_show_zap(hit)
 	SoundSystem.play_3d(ZAP_SOUND, global_position, 1.0, 0.0, 30.0)
 	if _entity_id >= 0 and NetworkManager.is_online():
-		NetworkManager.sync_entity_event.rpc(_entity_id, {"zap": hit})
+		NetworkManager.send_entity_event(_entity_id, {"zap": hit}, global_position, true)
 
 
 ## Everything it runs into takes 600 and it goes out with them — including a teammate who walks
@@ -129,8 +129,8 @@ func _burst(struck: Object) -> void:
 
 
 ## Zap and burst are one-shot events, not properties that converge — a zap landing between two
-## acks would simply be lost if it rode the synchronizer. Unreliable, as the original's TE_BEAMENTS
-## zap was (MSG_PAS); the burst is the port's own.
+## acks would simply be lost if it rode the synchronizer. Unreliable and to the PAS, as the
+## original's TE_BEAMENTS zap was (MSG_PAS); the burst is the port's own.
 func _apply_sync_state(state: Dictionary) -> void:
 	if "zap" in state:
 		_show_zap(state.zap)

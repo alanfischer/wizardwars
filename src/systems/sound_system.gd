@@ -2,7 +2,7 @@ extends Node
 # SoundSystem — plays positional and global audio with automatic network sync.
 #
 # Use play_3d() to play a sound at a world position. When online, the host
-# broadcasts the sound to all clients so everyone hears it.
+# sends it to the clients whose PAS reaches it, as the original sent its sounds.
 # Use play_global() for non-positional sounds (e.g. PotatoC PlaySound).
 
 const AudioSettings = preload("res://src/systems/audio_settings.gd")
@@ -181,19 +181,36 @@ func _get_or_load(sound_path: String) -> AudioStream:
 	return stream
 
 
-## Play a 3D sound at the given world position, synced to all peers.
+## Play a 3D sound at the given world position, for everyone whose PAS reaches it: GoldSrc sent
+## every sound but CHAN_STATIC only there, and with no occlusion here it would otherwise carry
+## through walls. The authority's own ear is held to the same rule.
 ## volume_db / max_dist default to the room-scale one-shot profile; raise both for
 ## big world events (a golem clap) that should carry beyond the room they happen in.
 func play_3d(sound_path: String, pos: Vector3, pitch := 1.0, volume_db := 0.0, max_dist := DEFAULT_MAX_DIST) -> void:
-	play_3d_local(sound_path, pos, pitch, volume_db, max_dist)
+	if not NetworkManager.is_authority() or VisibilitySystem.is_audible_locally(pos):
+		play_3d_local(sound_path, pos, pitch, volume_db, max_dist)
 	if NetworkManager.is_online() and NetworkManager.is_host():
-		_sync_sound_3d.rpc(sound_path, pos, pitch, volume_db, max_dist)
+		for peer_id in VisibilitySystem.peers_hearing(pos, multiplayer.get_peers()):
+			_sync_sound_3d.rpc_id(peer_id, sound_path, pos, pitch, volume_db, max_dist)
+
+
+## play_3d for the original's CHAN_STATIC sounds — a door or plat on the move — which went to every
+## client, reliably.
+func play_3d_static(sound_path: String, pos: Vector3) -> void:
+	play_3d_local(sound_path, pos)
+	if NetworkManager.is_online() and NetworkManager.is_host():
+		_sync_sound_3d_static.rpc(sound_path, pos)
 
 
 ## Play a 3D sound on this peer only — for events that already carry their own RPC, where
 ## play_3d would sync the sound a second time.
 func play_3d_local(sound_path: String, pos: Vector3, pitch := 1.0, volume_db := 0.0, max_dist := DEFAULT_MAX_DIST) -> void:
 	_play_local(sound_path, pos, pitch, volume_db, max_dist)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _sync_sound_3d_static(sound_path: String, pos: Vector3) -> void:
+	_play_local(sound_path, pos)
 
 
 @rpc("authority", "call_remote", "unreliable_ordered")

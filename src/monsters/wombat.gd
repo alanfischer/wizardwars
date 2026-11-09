@@ -352,7 +352,7 @@ func take_damage(amount: float, type: int = GameConsts.DamageType.PHYSICAL, atta
 func _die() -> void:
 	var pos := global_position
 	_death_effect(pos)
-	SoundSystem.play_3d(BITE_SOUNDS[0], pos, 0.5)  # to every peer, whether or not the event reaches them
+	SoundSystem.play_3d(BITE_SOUNDS[0], pos, 0.5)  # to the PAS, whether or not the event reaches them
 	_summon.die_at(pos)
 
 
