@@ -18,14 +18,9 @@
   policy. Main's remaining calls are the two setters, `build_menu`, `teardown_menu`, `start_game`,
   the two opens and `clear_watchdog`.
 
-  Next: **map load/unload** (`_load_map` 681, `_unload_map` 821), the larger one. Note what
-  ClientJoin exposed about it — `_unload_map`'s `keep` list is now eleven entries and every peel
-  adds one, which is the shape of a "persistent children" registry rather than a literal. Two
-  designs for that registry that do NOT work, checked: snapshotting `get_children()` at the end of
-  `_ready` would catch all eleven, but `_ready` can tail-call `_on_lobby_host` (465) under `--host`,
-  which loads a map, so the snapshot would have to be taken mid-`_ready`; and reparenting them
-  under a `Systems` container breaks both spawners, whose `spawn_path` is pinned to `..` = Main
-  (1648). A group marker or an `_add_system(node)` helper that records as it parents survives both.
+  Next: **map load/unload** (`_load_map`, `_unload_map`), the larger one. The persistent-children
+  registry it needed is done: `_add_system(node)` records main's long-lived children as it parents
+  them, and `_unload_map` frees everything else.
 
 - Retire the offline class-change path's private copy of a mechanism `Player` already has.
   `client_join.gd`'s `_queue_local_class_change` / `_on_local_class_change_timeout` reach into

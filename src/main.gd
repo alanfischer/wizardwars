@@ -135,6 +135,9 @@ var _auto_fire := false  # --auto-fire: test hook — local player attacks conti
 var _auto_fire_slot := 1  # --auto-fire-slot <idx>: which weapon slot auto-fire uses
 var _admin_password := ""  # --admin-password / WW_ADMIN_PASSWORD: enables /auth
 var _renderer_applied := false  # --renderer-applied: this process is already the relaunch
+## Main's children that outlive a map, recorded by _add_system as they are parented. _unload_map
+## frees every other child.
+var _systems: Array[Node] = []
 ## Renderer preference, trial marker and the relaunch that applies them (src/systems/renderer_trial.gd).
 var _renderer_trial: Node
 ## The server-told-us-something handlers (src/systems/client_sync.gd).
@@ -332,23 +335,24 @@ func _current_environment() -> Environment:
 func _ready() -> void:
 	KeyBindings.ensure_applied()
 	RenderingServer.set_debug_generate_wireframes(true)
+	_systems.append($XRRig)
 	_renderer_trial = RendererTrialScript.new()
 	_renderer_trial.name = "RendererTrial"
-	add_child(_renderer_trial)
+	_add_system(_renderer_trial)
 	_client_sync = ClientSyncScript.new()
 	_client_sync.name = "ClientSync"
 	_client_sync.bind(self)
-	add_child(_client_sync)
+	_add_system(_client_sync)
 	NetworkManager.register_sync_handler(_client_sync)
 	# Before _parse_cmdline_args: --perf-log and /perf are the same feature reached two ways, and
 	# the flag goes through the same setter, so the node has to exist by the time flags are read.
 	_client_perf = ClientPerfScript.new()
 	_client_perf.name = "ClientPerf"
 	_client_perf.bind(self, _renderer_trial)
-	add_child(_client_perf)
+	_add_system(_client_perf)
 	_client_join = ClientJoinScript.new()
 	_client_join.name = "ClientJoin"
-	add_child(_client_join)
+	_add_system(_client_join)
 	NetworkManager.register_sync_handler(_client_join)
 	_renderer_trial.log_active_renderer()
 	_parse_cmdline_args()
@@ -360,7 +364,7 @@ func _ready() -> void:
 		return  # relaunching; this process is on its way out
 	ServerVars.value_changed.connect(_on_server_var_changed)
 	_weather_cycle = WeatherCycle.new()
-	add_child(_weather_cycle)
+	_add_system(_weather_cycle)
 	if not _bsp_hulls_arg.is_empty():
 		var r: Dictionary = ServerVars.set_from_string("bsp_hulls", _bsp_hulls_arg)
 		if not r["ok"]:
@@ -379,17 +383,17 @@ func _ready() -> void:
 	_map_converter = Node.new()
 	_map_converter.set_script(MapConverter)
 	_map_converter.name = "MapConverter"
-	add_child(_map_converter)
+	_add_system(_map_converter)
 
 	_resource_converter = Node.new()
 	_resource_converter.set_script(ResourceConverter)
 	_resource_converter.name = "ResourceConverter"
-	add_child(_resource_converter)
+	_add_system(_resource_converter)
 
 	_blender_map_converter = Node.new()
 	_blender_map_converter.set_script(BlenderMapConverterScript)
 	_blender_map_converter.name = "BlenderMapConverter"
-	add_child(_blender_map_converter)
+	_add_system(_blender_map_converter)
 
 	NetworkManager.disconnected.connect(_on_disconnected)
 	NetworkManager.peer_connected.connect(_on_peer_connected)
@@ -431,7 +435,7 @@ func _ready() -> void:
 			_xr_rig_camera.add_child(_vr_lobby_panel)
 			_vr_lobby_panel.position = Vector3(0.0, 0.0, -2.0)
 		else:
-			add_child(_vr_lobby_panel)
+			_add_system(_vr_lobby_panel)
 		_vr_lobby_panel.add_ui(_lobby)
 
 		for ctrl in [_xr_right_controller, _xr_left_controller]:
@@ -450,7 +454,7 @@ func _ready() -> void:
 			laser.position = Vector3(0.0, 0.0, -2.0)
 			ctrl.add_child(laser)
 	else:
-		add_child(_lobby)
+		_add_system(_lobby)
 
 	_lobby.host_pressed.connect(_on_lobby_host)
 	_lobby.join_pressed.connect(_on_lobby_join)
@@ -834,6 +838,12 @@ func _load_map(map_name: String) -> void:
 
 
 
+## add_child for a node that lives as long as main does; see _systems.
+func _add_system(node: Node) -> void:
+	_systems.append(node)
+	add_child(node)
+
+
 ## The map .scn stays cached, so its meshes outlive the nodes that drew them, but a per-instance
 ## override material dies with its node — leaving RenderingServer reading a freed RID ("material is null").
 func _release_override_materials(node: Node) -> void:
@@ -857,15 +867,11 @@ func _unload_map() -> void:
 	if _vr_hud_panel:
 		_vr_hud_panel.queue_free()
 		_vr_hud_panel = null
-	# Everything here is init-time infrastructure: built once and never recreated, so freeing it
-	# leaves main.gd holding a freed instance for the rest of the session. The spawners dangle on
-	# the next spawn(); ClientSync also drops its NetworkManager registration (tree_exiting),
-	# killing sync dispatch for good. ClientPerf deliberately outlives a map change, overlay and all.
-	var keep := [_lobby, _map_converter, _resource_converter, _blender_map_converter, _xr_rig,
-			_player_spawner, _dyn_spawner, _client_sync, _renderer_trial, _client_perf,
-			_client_join, _weather_cycle]
+	# A system is built once and never recreated, so freeing one would leave main holding a freed
+	# instance for the session: the spawners dangle on the next spawn(), and ClientSync drops its
+	# NetworkManager registration (tree_exiting), killing sync dispatch for good.
 	for child in get_children():
-		if child in keep:
+		if child in _systems:
 			continue
 		_release_override_materials(child)
 		child.queue_free()
@@ -1661,7 +1667,7 @@ func _setup_player_spawner() -> void:
 	_player_spawner.add_spawnable_scene("res://src/remote_player.tscn")
 	_player_spawner.spawned.connect(_on_puppet_spawned)
 	_player_spawner.despawned.connect(_on_puppet_despawned)
-	add_child(_player_spawner)
+	_add_system(_player_spawner)
 
 	# Dynamic-entity spawner: custom spawn only (no registered scene), so the client runs
 	# _spawn_dyn_entity(data) to rebuild the projectile/plant from its script_path.
@@ -1672,7 +1678,7 @@ func _setup_player_spawner() -> void:
 	# Clients only (doesn't fire on the authority): an entity landing can complete an RPC that
 	# named it before it existed, e.g. a dragon mount.
 	_dyn_spawner.spawned.connect(_on_dyn_entity_spawned)
-	add_child(_dyn_spawner)
+	_add_system(_dyn_spawner)
 
 
 func _on_dyn_entity_spawned(_node: Node) -> void:
