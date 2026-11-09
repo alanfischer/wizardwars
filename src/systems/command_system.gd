@@ -795,7 +795,7 @@ func _temperature_text() -> String:
 	var text := "%s °C" % degrees
 	var weather := Game.weather_system
 	if weather:
-		var share := weather.snow_share()
+		var share := weather.snow_share
 		text += ", what falls is " + ("snow" if share >= 1.0 else ("rain" if share <= 0.0 else "sleet"))
 	return text
 
