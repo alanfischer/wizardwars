@@ -2,7 +2,7 @@ extends Node3D
 ## Renders the procedural sky's clouds from a map's spawn. OUT=dir, MAPS=a,b, STORM=0, VOL=1 for
 ## the volumetric (High quality) clouds, RAIN=0.8 for rain, SNOW=1 for it to fall as snow, WIND=8
 ## for a wind to drift it (m/s, toward WIND_DIR degrees), MELT=1 to melt holes in it every 6 m as
-## fireballs would, FIRE=1 to light a fire satchel's spiral where the snow lies deepest under the
+## fireballs would (ICE=1 glazes the wet ground over first, so they thaw holes in it), FIRE=1 to light a fire satchel's spiral where the snow lies deepest under the
 ## "ground" view and shoot it before and after. PERF=1 instead prints the GPU frame time looking
 ## up, with the volumetric clouds off and on.
 
@@ -41,6 +41,8 @@ func _ready() -> void:
 			weather.map_root = map
 			add_child(weather)
 			Game.weather_system = weather
+			if OS.get_environment("ICE") == "1":
+				weather.wetness = 1.0  # frozen hard, if TEMP is below freezing
 			weather.settle()
 			weather.bake_drifts()
 		var spawn := {}
@@ -63,8 +65,8 @@ func _ready() -> void:
 			var cell := f.size / Vector2(dims)
 			for j in range(0, dims.y, ceili(6.0 / cell.y)):
 				for i in range(0, dims.x, ceili(6.0 / cell.x)):
-					weather.melt(Vector3(f.origin.x + (i + 0.5) * cell.x, f.image.get_pixel(i, j).r,
-						f.origin.z + (j + 0.5) * cell.y), 1.5)
+					WeatherSystem.heat_ground(Vector3(f.origin.x + (i + 0.5) * cell.x,
+						f.image.get_pixel(i, j).r, f.origin.z + (j + 0.5) * cell.y), 1.5)
 		var views := [[sun_yaw + 180.0, 20.0, "away"], [sun_yaw, 15.0, "sun"],
 			[sun_yaw + 90.0, 55.0, "up"], [sun_yaw + 90.0, 8.0, "horizon"],
 			[sun_yaw + 180.0, -30.0, "ground"]]

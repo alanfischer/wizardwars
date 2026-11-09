@@ -74,6 +74,8 @@ func _register_defaults() -> void:
 	register("dynamic_wind", true, Type.BOOL)
 	# Ground friction on soaked ground, as a fraction of dry (1 = off); damp ground is between.
 	register("wet_friction", 0.85, Type.FLOAT)
+	# And on ground the wet has frozen over: below freezing, or where an ice spell landed on it.
+	register("ice_friction", 0.25, Type.FLOAT)
 
 
 func register(key: String, default_value, type: int, replicate: bool = true) -> void:

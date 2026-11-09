@@ -16,7 +16,7 @@ const HIT_SOUND := "spells/combos/meteor_hit.wav"
 ## Layered under the first meteor of a strike only — three of these on one tick is mud, one is
 ## the floor dropping out.
 const BOOM_SOUND := "ambience/biggun3.wav"
-const SNOW_MELT := 3.5  # metres of lying snow it melts round it
+const HEAT_RADIUS := 3.5  # metres round it the blast melts the snow and thaws the ice
 
 var _effect := EffectBehavior.new()
 var _boom := false
@@ -55,4 +55,4 @@ func _build() -> void:
 
 func _ready() -> void:
 	_effect.start()
-	WeatherSystem.melt_snow(global_position, SNOW_MELT)
+	WeatherSystem.heat_ground(global_position, HEAT_RADIUS)

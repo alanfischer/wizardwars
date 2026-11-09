@@ -4,6 +4,9 @@ extends Projectile
 ## Ice shard — straight-line flight, direct hit damage (no splash). ICE damage
 ## auto-applies frost via StatusSystem.
 
+## The wet ground a shard freezes over round where it lands.
+const GROUND_FREEZE_RADIUS := 1.5
+
 var damage := 10.0
 
 var _model: Node3D
@@ -62,6 +65,7 @@ func _on_actor_hit(victim) -> void:
 ## _fly_step has already put us at the impact point, so the shatter goes where we are.
 func _hit() -> void:
 	_spawn_hit_effect(global_position)
+	WeatherSystem.heat_ground(global_position, GROUND_FREEZE_RADIUS, -1.0)
 	_die()
 
 

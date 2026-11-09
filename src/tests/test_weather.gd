@@ -165,10 +165,11 @@ func test_the_maps_surfaces_pool_by_their_material() -> void:
 func test_the_server_sends_the_grounds_wetness_in_steps() -> void:
 	var weather := _roofed_weather()
 	weather.wetness = 0.51
-	weather._share_wetness()
-	assert_eq(weather._wet_sent, 0.5, "to the nearest step")
-	assert_eq(weather.wet_at(Vector3(1, 0, 0)), 0.5, "out in the rain the ground is that wet")
-	assert_eq(weather.wet_at(Vector3(-1, 0, 0)), 0.0, "under the roof it is dry")
+	weather.ice = 0.26
+	weather._share_ground()
+	assert_eq(weather._ground_sent, Vector2(0.5, 0.25), "to the nearest step")
+	assert_eq(weather.footing(Vector3(1, 0, 0)).x, 0.5, "out in the rain the ground is that wet")
+	assert_eq(weather.footing(Vector3(-1, 0, 0)), Vector2.ZERO, "under the roof it is dry")
 	weather.free()
 
 
@@ -176,15 +177,16 @@ func test_the_server_sends_the_grounds_wetness_in_steps() -> void:
 func test_a_client_draws_and_goes_by_the_servers_wetness() -> void:
 	var weather := _roofed_weather()
 	weather.wetness = 0.2
-	weather.set_ground_wetness(0.5)
+	weather.set_ground(0.5, 0.25)
 	assert_eq(weather.wetness, 0.5, "it draws the server's ground")
-	assert_eq(weather.wet_at(Vector3(1, 0, 0)), 0.5, "and its footing is the server's")
+	assert_eq(weather.ice, 0.25, "frozen as far")
+	assert_eq(weather.footing(Vector3(1, 0, 0)).x, 0.5, "and its footing is the server's")
 	weather.free()
 
 
 func test_soaked_ground_is_slick_and_stacks_with_frost() -> void:
 	var weather := _roofed_weather()
-	weather.set_ground_wetness(1.0)
+	weather.set_ground(1.0, 0.0)
 	var was: WeatherSystem = Game.weather_system
 	Game.weather_system = weather
 	var body := Node3D.new()
@@ -205,6 +207,53 @@ func test_soaked_ground_is_slick_and_stacks_with_frost() -> void:
 	Game.weather_system = was
 	body.free()
 	weather.free()
+
+
+func test_ice_spells_freeze_wet_ground_slick_and_fire_thaws_it() -> void:
+	var weather := _roofed_weather()
+	weather.set_ground(1.0, 0.0)
+	var was: WeatherSystem = Game.weather_system
+	Game.weather_system = weather
+	var body := Node3D.new()
+	var ctx := PlayerMovementContext.new(body, null, null)
+	var state := Movement.MovementState.new()
+	state.position = Vector3(1.5, 0, 0.5)
+	var wet := float(ServerVars.get_value("wet_friction", 1.0))
+	var icy := float(ServerVars.get_value("ice_friction", 1.0))
+	assert_lt(icy, wet, "ice is slicker than wet")
+	WeatherSystem.heat_ground(state.position, IceShard.GROUND_FREEZE_RADIUS, -1.0)
+	assert_eq(weather.footing(state.position).y, 1.0, "a shard freezes the wet ground over")
+	var mods := Movement.MovementModifiers.new()
+	ctx._slick_when_wet(mods, state)
+	assert_almost_eq(mods.friction_scale, icy, 1e-6, "and it is ice to walk on")
+	NetworkManager.test_authority = NetworkManager.TestAuthority.CLIENT
+	WeatherSystem.heat_ground(state.position, 2.0)
+	NetworkManager.test_authority = NetworkManager.TestAuthority.REAL
+	assert_eq(weather.footing(state.position).y, 1.0, "a client's own blast leaves the server's ice be")
+	WeatherSystem.heat_ground(state.position, 2.0)
+	mods = Movement.MovementModifiers.new()
+	ctx._slick_when_wet(mods, state)
+	assert_almost_eq(mods.friction_scale, wet, 1e-6, "fire thaws it back to wet")
+	weather.set_ground(0.0, 0.0)
+	WeatherSystem.heat_ground(state.position, IceShard.GROUND_FREEZE_RADIUS, -1.0)
+	assert_eq(weather.footing(state.position), Vector2.ZERO, "dry ground has nothing to freeze")
+	Game.weather_system = was
+	body.free()
+	weather.free()
+
+
+func test_a_joining_client_takes_up_the_servers_ice() -> void:
+	var server := _roofed_weather()
+	server.wetness = 1.0
+	server.heat(Vector3(1.5, 0, 0.5), 0.6, -1.0)
+	var cells := server.ice_cells()
+	var client := _roofed_weather()
+	client.set_ice(cells.size(), cells.compress(FileAccess.COMPRESSION_ZSTD))
+	client.set_ground(1.0, 0.0)
+	assert_eq(client.footing(Vector3(1.5, 0, 0.5)).y, 1.0, "frozen where the server's is")
+	assert_eq(client.footing(Vector3(0.5, 0, 0.5)).y, 0.0, "and not where it is not")
+	server.free()
+	client.free()
 
 
 func test_the_temperature_var_turns_the_fall_to_snow() -> void:
@@ -275,8 +324,10 @@ func test_fire_melts_the_lying_snow_where_it_lands() -> void:
 	Game.weather_system = weather
 	var at := Vector3(5.5, 0.0, 3.5)
 	assert_almost_eq(weather.snow_depth_at(at), WeatherSystem.DRIFT_LAYER, 1e-4, "snowed over")
-	WeatherSystem.melt_snow(at, 2.0)
-	assert_eq(weather.snow_depth_at(at), 0.0, "bare where the fire landed")
+	NetworkManager.test_authority = NetworkManager.TestAuthority.CLIENT
+	WeatherSystem.heat_ground(at, 2.0)
+	NetworkManager.test_authority = NetworkManager.TestAuthority.REAL
+	assert_eq(weather.snow_depth_at(at), 0.0, "bare where the fire landed, on a client too")
 	assert_almost_eq(weather.snow_depth_at(Vector3(9.5, 0.0, 3.5)), WeatherSystem.DRIFT_LAYER, 1e-4,
 		"and snowed over past its reach")
 	Game.weather_system = was

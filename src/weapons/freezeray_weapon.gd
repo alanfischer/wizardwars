@@ -7,6 +7,9 @@ const DAMAGE := 5.0
 const COOLDOWN := 0.25
 const MANA_COST := 4.0
 const MANA_DRAIN := 1.0
+## Each pulse freezes this share of the wet ground this far round where it lands.
+const GROUND_FREEZE := 0.35
+const GROUND_FREEZE_RADIUS := 1.0
 
 
 func _init() -> void:
@@ -40,6 +43,10 @@ func stop_firing(attacker: Node3D, _secondary: bool = false) -> void:
 
 func _apply_ray_hit(attacker: Node3D, target: Node, damage_mult: float = 1.0) -> void:
 	target.take_damage(DAMAGE * damage_mult, GameConsts.DamageType.ICE, attacker)
+
+
+func _on_ray_impact(at: Vector3) -> void:
+	WeatherSystem.heat_ground(at, GROUND_FREEZE_RADIUS, -GROUND_FREEZE)
 
 
 func fire(attacker: Node3D, aim_from: Vector3 = Vector3.INF, aim_dir: Vector3 = Vector3.ZERO, _charge_percent: float = 0.0, secondary: bool = false) -> bool:
