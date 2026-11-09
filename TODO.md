@@ -130,7 +130,7 @@ goldnet-godot's Usage first with `GoldNetMultiplayer.new()`, hop's pipeline priv
 classes prefixed (goldsrc-godot #74, goldnet-godot #52, hop #110, hop-godot #83,
 pmove-godot #16, WW #48); `GoldSrcBSP` and `GoldSrcMDL` as RefCounted loaders whose
 `build_scene()` returns the finished scene, MDL skins and sequences included, and team skins
-that apply and take the map's lighting (goldsrc-godot #75, WW #50).
+that apply and take the map's lighting (goldsrc-godot #75 and #76, WW #50).
 
 goldsrc-godot:
 
