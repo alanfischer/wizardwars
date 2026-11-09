@@ -136,7 +136,6 @@ func _run() -> void:
 				BAKE_WARMUP_SEC, now.size(), moved.size(), dropped.size()])
 
 	var bsp := GoldSrcBSP.new()
-	add_child(bsp)
 	if bsp.load_bsp("res://maps/%s.bsp" % map_name) != OK:
 		push_error("[NavSpike] cannot load %s" % map_name)
 		get_tree().quit(1)

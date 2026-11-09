@@ -21,24 +21,14 @@ func load_model(rel_path: String) -> Node3D:
 			var scene: PackedScene = load(native_path)
 			if scene:
 				model = scene.instantiate()
-	# Fallback to C++ plugin (host-only) — extract to plain Node3D so no runtime
-	# C++ dependency remains, matching the resource_converter.gd conversion path.
+	# Fallback to C++ plugin (host-only): the same plain Node3D resource_converter.gd saves.
 	if not model and ClassDB.class_exists(&"GoldSrcMDL"):
 		var full_path := "res://" + rel_path
 		var mdl = ClassDB.instantiate(&"GoldSrcMDL")
 		mdl.set_scale_factor(GameConsts.SCALE_FACTOR)
 		if mdl.load_mdl(full_path) == OK:
-			mdl.build_model()
-			var root := Node3D.new()
-			root.name = rel_path.get_file().get_basename()
-			root.rotation_degrees.y = 90.0
-			for child in mdl.get_children().duplicate():
-				mdl.remove_child(child)
-				root.add_child(child)
-			mdl.free()
-			model = root
+			model = mdl.build_scene()
 		else:
-			mdl.free()
 			push_warning("AssetLoader.load_model: failed to load %s" % full_path)
 	if not model:
 		push_warning("AssetLoader.load_model: no native scene and no plugin for %s" % rel_path)
@@ -52,14 +42,10 @@ func load_model(rel_path: String) -> Node3D:
 	return model
 
 
-## Apply a team skin to a model. Works with both GoldSrcMDL (plugin) and .scn (converted).
+## Apply a team skin to a model: its skin materials ride as metadata on its MeshInstance3Ds.
 func set_model_skin(model: Node3D, family: int) -> void:
 	if family <= 0 or DisplayServer.get_name() == "headless":
 		return
-	if model.has_method("set_skin"):
-		model.set_skin(family)
-		return
-	# Converted .scn path — skin materials stored as metadata on MeshInstance3D nodes
 	_apply_skin_recursive(model, family)
 
 
@@ -284,13 +270,28 @@ func _apply_mdl_overbright(node: Node, scale: float) -> void:
 				var mat := mesh.surface_get_material(surf_idx)
 				if mat is StandardMaterial3D and not _is_emissive_material(mat):
 					mesh.surface_set_material(surf_idx, _std_to_acube_material(mat, scale))
-			# Also convert skin override materials stored as metadata
-			for key in child.get_meta_list():
-				if key.begins_with("skin_"):
-					var skin_mat = child.get_meta(key)
-					if skin_mat is StandardMaterial3D:
-						child.set_meta(key, _std_to_acube_material(skin_mat, scale))
+			_convert_skin_metas(child, scale)
 		_apply_mdl_overbright(child, scale)
+
+
+## The skin families stored as metadata get the same ambient cube material as the base surfaces,
+## or a team skin is lit by Godot's lights instead of the map's. A skin is one material per
+## surface; a .scn converted before models merged their meshes holds a single material.
+func _convert_skin_metas(mi: MeshInstance3D, scale: float) -> void:
+	for key in mi.get_meta_list():
+		if not key.begins_with("skin_"):
+			continue
+		var stored = mi.get_meta(key)
+		if stored is Array:
+			mi.set_meta(key, stored.map(func(m): return _to_acube(m, scale)))
+		else:
+			mi.set_meta(key, _to_acube(stored, scale))
+
+
+func _to_acube(mat: Material, scale: float) -> Material:
+	if mat is StandardMaterial3D and not _is_emissive_material(mat):
+		return _std_to_acube_material(mat, scale)
+	return mat
 
 
 ## Load sprite frames: the pck's imported scene, then pre-converted PNGs (sprites the pck lacks),

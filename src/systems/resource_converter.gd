@@ -10,7 +10,7 @@ signal conversion_complete(success: bool)
 
 ## Bump whenever the MDL pipeline's output changes, so cached models reconvert instead of
 ## keeping the shape an older importer built — the cache keys off this, not off the .mdl.
-const MDL_CACHE_VERSION := 1
+const MDL_CACHE_VERSION := 2
 const MDL_VERSION_META := &"cache_version"
 const MDL_VERSION_PROPERTY := "metadata/cache_version"  # how the meta is named in packed state
 
@@ -83,64 +83,20 @@ func _convert_mdl(mdl_path: String, out_path: String) -> bool:
 	mdl.set_scale_factor(GameConsts.SCALE_FACTOR)
 	if mdl.load_mdl(mdl_path) != OK:
 		push_warning("ResourceConverter: failed to load %s" % mdl_path)
-		mdl.free()
 		return false
-	mdl.build_model()
-
-	# Reparent children to a plain Node3D (no GDExtension dependency)
-	var root := Node3D.new()
-	root.name = mdl_path.get_file().get_basename()
-	# GoldSrc models face -Z after axis swizzle; rotate to match old .scn orientation
-	root.rotation_degrees.y = 90.0
-
-	# Copy sequence metadata if available
-	if mdl.has_method("get_sequence_count"):
-		var seq_count: int = mdl.get_sequence_count()
-		var sequences := []
-		for i in seq_count:
-			sequences.append({
-				"name": mdl.get_sequence_name(i),
-				"fps": mdl.get_sequence_fps(i),
-				"num_frames": mdl.get_sequence_num_frames(i),
-			})
-		root.set_meta("sequences", sequences)
-
-	# Capture skin materials before reparenting (while mdl still owns meshes)
-	var skin_count: int = mdl.get_skin_count() if mdl.has_method("get_skin_count") else 0
-	if skin_count > 1 and mdl.has_method("get_skin_info"):
+	if mdl.get_skin_count() > 1:
 		Log.info("ResourceConverter: %s skin info:\n%s" % [mdl_path.get_file(), mdl.get_skin_info()])
-	if skin_count > 1:
-		for family in range(1, skin_count):
-			mdl.set_skin(family)
-			_store_skin_on_meshes(mdl, family)
-		mdl.set_skin(0)
-		# Clear surface overrides left by set_skin(0) — base mesh materials are correct
-		_clear_skin_overrides(mdl)
-
-	for child in mdl.get_children().duplicate():
-		mdl.remove_child(child)
-		root.add_child(child)
-		_set_owner_recursive(child, root)
-
-	root.set_meta("skin_count", skin_count)
+	# A plain Node3D (no GDExtension dependency) with the sequences and skin families on it.
+	var root: Node3D = mdl.build_scene()
 	root.set_meta(MDL_VERSION_META, MDL_CACHE_VERSION)
 
 	DirAccess.make_dir_recursive_absolute(out_path.get_base_dir())
 	var scene := PackedScene.new()
-	if scene.pack(root) != OK:
-		push_warning("ResourceConverter: failed to pack %s" % out_path)
-		root.free()
-		mdl.free()
-		return false
-	if ResourceSaver.save(scene, out_path) != OK:
-		push_warning("ResourceConverter: failed to save %s" % out_path)
-		root.free()
-		mdl.free()
-		return false
-
+	var ok: bool = scene.pack(root) == OK and ResourceSaver.save(scene, out_path) == OK
 	root.free()
-	mdl.free()
-	return true
+	if not ok:
+		push_warning("ResourceConverter: failed to pack or save %s" % out_path)
+	return ok
 
 
 func convert_all_spr() -> bool:
@@ -204,7 +160,6 @@ func _convert_spr(spr_path: String, base_dir: String, source_md5: String) -> boo
 	var spr = ClassDB.instantiate(&"GoldSrcSPR")
 	if spr.load_spr(spr_path) != OK:
 		push_warning("ResourceConverter: failed to load %s" % spr_path)
-		spr.free()
 		return false
 
 	DirAccess.make_dir_recursive_absolute(base_dir)
@@ -470,34 +425,3 @@ func _scan_dir(dir: DirAccess, base_path: String, pattern: String, results: Pack
 				results.append(full_path)
 		fname = dir.get_next()
 	dir.list_dir_end()
-
-
-func _set_owner_recursive(node: Node, p_owner: Node) -> void:
-	node.owner = p_owner
-	for child in node.get_children():
-		_set_owner_recursive(child, p_owner)
-
-
-## One material per surface: a bodypart's meshes are its surfaces, and each carries its own
-## skin_ref into the family's row of the skin table.
-func _store_skin_on_meshes(node: Node, family: int) -> void:
-	if node is MeshInstance3D:
-		var mats := []
-		var any := false
-		for surf_idx in (node as MeshInstance3D).get_surface_override_material_count():
-			var mat = node.get_surface_override_material(surf_idx)
-			# Duplicated so it's independent of the live override
-			mats.append(mat.duplicate() if mat else null)
-			any = any or mat != null
-		if any:
-			node.set_meta("skin_%d" % family, mats)
-	for child in node.get_children():
-		_store_skin_on_meshes(child, family)
-
-
-func _clear_skin_overrides(node: Node) -> void:
-	if node is MeshInstance3D:
-		for surf_idx in (node as MeshInstance3D).get_surface_override_material_count():
-			node.set_surface_override_material(surf_idx, null)
-	for child in node.get_children():
-		_clear_skin_overrides(child)

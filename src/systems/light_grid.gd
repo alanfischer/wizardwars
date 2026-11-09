@@ -171,12 +171,13 @@ func _apply_textures_recursive(node: Node) -> void:
 				var mat: Material = mi.get_active_material(surf_idx)
 				if mat is ShaderMaterial:
 					_set_grid_on_material(mat)
-		# Also bind to skin override materials stored as metadata,
-		# so they have textures when set_model_skin() applies them later.
+		# Also bind to skin override materials stored as metadata (one per surface, or one
+		# on an older .scn), so they have textures when set_model_skin() applies them later.
 		for key in mi.get_meta_list():
 			if key.begins_with("skin_"):
-				var skin_mat = mi.get_meta(key)
-				if skin_mat is ShaderMaterial:
-					_set_grid_on_material(skin_mat)
+				var stored = mi.get_meta(key)
+				for skin_mat in (stored if stored is Array else [stored]):
+					if skin_mat is ShaderMaterial:
+						_set_grid_on_material(skin_mat)
 	for child in node.get_children():
 		_apply_textures_recursive(child)
