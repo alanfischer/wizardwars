@@ -11,21 +11,12 @@
   `Game.hud`) and node references come by injection, so ClientSync and ClientPerf each bind main for
   one specific node and ClientJoin, needing none, binds nothing.
 
-  One seam the ClientJoin review named is done: sync handlers are a list now, newest first, and
-  `_on_reject_team_join` lives in `client_join.gd`, so `abandon` went private. The other, worth
-  doing before or with the next peel:
-
-  - ClientJoin should own the class menu's lifecycle, not just borrow the reference. Main creates
-    `_team_select_ui` in `_load_map` (VR branch included) and frees it in `_unload_map`, so the
-    node holds a second copy nobody nulls — which is the only reason `_abandon()` needs
-    `is_instance_valid`, and `game.gd` already states the one-copy rule. `build_menu(parent)` /
-    `teardown_menu()` would retire the guard. It is five more call sites than the signal, though:
-    `main.gd` 993 (`show_ui` on spectating), 1185-1191 (`team_menu`/`class_menu` actions) and
-    1206-1211 (VR menu) all poke the menu, and the first two duplicate the same
-    `team != Team.NONE` test. Fold `_auto_team`/`_auto_class` in at the same time — they are join
-    inputs, and `_set_game_active` 978-996 still holds the whole "come back on the scripted role,
-    else put the menu up" policy, which is the ClientPerf treatment (flag table calls a setter,
-    state lives in the node) that ClientJoin only got half of.
+  Both seams the ClientJoin review named are done: sync handlers are a list, newest first, so
+  `_on_reject_team_join` lives in `client_join.gd`; and ClientJoin owns the class menu
+  (`build_menu`/`teardown_menu`, `open_team_menu`/`open_class_menu`) and the `--team`/`--class`
+  role, with `start_game()` holding the "come back on the scripted role, else put the menu up"
+  policy. Main's remaining calls are the two setters, `build_menu`, `teardown_menu`, `start_game`,
+  the two opens and `clear_watchdog`.
 
   Next: **map load/unload** (`_load_map` 681, `_unload_map` 821), the larger one. Note what
   ClientJoin exposed about it — `_unload_map`'s `keep` list is now eleven entries and every peel

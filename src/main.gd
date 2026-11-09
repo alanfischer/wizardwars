@@ -80,7 +80,6 @@ var _player_spawner: MultiplayerSpawner = null
 var _dyn_spawner: MultiplayerSpawner = null
 
 var _lobby: CanvasLayer
-var _team_select_ui: CanvasLayer
 var _map_root: Node3D
 var _map_converter: Node
 var _resource_converter: Node
@@ -113,8 +112,6 @@ var _local_pending_map_name := ""
 
 var _auto_connect_ip := ""  # --connect <ip>: auto-join server on startup
 var _bsp_hulls_arg := ""  # --bsp-hulls <on|off>: start with BSP hull collision forced either way
-var _auto_team := 0  # --team <1-4>: auto-join team on game start
-var _auto_class := 0  # --class <name>: auto-pick class on game start
 var _auto_name := ""  # --name <name>: set player name from command line
 var _auto_bots := 0  # --bots <n>: dedicated server fills with this many AI bots on startup
 ## --timelimit/--scorelimit/--fraglimit <n>, --time <hours|h:mm|name>, --rain <0-1>, --snow <0-1>,
@@ -196,8 +193,8 @@ func _flag_handlers() -> Dictionary:
 		"--bake-waypoints": func() -> void: _bake_waypoints = true,
 		"--map": func(v: String) -> void: _current_map_name = v,
 		"--connect": func(v: String) -> void: _auto_connect_ip = v,
-		"--team": func(v: String) -> void: _auto_team = int(v),
-		"--class": func(v: String) -> void: _auto_class = _parse_element_name(v),
+		"--team": func(v: String) -> void: _client_join.set_auto_team(int(v)),
+		"--class": func(v: String) -> void: _client_join.set_auto_class(_parse_element_name(v)),
 		"--name": func(v: String) -> void: _auto_name = v,
 		# Test hook: request a rate WITHOUT persisting it, unlike the interactive
 		# NetworkManager.set_cl_updaterate path, which writes settings.cfg.
@@ -829,14 +826,11 @@ func _load_map(map_name: String) -> void:
 			_vr_hud_panel.position = Vector3(0.0, -0.1, -1.2)
 			hud.move_to_vr_panel(_vr_hud_panel.viewport)
 
-		_team_select_ui = CanvasLayer.new()
-		_team_select_ui.set_script(TeamSelectUI)
-		_team_select_ui.name = "TeamSelectUI"
+		var menu: CanvasLayer = _client_join.build_menu()
 		if XRManager.is_vr and _vr_lobby_panel:
-			_vr_lobby_panel.add_ui(_team_select_ui)
+			_vr_lobby_panel.add_ui(menu)
 		else:
-			add_child(_team_select_ui)
-		_client_join.bind_menu(_team_select_ui)
+			add_child(menu)
 
 
 
@@ -857,9 +851,7 @@ func _unload_map() -> void:
 	if _local_player and _local_player.has_method("free_debug_render"):
 		_local_player.free_debug_render()
 	# Free explicitly — in VR it lives in the SubViewport, not as a direct child.
-	if _team_select_ui:
-		_team_select_ui.queue_free()
-		_team_select_ui = null
+	_client_join.teardown_menu()
 	# Parented to the persistent XR rig camera, so the children loop below won't catch it — without
 	# this, each map reload stacks another ghost HUD on the camera.
 	if _vr_hud_panel:
@@ -1014,23 +1006,13 @@ func _set_game_active(active: bool) -> void:
 		if _lobby:
 			_lobby.hide_menu()
 		_set_status("")
-		# The role to come back on: only --team/--class, which is a scripted launch that must not
-		# stop at a menu. Everyone else picks again on every map, rotation included. Deferred — on
-		# a listen host the map change registers the host puppet after this call, and the join
-		# request needs that puppet.
-		var join_team := _auto_team
-		var join_class := _auto_class
-		var joining: bool = join_team > 0 and _local_player and _local_player.spectating
-		if joining:
-			_client_join.call_deferred("select_team_class", join_team,
-				join_class if join_class > 0 else GameConsts.Element.FIRE)
+		# Everyone picks again on every map, rotation included, except a scripted --team/--class.
+		var menu_up: bool = _client_join.start_game()
 		if _auto_bots > 0 and NetworkManager.is_host():  # dedicated spawns its own in _start_dedicated_server
 			for _b in _auto_bots:
 				BotSystem.add_bot()
 			_auto_bots = 0  # once per session, not per map change
-		if not joining and _team_select_ui and _local_player and _local_player.spectating:
-			_team_select_ui.show_ui()
-		else:
+		if not menu_up:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	else:
 		if _lobby:
@@ -1215,15 +1197,13 @@ func _try_activate_local_player() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not _game_active:
 		return
-	if event.is_action_pressed("team_menu") and _team_select_ui:
-		_team_select_ui.show_ui()
-		if XRManager.is_vr:
-			_attach_vr_panel_to_camera()
-	elif event.is_action_pressed("class_menu") and _team_select_ui and _local_player \
-			and _local_player.team != GameConsts.Team.NONE:
-		_team_select_ui.show_class_only(_local_player.team)
-		if XRManager.is_vr:
-			_attach_vr_panel_to_camera()
+	var opened := false
+	if event.is_action_pressed("team_menu"):
+		opened = _client_join.open_team_menu()
+	elif event.is_action_pressed("class_menu"):
+		opened = _client_join.open_class_menu()
+	if opened and XRManager.is_vr:
+		_attach_vr_panel_to_camera()
 
 
 func _attach_vr_panel_to_camera() -> void:
@@ -1236,13 +1216,10 @@ func _attach_vr_panel_to_camera() -> void:
 
 
 func _on_vr_menu_requested(class_only: bool) -> void:
-	if not _team_select_ui or not _vr_lobby_panel:
+	if not _vr_lobby_panel:
 		return
-	if class_only and _local_player and _local_player.team != GameConsts.Team.NONE:
-		_team_select_ui.show_class_only(_local_player.team)
-	else:
-		_team_select_ui.show_ui()
-	_attach_vr_panel_to_camera()
+	if (class_only and _client_join.open_class_menu()) or _client_join.open_team_menu():
+		_attach_vr_panel_to_camera()
 
 
 ## First entity of `classname` in the map's entity list, as its raw key/value dict. Maps carry
