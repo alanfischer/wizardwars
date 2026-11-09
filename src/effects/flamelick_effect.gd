@@ -4,7 +4,7 @@ extends Node3D
 ## Flamelick fire burst — animated mushroom.spr billboard at impact, auto-frees after 1.5s.
 
 const SPRITE_FPS := 20.0
-const SNOW_MELT := 1.0  # metres of lying snow each lick melts round it
+const HEAT_RADIUS := 1.0  # metres round each lick it melts the snow and thaws the ice
 
 var _effect := EffectBehavior.new()
 
@@ -33,4 +33,4 @@ func _build() -> void:
 
 func _ready() -> void:
 	_effect.start()
-	WeatherSystem.melt_snow(global_position, SNOW_MELT)
+	WeatherSystem.heat_ground(global_position, HEAT_RADIUS)

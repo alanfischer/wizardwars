@@ -88,12 +88,18 @@ func _fire_ray(attacker: Node3D, aim_from: Vector3, aim_dir: Vector3,
 			if target:
 				_apply_ray_hit(attacker, target, damage_mult)
 
+		_on_ray_impact(ray.impact_pos)
 		var scene_root := attacker.get_tree().current_scene
 		var effect := RayHitEffect.spawn(scene_root, ray.impact_pos + ray.impact_norm * EFFECT_OFFSET, hit_color, particle_type)
 		NetworkManager.register_effect(effect, "res://src/effects/ray_hit_effect.gd",
 			{"light_color": hit_color, "particle_type": particle_type})
 
 	_fire_beam(attacker)
+
+
+## Where a pulse of the beam landed, on the firing authority.
+func _on_ray_impact(_at: Vector3) -> void:
+	pass
 
 
 ## Call from subclass fire() after damage/effects to set up beam visuals.

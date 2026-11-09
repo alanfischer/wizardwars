@@ -355,6 +355,18 @@ overcast_ground_shift={
 "type": "float",
 "value": 1.0
 }
+overcast_ice={
+"type": "float",
+"value": 0.0
+}
+overcast_has_ice_field={
+"type": "bool",
+"value": false
+}
+overcast_ice_field={
+"type": "sampler2D",
+"value": ""
+}
 overcast_rain_under={
 "type": "sampler2D",
 "value": ""
