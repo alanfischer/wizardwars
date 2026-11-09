@@ -26,7 +26,7 @@ func _ready() -> void:
 		var sky_name: String = ws.get_meta("entity").get("skyname", "") if ws else ""
 		sky.setup(sky_name, map, _find(map, "light_environment"))
 		if sky.overcast:
-			sky.overcast.storm = storm
+			sky.overcast.set_weather(storm, sky.overcast.snowy)
 		if OS.get_environment("TIME") != "":
 			ServerVars.set_from_string("time", OS.get_environment("TIME"))
 		NightMode.apply(map)
