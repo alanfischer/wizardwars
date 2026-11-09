@@ -1,26 +1,11 @@
 # TODO
 
-- Keep peeling `main.gd` (2016 lines, 80 methods). ClientSync was the first peel; ClientPerf
-  (`src/systems/client_perf.gd`, done 2026-10-11) was the second — the overlay, the [ClientPerf]
-  report and the scene inventory, plus `--perf-log`/`--perf-quit` and their `_process`/
-  `_physics_process` hooks, all of which the node now runs for itself. ClientJoin
-  (`src/systems/client_join.gd`, done 2026-10-11) was the third: the nine methods from
-  `_on_team_class_selected` to `_join_watchdog`, the three class-change fields and the two watchdog
-  ones, down to four call sites on main (`bind_menu`, `select_team_class`, `clear_watchdog`,
-  `abandon`). The rule the three peels share: gameplay state comes off `Game` (`Game.local_player`,
-  `Game.hud`) and node references come by injection, so ClientSync and ClientPerf each bind main for
-  one specific node and ClientJoin, needing none, binds nothing.
-
-  Both seams the ClientJoin review named are done: sync handlers are a list, newest first, so
-  `_on_reject_team_join` lives in `client_join.gd`; and ClientJoin owns the class menu
-  (`build_menu`/`teardown_menu`, `open_team_menu`/`open_class_menu`) and the `--team`/`--class`
-  role, with `start_game()` holding the "come back on the scripted role, else put the menu up"
-  policy. Main's remaining calls are the two setters, `build_menu`, `teardown_menu`, `start_game`,
-  the two opens and `clear_watchdog`.
-
-  Next: **map load/unload** (`_load_map`, `_unload_map`), the larger one. The persistent-children
-  registry it needed is done: `_add_system(node)` records main's long-lived children as it parents
-  them, and `_unload_map` frees everything else.
+- Keep peeling `main.gd`: map load/unload (`_load_map`, `_unload_map`, `load_map_headless`) is
+  next. It spans four clusters that peel separately: the sky (`_skybox`, `_world_env`,
+  `_sky_surfaces`, the night rebuild, VR passthrough, the light-grid ambient), the map world (root,
+  PVS, entities, decals, weather, precache), the local view (player, HUD, VR HUD panel, class menu)
+  and the client map download flags. The rule the earlier peels share: gameplay state comes off
+  `Game`, node references come by injection.
 
 - Retire the offline class-change path's private copy of a mechanism `Player` already has.
   `client_join.gd`'s `_queue_local_class_change` / `_on_local_class_change_timeout` reach into
@@ -67,30 +52,27 @@
   `trigger_system.gd` is 61 generic lines whose only non-generic statement is the authority gate
   at line 46, which is exactly `not NetworkManager.is_authority()`.
 
-  The EntityUtil split (done 2026-10-11) gave those files two WW-free modules to lean on:
-  `EntityRender` (17 callers in `src/entities/`, two AssetLoader calls of its own) and
-  `GoldSrcEntity` (11 callers, one GameConsts constant).
+  Those files already lean on two WW-free modules: `EntityRender` (17 callers in
+  `src/entities/`, two AssetLoader calls of its own) and `GoldSrcEntity` (11 callers, one
+  GameConsts constant).
 
-  What stands in the way is the other 27 files, and it is NOT a short list of reach-throughs —
-  the "exactly four" this bullet used to claim was wrong. Audited 2026-10-11: the generic ones
-  among them want eight host systems, not four functions. `ambient_generic` → SentenceSystem;
-  `env_beam` → BeamSystem; `env_model` → VisibilitySystem; `env_sound` and `func_door_base` →
-  SoundSystem; `env_fade`, `env_shake`, `game_text` and `trigger_multiple` → NetworkManager's
-  screen and HUD RPCs; `func_breakable` and `light_environment` → `sync_entity_state`;
-  `trigger_multiple` → `Game.hud` / `Game.local_player`; `func_door_base` and `trigger_multiple`
-  → Teams; `item_tfgoal` → `SpatialQuery.ground_y_below`; and `EntityBase` itself →
-  `register_synced_entity`, `transport.relevance_events` and
+  What stands in the way is the other 27 files: the generic ones among them want eight host systems,
+  not a few reach-throughs. `ambient_generic` → SentenceSystem; `env_beam` → BeamSystem; `env_model`
+  → VisibilitySystem; `env_sound` and `func_door_base` → SoundSystem; `env_fade`, `env_shake`,
+  `game_text` and `trigger_multiple` → NetworkManager's screen and HUD RPCs; `func_breakable` and
+  `light_environment` → `sync_entity_state`; `trigger_multiple` → `Game.hud` / `Game.local_player`;
+  `func_door_base` and `trigger_multiple` → Teams; `item_tfgoal` → `SpatialQuery.ground_y_below`;
+  and `EntityBase` itself → `register_synced_entity`, `transport.relevance_events` and
   `VisibilitySystem.set_entity_game_visible`. `trigger_hurt` is not one of them: it only names
-  SpatialQuery in a comment, and the point query runs from `Projectile._check_hazards` against
-  the `hurt_volume` meta the trigger sets, which is already a decoupled contract.
+  SpatialQuery in a comment, and the point query runs from `Projectile._check_hazards` against the
+  `hurt_volume` meta the trigger sets, which is already a decoupled contract.
 
-  Tried and reverted 2026-10-11: one `EntityHost` autoload forwarding the four calls this bullet
-  used to name. It worked and bought nothing — the seam has to carry sound, sentences, beams,
-  visibility, HUD text and the entity-state protocol before a single entity file stops naming
-  WizardWars, at which point it is an indirection layer over most of the game. Settle the shape
-  before the plumbing: SoundSystem, SentenceSystem, BeamSystem, VisibilitySystem and SpatialQuery
-  are platform the library can take by injection or ship itself, while Teams, Game and GoalSystem
-  are gameplay that stays with the host.
+  Tried and reverted 2026-10-11: one `EntityHost` autoload forwarding four of those calls. It worked
+  and bought nothing — the seam has to carry sound, sentences, beams, visibility, HUD text and the
+  entity-state protocol before a single entity file stops naming WizardWars, at which point it is an
+  indirection layer over most of the game. Settle the shape before the plumbing: SoundSystem,
+  SentenceSystem, BeamSystem, VisibilitySystem and SpatialQuery are platform the library can take by
+  injection or ship itself, while Teams, Game and GoalSystem are gameplay that stays with the host.
 
 - Send sounds and `MSG_PAS` temp entities to the PAS. `VisibilityManager` has it now
   (`is_position_audible_to_observer`, goldsrc-godot #77) and `VisibilitySystem.peers_hearing` picks
@@ -107,13 +89,7 @@
 
 ## Library APIs (review 2026-11-09)
 
-Each item is a branch + PR in its own submodule, then a pin bump here. Done so far: Godot 4.7
-minimums, WW internals out of the READMEs, goldsrc-godot's metadata table as the one hull spec,
-goldnet-godot's Usage first with `GoldNetMultiplayer.new()`, hop's pipeline private, pmove's
-classes prefixed (goldsrc-godot #74, goldnet-godot #52, hop #110, hop-godot #83,
-pmove-godot #16, WW #48); `GoldSrcBSP` and `GoldSrcMDL` as RefCounted loaders whose
-`build_scene()` returns the finished scene, MDL skins and sequences included, and team skins
-that apply and take the map's lighting (goldsrc-godot #75 and #76, WW #50).
+Each item is a branch + PR in its own submodule, then a pin bump here.
 
 goldsrc-godot:
 
