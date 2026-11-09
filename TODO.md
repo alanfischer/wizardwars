@@ -128,13 +128,12 @@ Each item is a branch + PR in its own submodule, then a pin bump here. Done so f
 minimums, WW internals out of the READMEs, goldsrc-godot's metadata table as the one hull spec,
 goldnet-godot's Usage first with `GoldNetMultiplayer.new()`, hop's pipeline private, pmove's
 classes prefixed (goldsrc-godot #74, goldnet-godot #52, hop #110, hop-godot #83,
-pmove-godot #16, WW #48).
+pmove-godot #16, WW #48); `GoldSrcBSP` and `GoldSrcMDL` as RefCounted loaders whose
+`build_scene()` returns the finished scene, MDL skins and sequences included, and team skins
+that apply and take the map's lighting (goldsrc-godot #75, WW #50).
 
 goldsrc-godot:
 
-- `GoldSrcBSP` and `GoldSrcMDL` are `Node3D`s used as loaders (`GoldSrcBSP.new() … bsp.free()`;
-  forget the `free()` and it leaks), while `GoldSrcSPR` / `GoldSrcWAD` are `Resource`s. Make the
-  loaders `RefCounted`; only the built scene is nodes. Breaks WW's map conversion.
 - Split `GoldSrcBSP`: the light grid, sun fraction and rain floor bakers into their own classes
   or files.
 - The rain floor is weather in an asset loader. It is a "first solid surface going down" query;
