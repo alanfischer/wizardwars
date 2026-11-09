@@ -380,6 +380,19 @@ func peers_seeing(box: AABB, peers: PackedInt32Array) -> PackedInt32Array:
 	return out
 
 
+## The peers whose PAS reaches `pos`: GoldSrc's MSG_PAS, and where every non-static sound went.
+## Fail-open like peers_seeing.
+func peers_hearing(pos: Vector3, peers: PackedInt32Array) -> PackedInt32Array:
+	if not _vm:
+		return peers
+	var out := PackedInt32Array()
+	for peer_id in peers:
+		var obs: int = _peer_observers.get(peer_id, -1)
+		if obs == -1 or _vm.is_position_audible_to_observer(pos, obs):
+			out.append(peer_id)
+	return out
+
+
 ## Register a worldspawn spatial group using its pre-baked BSP leaf set.
 func track_node_by_leaves(node_id: int, node: Node3D, leaves: PackedInt32Array) -> void:
 	var handle := -1

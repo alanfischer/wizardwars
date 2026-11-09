@@ -8,6 +8,8 @@ class StubVM:
 	var registered: Array[AABB] = []
 	var unregistered: Array[int] = []
 	var visible_to := {}  # observer handle -> bool
+	var heard_by := {}  # observer handle -> bool
+	var heard_at: Array[Vector3] = []
 
 	func register_entity(aabb: AABB) -> int:
 		registered.append(aabb)
@@ -18,6 +20,10 @@ class StubVM:
 
 	func is_entity_visible_to_observer(_h: int, obs: int) -> bool:
 		return visible_to.get(obs, false)
+
+	func is_position_audible_to_observer(pos: Vector3, obs: int) -> bool:
+		heard_at.append(pos)
+		return heard_by.get(obs, false)
 
 
 class StatusSink extends Node:
@@ -68,6 +74,26 @@ func test_pvs_send_pads_a_point() -> void:
 	vs._vm = stub
 	vs.peers_seeing(AABB(Vector3(1, 2, 3), Vector3.ZERO), PackedInt32Array())
 	assert_true(stub.registered[0].has_volume(), "a bare point is grown into a box, like an entity")
+	vs.free()
+
+
+func test_pas_send_reaches_only_peers_that_hear_the_point() -> void:
+	var vs = load("res://src/systems/visibility_system.gd").new()
+	var stub := StubVM.new()
+	vs._vm = stub
+	vs._peer_observers = {2: 20, 3: 30}
+	stub.heard_by = {20: true, 30: false}
+	var pos := Vector3(1, 2, 3)
+	var got: PackedInt32Array = vs.peers_hearing(pos, PackedInt32Array([2, 3, 4]))
+	assert_eq(Array(got), [2, 4], "the hearing peer, and the one with no observer yet (fail open)")
+	assert_eq(stub.heard_at, [pos, pos], "asked about the point, once per observed peer")
+	vs.free()
+
+
+func test_pas_send_without_a_map_reaches_everyone() -> void:
+	var vs = load("res://src/systems/visibility_system.gd").new()
+	var peers := PackedInt32Array([2, 3])
+	assert_eq(vs.peers_hearing(Vector3.ZERO, peers), peers, "no PVS, no PAS: fail open")
 	vs.free()
 
 
