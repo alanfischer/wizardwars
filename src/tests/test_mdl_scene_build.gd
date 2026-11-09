@@ -2,7 +2,8 @@ extends "res://src/tests/test_base.gd"
 ## What goldsrc-godot's MDL build must keep while it shrinks the scene: skins keep their mip
 ## chain (without one a wizard across the map is a crawl of aliased texels), and a clip whose
 ## keys were cut still starts on frame 0 and ends on its last frame, so nothing is truncated.
-## And what build_scene() hands over: the sequences and skin families as metadata.
+## And what build_scene() hands over: the sequences and skin families as metadata, which a
+## team skin takes in the same lit material as the base skin.
 
 const MODEL := "res://models/player/death.mdl"
 
@@ -72,4 +73,22 @@ func test_scene_carries_sequences_and_skins() -> void:
 	assert_gt(skinned, 0, "the skinned meshes carry the other families")
 	assert_true(root.find_children("*", "", true, false).all(func(n): return n.owner == root), "owned by the root, so it packs")
 	assert_true(mdl.build_scene() == null, "once per load")
+	root.free()
+
+
+## A team skin must be lit like the base skin: the map's ambient cube, not Godot's lights.
+func test_team_skins_take_the_acube_material() -> void:
+	var mdl := GoldSrcMDL.new()
+	assert_eq(mdl.load_mdl(MODEL), OK, "model loads")
+	var root := mdl.build_scene()
+	var converted := 0
+	for mi: MeshInstance3D in root.find_children("*", "MeshInstance3D", true, false):
+		AssetLoader._convert_skin_metas(mi, 2.0)
+		for family in range(1, 5):
+			for mat in mi.get_meta("skin_%d" % family, []):
+				if mat == null:
+					continue
+				assert_true(mat is ShaderMaterial, "%s skin_%d is the ambient cube material" % [mi.name, family])
+				converted += 1
+	assert_gt(converted, 0, "the team skins were converted")
 	root.free()
