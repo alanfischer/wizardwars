@@ -967,8 +967,8 @@ func tick(delta: float) -> void:
 	# leaves the cone is remembered briefly (below) rather than forgotten the same tick.
 	# A target that died or left is dropped on the tick it happens; acquiring a new one runs on
 	# this bot's own sense tick (see SENSE_INTERVAL) and the last answer is held until then.
-	if _seen != null and (not is_instance_valid(_seen) or not _seen.is_inside_tree()
-			or _seen.get("is_dead")):
+	# A freed object compares equal to null, so `_seen != null` can't guard it.
+	if not is_instance_valid(_seen) or not _seen.is_inside_tree() or _seen.get("is_dead"):
 		_seen = null
 	_sense_t -= delta
 	if _sense_t <= 0.0:
@@ -978,7 +978,7 @@ func tick(delta: float) -> void:
 			_bot.get_rid(), Vector3.INF, facing, FOV_COS)
 	var enemy := _seen
 	_known_t = maxf(_known_t - delta, 0.0)
-	if _known != null and (_known_t <= 0.0 or not is_instance_valid(_known) or _known.get("is_dead")):
+	if _known_t <= 0.0 or not is_instance_valid(_known) or _known.get("is_dead"):
 		_known = null
 		_known_pos = Vector3.INF
 	if enemy != null:
