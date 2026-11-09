@@ -115,8 +115,6 @@
 
 - The staff's wall decal is port-only: 1.2.9's `CStaff::Smack` has its `DecalGunshot` commented
   out, so the original staff left no mark. Keep it with a reason, or drop it.
-- `VisibilitySystem` does two jobs: client render culling, and choosing which peers get a send
-  (`peers_seeing`, `peers_hearing`, the epochs). The second could be its own autoload.
 
 ## Library APIs (review 2026-11-09)
 
