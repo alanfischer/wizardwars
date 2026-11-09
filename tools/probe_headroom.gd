@@ -41,7 +41,7 @@ func _initialize() -> void:
 	player.add_child(cs)
 	map_root.add_child(player)
 
-	var gbody := GodotBody.new(player)
+	var gbody := PmoveGodotBody.new(player)
 	# Feet on the cockpit deck, mid-floor — a spot the earlier scan proved is a
 	# perfectly good place to stand up.
 	player.global_position = body_node.global_transform * gs_to_godot(0.0, 0.0, -112.0)

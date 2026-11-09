@@ -135,8 +135,8 @@ var _is_crouched := false
 var _last_input_cmd: RefCounted = null  # InputCommand; last cmd for server-authoritative send
 
 # Client-side predicted movement (netmove module)
-var _movement: ClientMovement = ClientMovement.new()
-var _body: GodotBody
+var _movement: PmoveClientMovement = PmoveClientMovement.new()
+var _body: PmoveGodotBody
 
 
 # Camera world-space position smoothing — hides tiny prediction corrections visually.
@@ -333,7 +333,7 @@ func _post_ready() -> void:
 	platform_wall_layers = 0
 	# Disable Godot physics interpolation on the local player subtree.
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
-	_body = GodotBody.new(self, PackedStringArray(["LadderDetector/CollisionShape3D"]))
+	_body = PmoveGodotBody.new(self, PackedStringArray(["LadderDetector/CollisionShape3D"]))
 	_movement.bind_body(_body)
 	var active_cam := _active_camera()
 	camera.current = not XRManager.is_vr
@@ -1202,7 +1202,7 @@ func _on_server_state(seq: int, pos: Vector3, vel: Vector3,
 	# Queue for processing in _physics_process so move_and_slide uses the
 	# fixed physics delta during replay, not the variable process delta.
 	_pending_server_states.append(
-		ClientMovement.ServerState.new(seq, pos, vel, crouched, on_floor, jumping, jump_held))
+		PmoveClientMovement.ServerState.new(seq, pos, vel, crouched, on_floor, jumping, jump_held))
 
 
 func _process_pending_server_states() -> void:
@@ -1211,7 +1211,7 @@ func _process_pending_server_states() -> void:
 	_pending_server_states.clear()
 
 
-func _reconcile_server_state(server_state: ClientMovement.ServerState) -> void:
+func _reconcile_server_state(server_state: PmoveClientMovement.ServerState) -> void:
 	if is_dead or spectating:
 		return
 
@@ -1277,9 +1277,9 @@ func get_movement_modifiers(cmd) -> Movement.MovementModifiers:
 	return _move_ctx.get_modifiers(_movement.cfg, _movement.state, weapons, speed_multiplier, cmd)
 
 
-## The adapter ClientMovement predicts on — the client-side counterpart of RemotePlayer's.
+## The adapter PmoveClientMovement predicts on — the client-side counterpart of RemotePlayer's.
 ## [PlayerMovementContext] asks for it to probe poses the hull is not in (its unstick fallback).
-func get_godot_body() -> GodotBody:
+func get_godot_body() -> PmoveGodotBody:
 	return _body
 
 

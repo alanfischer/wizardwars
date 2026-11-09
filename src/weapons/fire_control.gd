@@ -135,9 +135,9 @@ func _shoot(cmd, shooter, weapon: Weapon, secondary: bool, charge_percent: float
 			end_hold(shooter)
 
 
-## The command's msec as the server plays it (ServerMovement clamps a long one).
+## The command's msec as the server plays it (PmoveServerMovement clamps a long one).
 static func msec_of(cmd) -> int:
-	return mini(roundi(cmd.delta * 1000.0), roundi(ServerMovement.MAX_CMD_DELTA * 1000.0))
+	return mini(roundi(cmd.delta * 1000.0), roundi(PmoveServerMovement.MAX_CMD_DELTA * 1000.0))
 
 
 static func input_of(cmd) -> TriggerInput:

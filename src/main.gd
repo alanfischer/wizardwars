@@ -1543,7 +1543,7 @@ func _process_player_movements() -> void:
 		var remote: RemotePlayer = players[peer_id]
 		if remote.is_dead or not remote.has_server_movement():
 			continue
-		var sm: ServerMovement = remote.get_server_movement()
+		var sm: PmoveServerMovement = remote.get_server_movement()
 		sm.noclip_grant = CommandSystem.is_noclip(peer_id)
 		if sm.queue_size() > 0:
 			# pmove's one per-command hook, so the trigger steps here too, on each command's own time.
@@ -1611,14 +1611,14 @@ func _feed_host_puppet() -> void:
 ## equals the physics rate, so each client gets a correction every tick it predicted (or as often
 ## as its granted update rate allows) — the shortest prediction-error feedback loop available.
 func _broadcast_player_states() -> void:
-	# The host's own state rides the generic loop below — its body puppet has a ServerMovement like
+	# The host's own state rides the generic loop below — its body puppet has a PmoveServerMovement like
 	# every client's.
 	var players := NetworkManager.player_table()
 	for peer_id in players:
 		var remote: RemotePlayer = players[peer_id]
 		if not remote.has_server_movement():
 			continue
-		var sm: ServerMovement = remote.get_server_movement()
+		var sm: PmoveServerMovement = remote.get_server_movement()
 		# seq=-1 signals no commands processed yet; client skips reconciliation but still reads queue_depth.
 		if peer_id == multiplayer.get_unique_id():
 			# Host's own view: there is no snapshot to itself, so deliver directly and SYNCHRONOUSLY.

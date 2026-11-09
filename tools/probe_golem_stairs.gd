@@ -89,7 +89,7 @@ func _initialize() -> void:
 	print("safe_margin = %.4f m (%.2f GoldSrc units)" % [char_body.safe_margin, char_body.safe_margin / S])
 	char_body.floor_max_angle = acos(Movement.WALK_NORMAL_Y)
 	var cs := CollisionShape3D.new()
-	cs.name = "CollisionShape3D"  # GodotBody.set_collision_height looks it up by name
+	cs.name = "CollisionShape3D"  # PmoveGodotBody.set_collision_height looks it up by name
 	var cap := CapsuleShape3D.new()
 	cap.radius = 0.4
 	cap.height = 1.8
@@ -100,7 +100,7 @@ func _initialize() -> void:
 
 	var cfg := MovementConfig.new()
 	var sim := Movement.Simulation.new(cfg)
-	var body := GodotBody.new(char_body)
+	var body := PmoveGodotBody.new(char_body)
 	var state := Movement.MovementState.new()
 	state.bind_body(body)
 

@@ -178,7 +178,7 @@ var _hazard_point := PhysicsPointQueryParameters3D.new()  # MASK_HAZARD probe (s
 # kernel, so an edge only links if the bot can PHYSICALLY walk it (step-up, slide, gravity), not
 # merely if a hull sweep clears. Built in bake() when an owner Node is supplied.
 var _sim_char: CharacterBody3D = null
-var _sim_body = null                     # GodotBody wrapping _sim_char
+var _sim_body = null                     # PmoveGodotBody wrapping _sim_char
 var _sim = null                          # Movement.Simulation
 var _sim_state = null                    # Movement.MovementState
 var _sim_cfg = null                      # MovementConfig (for max_speed / step_height)
@@ -1871,7 +1871,7 @@ func _setup_move_sim(owner: Node) -> void:
 	cs.position = Vector3(0, STAND_HEIGHT * 0.5, 0)
 	_sim_char.add_child(cs)
 	owner.add_child(_sim_char)
-	_sim_body = GodotBody.new(_sim_char)
+	_sim_body = PmoveGodotBody.new(_sim_char)
 	_sim_cfg = MovementConfig.new()
 	_sim = Movement.Simulation.new(_sim_cfg)
 
