@@ -76,7 +76,7 @@ func _walk_into_it() -> float:
 	await tree.physics_frame
 
 	var sim := Movement.Simulation.new(MovementConfig.new())
-	var body := GodotBody.new(player)
+	var body := PmoveGodotBody.new(player)
 	var state := Movement.MovementState.new()
 	state.bind_body(body)
 	state.on_floor = true

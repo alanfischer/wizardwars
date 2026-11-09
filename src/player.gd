@@ -288,7 +288,7 @@ func has_server_movement() -> bool:
 	return false
 
 
-func get_server_movement() -> ServerMovement:
+func get_server_movement() -> PmoveServerMovement:
 	return null
 
 
@@ -302,9 +302,9 @@ func _is_server_player() -> bool:
 			(NetworkManager.is_host() and NetworkManager.get_player(peer_id) == self)
 
 
-## The netmove body wrapper driven by ServerMovement. Null when this player has
+## The netmove body wrapper driven by PmoveServerMovement. Null when this player has
 ## no server-side simulation on this machine.
-func get_godot_body() -> GodotBody:
+func get_godot_body() -> PmoveGodotBody:
 	return null
 
 

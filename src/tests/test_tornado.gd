@@ -120,7 +120,7 @@ func test_it_chases_an_enemy_and_grinds_it_down() -> void:
 	assert_gt(target.damage_taken, 0.0, "and ground it down once it arrived")
 
 
-## A victim wired to the real movement kernel — the same Simulation ServerMovement runs, reading
+## A victim wired to the real movement kernel — the same Simulation PmoveServerMovement runs, reading
 ## body.velocity the way its tick() does. A stub body is what hid this bug: it has no notion of
 ## standing on the floor, so it accepted lifts a real player's movement would have thrown away.
 class SimVictim extends CharacterBody3D:

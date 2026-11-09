@@ -56,7 +56,7 @@ var cfg: MovementConfig
 var in_water := false
 
 var _sim: Movement.Simulation
-var _body: GodotBody
+var _body: PmoveGodotBody
 var _host: CharacterBody3D
 var _cmd
 ## Countdown on a water-jump launch, during which the swim clamp is off so ordinary air movement
@@ -82,7 +82,7 @@ func setup(host: CharacterBody3D, speed: float, height: float) -> void:
 	_sim = Movement.Simulation.new(cfg)
 	state = Movement.MovementState.new()
 	_host = host
-	_body = GodotBody.new(host)
+	_body = PmoveGodotBody.new(host)
 	_cmd = InputCommand.new()
 	state.bind_body(_body)
 	_hull = HullContacts.new(host)
@@ -111,7 +111,7 @@ func setup(host: CharacterBody3D, speed: float, height: float) -> void:
 ## them off at an angle instead.
 func walk(delta: float, dir: Vector3, swim_to := Vector3.INF) -> void:
 	# The host's own `velocity` is the source of truth between ticks, the way it is for a player
-	# (see ServerMovement), so an external write — a forceblast, a blast wave, trigger_push — is
+	# (see PmoveServerMovement), so an external write — a forceblast, a blast wave, trigger_push — is
 	# picked up instead of being overwritten by the state we were carrying.
 	state.velocity = _body.velocity
 	var yaw: float = _host_yaw()

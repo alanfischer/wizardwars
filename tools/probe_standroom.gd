@@ -34,7 +34,7 @@ func _initialize() -> void:
 	b.collision_mask = 33
 	b.safe_margin = 0.01
 	var cs := CollisionShape3D.new()
-	cs.name = "CollisionShape3D"  # GodotBody.set_collision_height looks it up by name
+	cs.name = "CollisionShape3D"  # PmoveGodotBody.set_collision_height looks it up by name
 	var cap := CapsuleShape3D.new()
 	cap.radius = 0.4
 	cap.height = 0.9
@@ -42,7 +42,7 @@ func _initialize() -> void:
 	cs.position = Vector3(0, 0.45, 0)
 	b.add_child(cs)
 	map_root.add_child(b)
-	var body := GodotBody.new(b)
+	var body := PmoveGodotBody.new(b)
 	var cfg := MovementConfig.new()
 
 	var z := 224.0

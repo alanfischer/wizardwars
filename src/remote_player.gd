@@ -21,8 +21,8 @@ var _sustained_shown := false  # OBSERVER: whether we've started this puppet's h
 ## after the first send. See tick_target_id.
 var _target_id_sent: Array = ["", 0, -1]
 var _target_id_cooldown := 0.0
-var _server_movement: ServerMovement = null
-var _godot_body: GodotBody = null
+var _server_movement: PmoveServerMovement = null
+var _godot_body: PmoveGodotBody = null
 var _model_name = ""
 var _staff_path := ""  # staff currently attached, so a re-apply of the same loadout is a no-op
 
@@ -187,8 +187,8 @@ func _setup_local_avatar() -> void:
 
 
 func setup_server_movement() -> void:
-	_server_movement = ServerMovement.new()
-	_godot_body = GodotBody.new(self, PackedStringArray(["LadderDetector/CollisionShape3D"]))
+	_server_movement = PmoveServerMovement.new()
+	_godot_body = PmoveGodotBody.new(self, PackedStringArray(["LadderDetector/CollisionShape3D"]))
 	_server_movement.bind_body(_godot_body)
 	_server_movement.state.on_floor = is_on_floor()
 	fire.secondary_waits = true
@@ -209,11 +209,11 @@ func has_server_movement() -> bool:
 	return _server_movement != null
 
 
-func get_server_movement() -> ServerMovement:
+func get_server_movement() -> PmoveServerMovement:
 	return _server_movement
 
 
-func get_godot_body() -> GodotBody:
+func get_godot_body() -> PmoveGodotBody:
 	return _godot_body
 
 
@@ -1155,7 +1155,7 @@ func _look_target_line() -> Array:
 
 
 ## Host-only: turn a landing impact speed (m/s) into GoldSrc-style fall damage.
-## Fired per landing tick by ServerMovement.process_queue (see main._process_player_movements).
+## Fired per landing tick by PmoveServerMovement.process_queue (see main._process_player_movements).
 func apply_fall_damage(impact_speed: float) -> void:
 	if is_dead or impact_speed <= FALL_SAFE_SPEED:
 		return

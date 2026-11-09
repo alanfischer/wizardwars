@@ -69,7 +69,7 @@ Cleanest spot is a new branch in `player_movement_context.gd`: when
 `_flying`, swap to a dedicated `DragonFlightMovement` path that reads
 `cmd.pitch` / `cmd.move_forward` to produce 3D velocity. No gravity, no jump,
 no crouch. Standard server-authoritative flow (no special prediction work —
-the existing `ServerMovement` queue + reconciliation handles it).
+the existing `PmoveServerMovement` queue + reconciliation handles it).
 
 Toggle is a player-side flag `_flying`, set/cleared in `mount_dragon` /
 `dismount`. No new `cmd.custom_flags` bit needed (the player's mount state is
@@ -198,7 +198,7 @@ are mountable by anyone; otherwise only same-team can mount. Skip hostile-AI
 dragons (out of scope this pass).
 
 **Network model.** Rider drives position via the existing server-authoritative
-path. Dragon entity has no `ServerMovement` of its own — it just follows the
+path. Dragon entity has no `PmoveServerMovement` of its own — it just follows the
 rider in a `_physics_process` (host-side `global_position = rider.global_position`).
 Matches original `MOVETYPE_FOLLOW`.
 

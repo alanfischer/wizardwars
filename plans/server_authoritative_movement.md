@@ -148,7 +148,7 @@ Host's own player: runs movement locally (that IS authoritative), broadcasts via
 ## Server Flow (per tick in main.gd _physics_process, host only)
 
 ```
-For each remote peer with a ServerMovement instance:
+For each remote peer with a PmoveServerMovement instance:
   1. Pop queued InputCommands (up to MAX_QUEUE=10)
   2. For each cmd in order:
      a. Set state modifiers from game systems (StatusSystem → friction_scale, etc.)
@@ -167,7 +167,7 @@ For each remote peer with a ServerMovement instance:
   - Death: clear buffer, stop sending commands
   - Respawn: clear buffer, snap to spawn position, resume
   - Teleport: server sends flag with sync_server_state indicating hard snap
-  - Knockback: server applies to ServerMovement.state.velocity, client predicts locally
+  - Knockback: server applies to PmoveServerMovement.state.velocity, client predicts locally
 
 ## Test Plan
 
@@ -260,7 +260,7 @@ For each remote peer with a ServerMovement instance:
 
 - Create netmove/server_movement.gd
 - Add send_input_command RPC to network_manager.gd
-- On host: create ServerMovement per remote peer, attached to puppet
+- On host: create PmoveServerMovement per remote peer, attached to puppet
 - main.gd host loop: process input queues, call Movement.simulate_tick on puppet bodies
 - Add sync_server_state RPC (server → owning client, received but ignored for now)
 - Host broadcasts authoritative positions to other clients
@@ -280,6 +280,6 @@ For each remote peer with a ServerMovement instance:
 - Death: clear prediction buffer, stop sending commands
 - Respawn: clear buffer, snap to spawn, resume
 - Teleport: server flags hard-snap, client resets buffer
-- Knockback: server applies to ServerMovement.state.velocity
+- Knockback: server applies to PmoveServerMovement.state.velocity
 - Remove dead code
 - Final pass on all tests
