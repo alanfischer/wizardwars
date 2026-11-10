@@ -680,11 +680,6 @@ func _update_one_vr_hand(is_right: bool) -> void:
 		wrist_xform.origin - model_basis * hand_offset)
 
 
-func apply_local_spawn_state(new_element: int = -1, reload_loadout: bool = true, dismount: bool = true) -> void:
-	reset_for_spawn(new_element, reload_loadout, dismount)
-	_on_spawn_state_reset()
-
-
 func _on_spawn_state_reset() -> void:
 	_clear_all_statuses()
 	_pending_dragon_mount_id = -1  # reset_for_spawn dismounts; don't replay a parked mount
@@ -1039,19 +1034,13 @@ func _respawn() -> void:
 		_last_input_cmd = null
 		return
 	# Apply a role queued via die_for_class_change (mirrors remote_player._host_respawn).
-	var applied_change := class_change_pending_team >= 0
-	if applied_change:
+	if class_change_pending_team >= 0:
 		team = class_change_pending_team
 		set_element(class_change_pending_element)
 		class_change_pending_team = -1
 		class_change_pending_element = -1
 	var sp := SpawnSystem.get_spawn_for_team(team)
 	spawn_at(sp, element, false)
-	# Network: broadcast host player respawn so clients re-show the puppet
-	if NetworkManager.is_online() and NetworkManager.is_host():
-		sync_spawn_to_network(sp, false, false, true)
-		if applied_change:
-			NetworkManager.sync_team_for_peer.rpc(peer_id, team, element, global_position, rotation.y)
 	Log.info("Player respawned")
 
 
