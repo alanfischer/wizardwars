@@ -91,9 +91,8 @@ func select_team_class(team: int, element: int) -> void:
 		return
 	var is_actual_change : bool = lp.team != team or lp.element != element
 	# Re-confirming the same class is a no-op (matches TFC): otherwise an alive player would
-	# die()+instantly respawn (free heal + teleport to base) and a dead one would skip the respawn
-	# delay. Spectators and first-join always differ (team NONE), so this only short-circuits a
-	# true reselect.
+	# die()+respawn (free heal + teleport to base). Spectators and first-join always differ (team
+	# NONE), so this only short-circuits a true reselect.
 	if not is_actual_change and not lp.spectating:
 		return
 	if NetworkManager.is_online():

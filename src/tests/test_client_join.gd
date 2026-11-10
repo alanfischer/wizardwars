@@ -7,19 +7,8 @@ const ClientJoinScript := preload("res://src/systems/client_join.gd")
 const LocalPlayerScene := preload("res://src/local_player.tscn")
 
 
-class FakeSpawn extends Node3D:
-	var team_no := 0
-	var goal_no := 0
-	var group_no := 0
-	var items := 0
-
-	func get_spawn_position() -> Vector3:
-		return position
-
-
 var _join: Node
 var _saved_player: LocalPlayer
-var _spawns: Array[Node3D] = []
 var _scene_children: Array[Node] = []
 
 
@@ -33,29 +22,23 @@ func _setup_test(_test_name: String) -> void:
 
 func _teardown_test() -> void:
 	Game.local_player = _saved_player
-	for sp in _spawns:
-		SpawnSystem.unregister(sp)
-	_spawns.clear()
 	for n in _tree().current_scene.get_children():
 		if not n in _scene_children:
 			n.free()  # the class-change corpse
 	super._teardown_test()
 
 
-func _spawn_for(team: int, at: Vector3) -> FakeSpawn:
-	var sp: FakeSpawn = _keep(FakeSpawn.new())
-	sp.team_no = team
+## Registers itself with SpawnSystem on entering the tree and unregisters on leaving it.
+func _spawn_for(team: int, at: Vector3) -> void:
+	var sp: InfoPlayerSpawn = _keep(InfoPlayerSpawn.new())
+	sp.set_meta("entity", {"classname": "info_player_teamspawn", "team_no": str(team)})
 	sp.position = at
 	_root().add_child(sp)
-	SpawnSystem.register(sp, 0, 0)
-	_spawns.append(sp)
-	return sp
 
 
 func _local_player() -> LocalPlayer:
 	var lp: LocalPlayer = _keep(LocalPlayerScene.instantiate())
 	_root().add_child(lp)
-	await _physics_tick()
 	lp.set_physics_process(false)
 	lp.set_process(false)
 	lp.set_spectating(true)  # as main leaves it on map load: no team picked yet
@@ -102,7 +85,7 @@ func test_no_player_means_no_menu_on_start() -> void:
 
 
 func test_a_first_pick_spawns_at_once() -> void:
-	var lp := await _local_player()
+	var lp := _local_player()
 	_spawn_for(1, Vector3(5, 0, 0))
 	assert_true(lp.spectating, "precondition: never spawned")
 	_join.select_team_class(1, GameConsts.Element.ICE)
@@ -114,7 +97,7 @@ func test_a_first_pick_spawns_at_once() -> void:
 
 
 func test_a_first_pick_with_no_spawn_reopens_the_menu() -> void:
-	var lp := await _local_player()
+	var lp := _local_player()
 	var menu: TeamSelectUI = _keep(_join.build_menu())
 	_root().add_child(menu)
 	_join.select_team_class(3, GameConsts.Element.ICE)
@@ -125,7 +108,7 @@ func test_a_first_pick_with_no_spawn_reopens_the_menu() -> void:
 
 
 func test_a_class_change_waits_for_the_respawn() -> void:
-	var lp := await _local_player()
+	var lp := _local_player()
 	_spawn_for(1, Vector3.ZERO)
 	_join.select_team_class(1, GameConsts.Element.FIRE)
 	_join.select_team_class(1, GameConsts.Element.ICE)
@@ -140,7 +123,7 @@ func test_a_class_change_waits_for_the_respawn() -> void:
 
 
 func test_a_pick_while_dead_replaces_the_queued_one() -> void:
-	var lp := await _local_player()
+	var lp := _local_player()
 	_spawn_for(1, Vector3.ZERO)
 	_spawn_for(2, Vector3.ZERO)
 	_join.select_team_class(1, GameConsts.Element.FIRE)
@@ -150,12 +133,3 @@ func test_a_pick_while_dead_replaces_the_queued_one() -> void:
 	lp._respawn()
 	assert_eq(lp.team, 1, "the last pick wins")
 	assert_eq(lp.element, GameConsts.Element.FIRE, "back on the old class")
-
-
-func _physics_tick() -> void:
-	await _tree().physics_frame
-	await _tree().physics_frame
-
-
-func _tree() -> SceneTree:
-	return Engine.get_main_loop() as SceneTree

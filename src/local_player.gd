@@ -1033,7 +1033,7 @@ func _respawn() -> void:
 		_movement.clear()
 		_last_input_cmd = null
 		return
-	# Apply a role queued via die_for_class_change (mirrors remote_player._host_respawn).
+	# Apply a role queued via die_for_class_change.
 	if class_change_pending_team >= 0:
 		team = class_change_pending_team
 		set_element(class_change_pending_element)
