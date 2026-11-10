@@ -258,8 +258,9 @@ func get_modifiers(
 	return mods
 
 
-## Rain-soaked ground is a little slick: less ground friction, and so less grip to speed up; iced
-## over, far slicker. Goes by the server's ground, so the client predicts what the server simulates.
+## Rain-soaked ground is a little slick: less ground friction, and so less grip to speed up. Ice
+## takes the grip twice over, as frost does, so it slows as well as slides. Goes by the server's
+## ground, so the client predicts what the server simulates.
 func _slick_when_wet(mods: Movement.MovementModifiers, state: Movement.MovementState) -> void:
 	var weather := Game.weather_system
 	if weather == null:
@@ -270,3 +271,4 @@ func _slick_when_wet(mods: Movement.MovementModifiers, state: Movement.MovementS
 	var wet := float(ServerVars.get_value("wet_friction", 1.0))
 	var icy := float(ServerVars.get_value("ice_friction", 1.0))
 	mods.friction_scale *= lerpf(1.0, lerpf(wet, icy, minf(ground.y / ground.x, 1.0)), ground.x)
+	mods.accel_scale *= lerpf(1.0, icy, ground.y)

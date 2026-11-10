@@ -226,6 +226,7 @@ func test_ice_spells_freeze_wet_ground_slick_and_fire_thaws_it() -> void:
 	var mods := Movement.MovementModifiers.new()
 	ctx._slick_when_wet(mods, state)
 	assert_almost_eq(mods.friction_scale, icy, 1e-6, "and it is ice to walk on")
+	assert_almost_eq(mods.accel_scale, icy, 1e-6, "which takes the grip twice over, as frost does")
 	NetworkManager.test_authority = NetworkManager.TestAuthority.CLIENT
 	WeatherSystem.heat_ground(state.position, 2.0)
 	NetworkManager.test_authority = NetworkManager.TestAuthority.REAL
@@ -234,6 +235,7 @@ func test_ice_spells_freeze_wet_ground_slick_and_fire_thaws_it() -> void:
 	mods = Movement.MovementModifiers.new()
 	ctx._slick_when_wet(mods, state)
 	assert_almost_eq(mods.friction_scale, wet, 1e-6, "fire thaws it back to wet")
+	assert_eq(mods.accel_scale, 1.0, "and wet alone only the once")
 	weather.set_ground(0.0, 0.0, 0.0)
 	WeatherSystem.heat_ground(state.position, IceShard.GROUND_FREEZE_RADIUS, -1.0)
 	assert_eq(weather.footing(state.position), Vector2.ZERO, "dry ground has nothing to freeze")
