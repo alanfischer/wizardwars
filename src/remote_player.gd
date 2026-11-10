@@ -1514,7 +1514,7 @@ func _host_respawn(force: bool = false) -> void:
 		return
 	# Resolve the spawn for the team we'll land on (honoring a queued class/team change) BEFORE
 	# touching any state — a null spawn must abort cleanly.
-	var next_team: int = class_change_pending_team if class_change_pending_team >= 0 else team
+	var next_team := _respawn_team()
 	var sp := SpawnSystem.get_spawn_for_team(next_team)
 	if sp == null:
 		# No active spawn right now (spawns toggled off on a control map, or a transient gap). Do NOT
@@ -1530,12 +1530,7 @@ func _host_respawn(force: bool = false) -> void:
 	# Apply a class/team change queued via die_for_class_change now that the
 	# respawn delay has elapsed. Combat deaths and class-change deaths share this
 	# timer, so the pending role is honored however the player died.
-	var applied_change := class_change_pending_team >= 0
-	if applied_change:
-		team = class_change_pending_team
-		set_element(class_change_pending_element)
-		class_change_pending_team = -1
-		class_change_pending_element = -1
+	var applied_change := _apply_pending_role()
 	# Beanstalks and thornplants persist across death and forced-respawn —
 	# only class/team change destroys them (see cleanup_for_class_change).
 	# Move to spawn BEFORE re-enabling collision and marking alive,

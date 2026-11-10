@@ -4,10 +4,10 @@ extends Node
 ## One screen's worth of UI drives a sequence that spans the network: the menu's selection becomes
 ## a request_join_team, the server answers with assign_spawn or reject_team_join, and nothing on
 ## screen says which until it arrives. Three things have to hold through that gap — a live player
-## can't dodge death by switching class, a re-pick of the same role is a no-op, and a request that
-## never lands has to re-ask rather than leave a spectator staring at an empty map. Those are the
-## three mechanisms in this file: the respawn-timer handoff, the is_actual_change gate, and the
-## watchdog.
+## can't dodge death by switching class, a re-pick of the current role only drops a queued change,
+## and a request that never lands has to re-ask rather than leave a spectator staring at an empty
+## map. Those are the three mechanisms in this file: the role queued for the respawn (die_for_class_change), the
+## is_actual_change gate, and the watchdog.
 ##
 ## Offline is the same sequence with the round-trip removed: no server to ask, so the death,
 ## cleanup and respawn all apply locally.
@@ -20,9 +20,6 @@ extends Node
 const JOIN_WATCHDOG_DELAY := 4.0
 const JOIN_MAX_RETRIES := 3
 
-var _local_class_change_pending_team := -1
-var _local_class_change_pending_element := -1
-var _local_class_change_waiting := false
 var _pending_join_seq := 0
 var _pending_join_tries := 0
 
@@ -94,9 +91,8 @@ func select_team_class(team: int, element: int) -> void:
 		return
 	var is_actual_change : bool = lp.team != team or lp.element != element
 	# Re-confirming the same class is a no-op (matches TFC): otherwise an alive player would
-	# die()+instantly respawn (free heal + teleport to base) and a dead one would skip the respawn
-	# delay. Spectators and first-join always differ (team NONE), so this only short-circuits a
-	# true reselect.
+	# die()+respawn (free heal + teleport to base). Spectators and first-join always differ (team
+	# NONE), so this only short-circuits a true reselect.
 	if not is_actual_change and not lp.spectating:
 		return
 	if NetworkManager.is_online():
@@ -111,84 +107,39 @@ func select_team_class(team: int, element: int) -> void:
 		if lp.spectating and not lp.is_dead:
 			clear_watchdog()  # a fresh pick starts its retry budget over
 			_arm_join_watchdog(team, element)
+		elif is_actual_change:
+			# The server queues it for the respawn. Kept here too, so the respawn watchdog asks
+			# for this role: asking for the current one would cancel it.
+			lp.class_change_pending_team = team
+			lp.class_change_pending_element = element
+		else:
+			lp.cancel_class_change()
 		return
 	# Offline: no server round-trip, so apply death/cleanup and respawn locally. Re-confirming the
 	# same role keeps owned plants, matching TFC class-menu behavior.
 	if is_actual_change:
 		lp.cleanup_for_class_change()
-	var was_alive : bool = not lp.is_dead and not lp.spectating
-	if was_alive:
-		lp.die()
-	# Redirect the respawn timer to apply the class change after the delay, so a live player can't
-	# dodge death by switching class mid-combat.
-	if lp._respawn_timer and lp._respawn_timer.time_left > 0:
-		# A re-confirm with nothing already queued rides the timer out as it is.
-		if _local_class_change_waiting or is_actual_change:
-			_queue_local_class_change(lp, team, element)
+	if lp.spectating and not lp.is_dead:
+		_spawn_offline(lp, team, element)
 		return
-	_finish_class_change(lp, team, element)
-
-
-func _queue_local_class_change(lp: LocalPlayer, team: int, element: int) -> void:
-	_local_class_change_pending_team = team
-	_local_class_change_pending_element = element
-	var timer = lp._respawn_timer
-	if not timer or timer.time_left <= 0.0:
-		_on_local_class_change_timeout()
-		return
-	var default_respawn := Callable(lp, "_respawn")
-	if timer.timeout.is_connected(default_respawn):
-		timer.timeout.disconnect(default_respawn)
-	var class_change_timeout := Callable(self, "_on_local_class_change_timeout")
-	if not _local_class_change_waiting and not timer.timeout.is_connected(class_change_timeout):
-		_local_class_change_waiting = true
-		timer.timeout.connect(class_change_timeout)
-
-
-func _on_local_class_change_timeout() -> void:
-	_local_class_change_waiting = false
-	var lp := Game.local_player
-	if lp:
-		lp._respawn_timer = null
-	var team := _local_class_change_pending_team
-	var element := _local_class_change_pending_element
-	_local_class_change_pending_team = -1
-	_local_class_change_pending_element = -1
-	if not lp or team < 0 or element < 0:
-		return
-	if not lp.is_dead and not lp.spectating:
-		return
-	_finish_class_change(lp, team, element)
-
-
-func _finish_class_change(lp: LocalPlayer, team: int, element: int) -> void:
-	_local_class_change_pending_team = -1
-	_local_class_change_pending_element = -1
-	_local_class_change_waiting = false
-	lp.is_dead = false
-	lp._stop_all_attacks()
-	lp.apply_local_spawn_state(element, true, true)
-	Log.info("[team_class_selected] element=%d wizard_speed=%.3f" % [element, lp.speed_multiplier])
-	_join_team(lp, team)
-
-
-func _join_team(lp: LocalPlayer, team: int) -> void:
-	lp.team = team
-	if NetworkManager.is_online() and not NetworkManager.is_host():
-		# Client: ask host to pick a spawn and send us coordinates
-		NetworkManager.send_request_join_team(team, lp.element)
-		return
-	# Host or offline: pick spawn locally
-	var sp := SpawnSystem.get_spawn_for_team(team)
-	if sp:
-		lp.spawn_at(sp, lp.element, true)
-		if NetworkManager.is_online():
-			NetworkManager.set_player_team(multiplayer.get_unique_id(), team)  # host copy of the PVS-independent roster
-			NetworkManager.sync_team_for_peer.rpc(multiplayer.get_unique_id(), team, lp.element, lp.position, lp.rotation.y)
-		Log.info("Joined team %d (element=%d), spawned at %s, yaw=%.1f°" % [
-			team, lp.element, sp.position, rad_to_deg(sp.rotation.y)])
+	# The respawn timer applies the pick, so a live player can't dodge death by switching class
+	# mid-combat.
+	if is_actual_change:
+		lp.die_for_class_change(team, element)
 	else:
-		push_warning("No active spawn point found for team %d" % team)
+		lp.cancel_class_change()
+
+
+## A never-spawned spectator has no death to serve.
+func _spawn_offline(lp: LocalPlayer, team: int, element: int) -> void:
+	var sp := SpawnSystem.get_spawn_for_team(team)
+	if sp == null:
+		_abandon("%s has no spawn point" % GoalSystem.get_team_name(team))
+		return
+	lp.team = team
+	lp.spawn_at(sp, element, true)
+	Log.info("Joined team %d (element=%d), spawned at %s, yaw=%.1f°" % [
+		team, element, sp.position, rad_to_deg(sp.rotation.y)])
 
 
 ## The server refused a team (full, no active spawn, class restricted).

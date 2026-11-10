@@ -1919,6 +1919,7 @@ func _on_assign_spawn(pos: Vector3, yaw: float, team: int, element: int = GameCo
 	if not _local_player:
 		return
 	_client_join.clear_watchdog()
+	_local_player.cancel_class_change()  # the server applied whatever was queued
 	_local_player.team = team
 	var previous_speed : float = _local_player.speed_multiplier
 	_local_player.spawn_at_transform(pos, yaw, element, true)

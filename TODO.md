@@ -7,31 +7,6 @@
   and the client map download flags. The rule the earlier peels share: gameplay state comes off
   `Game`, node references come by injection.
 
-- Retire the offline class-change path's private copy of a mechanism `Player` already has.
-  `client_join.gd`'s `_queue_local_class_change` / `_on_local_class_change_timeout` reach into
-  LocalPlayer's privates from outside — read `_respawn_timer`, disconnect the player's own
-  `_respawn` Callable from it, substitute their own, and later null the field — with three fields
-  and a `_waiting` latch to keep that swap honest. `player.gd` 339 `die_for_class_change(team,
-  element)` is the same mechanism on the object that owns it, documented as safe to call
-  repeatedly while counting down, and the authoritative path already uses it
-  (`server_requests.gd` 172). Found during the ClientJoin peel review; left alone there because a
-  pure move was the commit's job.
-
-  Three things to settle rather than assume, which is why this is its own item and not a cleanup:
-  `die_for_class_change` guards only `if not is_dead`, so it would `die()` a never-spawned
-  spectator that the current `was_alive` check deliberately spares (a `spectating` guard on it
-  would also harden the server path); `local_player.gd` 1054-1060, the consumer that would start
-  carrying this, is dead code today — nothing sets `class_change_pending_team` on a LocalPlayer, so
-  it has never run; and `_finish_class_change` currently calls `apply_local_spawn_state` and then
-  `_join_team` -> `spawn_at`, which re-runs `reset_for_spawn` + `_on_spawn_state_reset`, so the two
-  routes are not bit-identical today. That double reset is worth fixing on its own terms, but note
-  it is load-bearing in one case: when `get_spawn_for_team` returns null, the first reset is what
-  still applies the new element. While in there, `_join_team`'s `is_online()` branches are
-  unreachable — `_finish_class_change` is only reached from the offline tail of
-  `select_team_class` — and they are a fourth copy of the `set_player_team` +
-  `sync_team_for_peer.rpc` pair (`bot_system.gd` 107, `remote_player.gd` 1489,
-  `server_requests.gd` 193).
-
 - Give the entities that never move a presence-only sync. 19 classes call `_register_for_sync()`
   and most are scenery — `env_sprite`, `light_entity`, `ambient_generic`, `info_tfgoal`,
   `item_healthkit` — which take a `MoverNetPublisher` purely because the MoverSync is also the PVS

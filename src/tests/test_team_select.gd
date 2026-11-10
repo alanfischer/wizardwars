@@ -222,3 +222,20 @@ func test_a_full_team_is_refused_as_full_not_as_spawnless() -> void:
 
 	assert_eq(spy.got.size(), 1, "a full team answers the asker")
 	assert_eq(spy.got[0][1], "is full", "with the reason that actually stopped the join")
+
+
+## Picking B, then your current role A again while dead, means "never mind": you come back as A.
+## The old server ignored the second pick and still respawned you as B.
+func test_re_picking_the_current_role_while_dead_cancels_the_queued_change() -> void:
+	var p := _add_player(7)
+	p.team = Team.BLUE
+	p.element = GameConsts.Element.FIRE
+	p.is_dead = true
+	p.class_change_pending_team = Team.RED
+	p.class_change_pending_element = GameConsts.Element.ICE
+
+	ServerRequests.join_team(7, Team.BLUE, GameConsts.Element.FIRE)
+
+	assert_eq(p.class_change_pending_team, -1, "the queued change is dropped")
+	assert_eq(p.team, Team.BLUE, "and the player is still on their own team")
+	assert_true(p.is_dead, "the death still runs its course")

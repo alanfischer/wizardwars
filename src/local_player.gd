@@ -404,8 +404,8 @@ func _on_died(_attacker: Node3D, type: int = GameConsts.DamageType.PHYSICAL,
 
 
 ## Recover a stranded spectator whose assign_spawn never arrived. As host, re-run our own
-## body puppet's respawn (force=true bypasses its is_dead guard); as a client, re-request our
-## current role. `seq` guards against acting on a death a later respawn/death superseded.
+## body puppet's respawn (force=true bypasses its is_dead guard); as a client, re-request the
+## role we respawn as. `seq` guards against acting on a death a later respawn/death superseded.
 func _respawn_watchdog(seq: int) -> void:
 	if seq != _death_seq or not spectating or not is_dead:
 		return
@@ -419,7 +419,7 @@ func _respawn_watchdog(seq: int) -> void:
 		if puppet and puppet != self and puppet.has_method("_host_respawn"):
 			puppet._host_respawn(true)
 	elif team != GameConsts.Team.NONE:
-		NetworkManager.send_request_join_team(team, element)
+		NetworkManager.send_request_join_team(_respawn_team(), _respawn_element())
 
 
 ## Set camera zoom to the given FOV. Pass 0.0 to restore the default FOV.
@@ -678,11 +678,6 @@ func _update_one_vr_hand(is_right: bool) -> void:
 	var model_basis := wrist_xform.basis * calib
 	model.global_transform = Transform3D(model_basis,
 		wrist_xform.origin - model_basis * hand_offset)
-
-
-func apply_local_spawn_state(new_element: int = -1, reload_loadout: bool = true, dismount: bool = true) -> void:
-	reset_for_spawn(new_element, reload_loadout, dismount)
-	_on_spawn_state_reset()
 
 
 func _on_spawn_state_reset() -> void:
@@ -1038,35 +1033,16 @@ func _respawn() -> void:
 		_movement.clear()
 		_last_input_cmd = null
 		return
-	# Apply a role queued via die_for_class_change (mirrors remote_player._host_respawn).
-	var applied_change := class_change_pending_team >= 0
-	if applied_change:
-		team = class_change_pending_team
-		set_element(class_change_pending_element)
-		class_change_pending_team = -1
-		class_change_pending_element = -1
-	var sp := SpawnSystem.get_spawn_for_team(team)
-	spawn_at(sp, element, false)
-	# Network: broadcast host player respawn so clients re-show the puppet
-	if NetworkManager.is_online() and NetworkManager.is_host():
-		sync_spawn_to_network(sp, false, false, true)
-		if applied_change:
-			NetworkManager.sync_team_for_peer.rpc(peer_id, team, element, global_position, rotation.y)
-	Log.info("Player respawned")
-
-
-## Called by TFC goal system (GR_FORCE_RESPAWN_NO_DIE) to respawn the host
-## player without a death animation. Mirrors remote_player.gd._host_respawn(true).
-func _host_respawn(_force: bool = false) -> void:
-	if team == GameConsts.Team.NONE:
+	if not is_dead:
+		return  # a round reset got here first
+	# No spawn point, no spawn: stay dead and look again, as RemotePlayer._host_respawn does.
+	var sp := SpawnSystem.get_spawn_for_team(_respawn_team())
+	if sp == null:
+		get_tree().create_timer(1.0).timeout.connect(_respawn)
 		return
-	# Beanstalks and thornplants persist across death and forced-respawn —
-	# only class/team change destroys them (see ClientJoin.select_team_class).
-	var sp := SpawnSystem.get_spawn_for_team(team)
-	spawn_at(sp, element, true)
-	# Broadcast respawn so other clients re-show the puppet
-	if NetworkManager.is_online():
-		sync_spawn_to_network(sp, false, false, true)
+	_apply_pending_role()
+	spawn_at(sp, element, false)
+	Log.info("Player respawned")
 
 
 # --- Trigger (FireControl's shooter) ---
