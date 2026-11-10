@@ -4,9 +4,9 @@ extends Node
 ## One screen's worth of UI drives a sequence that spans the network: the menu's selection becomes
 ## a request_join_team, the server answers with assign_spawn or reject_team_join, and nothing on
 ## screen says which until it arrives. Three things have to hold through that gap — a live player
-## can't dodge death by switching class, a re-pick of the same role is a no-op, and a request that
-## never lands has to re-ask rather than leave a spectator staring at an empty map. Those are the
-## three mechanisms in this file: the role queued for the respawn (die_for_class_change), the
+## can't dodge death by switching class, a re-pick of the current role only drops a queued change,
+## and a request that never lands has to re-ask rather than leave a spectator staring at an empty
+## map. Those are the three mechanisms in this file: the role queued for the respawn (die_for_class_change), the
 ## is_actual_change gate, and the watchdog.
 ##
 ## Offline is the same sequence with the round-trip removed: no server to ask, so the death,
@@ -107,6 +107,13 @@ func select_team_class(team: int, element: int) -> void:
 		if lp.spectating and not lp.is_dead:
 			clear_watchdog()  # a fresh pick starts its retry budget over
 			_arm_join_watchdog(team, element)
+		elif is_actual_change:
+			# The server queues it for the respawn. Kept here too, so the respawn watchdog asks
+			# for this role: asking for the current one would cancel it.
+			lp.class_change_pending_team = team
+			lp.class_change_pending_element = element
+		else:
+			lp.cancel_class_change()
 		return
 	# Offline: no server round-trip, so apply death/cleanup and respawn locally. Re-confirming the
 	# same role keeps owned plants, matching TFC class-menu behavior.
@@ -116,8 +123,11 @@ func select_team_class(team: int, element: int) -> void:
 		_spawn_offline(lp, team, element)
 		return
 	# The respawn timer applies the pick, so a live player can't dodge death by switching class
-	# mid-combat. A same-role pick while dead re-queues the current role over any earlier pick.
-	lp.die_for_class_change(team, element)
+	# mid-combat.
+	if is_actual_change:
+		lp.die_for_class_change(team, element)
+	else:
+		lp.cancel_class_change()
 
 
 ## A never-spawned spectator has no death to serve.

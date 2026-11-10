@@ -122,14 +122,31 @@ func test_a_class_change_waits_for_the_respawn() -> void:
 	assert_eq(lp.class_change_pending_team, -1, "nothing left queued")
 
 
-func test_a_pick_while_dead_replaces_the_queued_one() -> void:
+func test_re_picking_the_current_role_while_dead_cancels_the_queued_change() -> void:
 	var lp := _local_player()
 	_spawn_for(1, Vector3.ZERO)
 	_spawn_for(2, Vector3.ZERO)
 	_join.select_team_class(1, GameConsts.Element.FIRE)
 	_join.select_team_class(2, GameConsts.Element.ICE)
 	_join.select_team_class(1, GameConsts.Element.FIRE)
-	assert_true(lp.is_dead, "still serving the first death")
+	assert_true(lp.is_dead, "still serving the death")
+	assert_eq(lp.class_change_pending_team, -1, "nothing queued")
 	lp._respawn()
-	assert_eq(lp.team, 1, "the last pick wins")
-	assert_eq(lp.element, GameConsts.Element.FIRE, "back on the old class")
+	assert_eq(lp.team, 1, "back on the old team")
+	assert_eq(lp.element, GameConsts.Element.FIRE, "as the old class")
+
+
+func test_no_spawn_point_means_no_respawn() -> void:
+	var lp := _local_player()
+	_spawn_for(1, Vector3.ZERO)
+	_join.select_team_class(1, GameConsts.Element.FIRE)
+	_join.select_team_class(2, GameConsts.Element.ICE)
+	lp._respawn()
+	assert_true(lp.is_dead, "no spawn for the new team: still dead")
+	assert_eq(lp.team, 1, "the change stays queued")
+	assert_eq(lp.class_change_pending_team, 2, "for when a spawn turns up")
+	_spawn_for(2, Vector3(7, 0, 0))
+	lp._respawn()
+	assert_false(lp.is_dead, "a spawn turned up")
+	assert_eq(lp.team, 2, "on the new team")
+	assert_almost_eq(lp.global_position.x, 7.0, 0.01, "at its spawn")

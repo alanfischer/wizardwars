@@ -355,6 +355,31 @@ func die_for_class_change(pending_team: int, pending_element: int) -> void:
 		die()
 
 
+## Re-picking the current role while dead drops a queued change; the death still runs its course.
+func cancel_class_change() -> void:
+	class_change_pending_team = -1
+	class_change_pending_element = -1
+
+
+## The team the next respawn lands on: the queued one if a change is pending.
+func _respawn_team() -> int:
+	return class_change_pending_team if class_change_pending_team >= 0 else team
+
+
+func _respawn_element() -> int:
+	return class_change_pending_element if class_change_pending_team >= 0 else element
+
+
+## Apply a role queued by die_for_class_change. True when there was one.
+func _apply_pending_role() -> bool:
+	if class_change_pending_team < 0:
+		return false
+	team = class_change_pending_team
+	set_element(class_change_pending_element)
+	cancel_class_change()
+	return true
+
+
 ## Give mana (resupply/backpack pickup). Authority-side: syncs the new totals to
 ## the owner — for the host body / offline this dispatches _on_sync_mana locally.
 func add_mana(amount: float) -> void:

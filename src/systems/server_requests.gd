@@ -147,7 +147,8 @@ static func join_team(peer_id: int, team: int, element: int) -> void:
 			remote.die_for_class_change(team, element)
 			return
 	elif remote.is_dead:
-		return  # same-role request while dead: the existing respawn timer owns the countdown
+		remote.cancel_class_change()  # the respawn timer still owns the countdown
+		return
 	# Resolve the spawn BEFORE committing the team. Spawns toggle off on control maps, and
 	# recording a team we then fail to spawn strands the client: no assign_spawn arrives, so the
 	# view sits in the spectator cam with nothing to re-drive the join, while the host starts
