@@ -36,10 +36,17 @@ const CACHE_VERSION := 3
 func convert(bsp_name: String) -> bool:
 	var scn_path := "%s/%s.scn" % [CACHE_DIR, bsp_name]
 	if FileAccess.file_exists(scn_path):
-		# Loading the PackedScene to read the stamp is cheap — the sub-resources aren't
-		# built until instantiate() (177 MB ww_chasm loads in ~50ms) — so this asks the
-		# file itself rather than trusting anything alongside it.
+		# Loading the PackedScene to read the stamp is cheap (177 MB ww_chasm loads in ~50ms), so
+		# this asks the file itself rather than trusting anything alongside it. Muted, because its
+		# shaders compile on load and a stale file's call the hook by an older signature; a fresh
+		# one is loaded again, unmuted, by whoever plays it.
+		var errors := Engine.print_error_messages
+		var stdout := Engine.print_to_stdout
+		Engine.print_error_messages = false
+		Engine.print_to_stdout = false
 		var cached := ResourceLoader.load(scn_path, "", ResourceLoader.CACHE_MODE_IGNORE) as PackedScene
+		Engine.print_error_messages = errors
+		Engine.print_to_stdout = stdout
 		var cached_version := scene_cache_version(cached)
 		var cached_pipeline := scene_pipeline_id(cached)
 		var pipeline := pipeline_id()
