@@ -32,7 +32,6 @@ var _is_on: bool = true
 var _initial_is_on: bool = true
 var _ls_image: Image = null
 var _ls_texture: ImageTexture = null
-var _bsp: Node = null  # fallback for legacy C++ path
 var _light_node: Light3D = null
 var _base_energy: float = 1.0
 
@@ -42,11 +41,10 @@ func _ready() -> void:
 	_register_for_sync()
 	_style = parse_int(ent, "style", 0)
 	var spawnflags := parse_spawnflags(ent)
-	var scene := get_tree().current_scene
-	_ls_image = scene.get("lightstyle_image") if scene else null
-	_ls_texture = scene.get("lightstyle_texture") if scene else null
-	if not _ls_image:
-		_bsp = scene.get("_bsp") if scene else null
+	# The map's scene root owns a map-placed entity; a spawned one has no shared lightstyles to drive.
+	if owner and owner.has_meta("lightstyle_image"):
+		_ls_image = owner.get_meta("lightstyle_image")
+		_ls_texture = owner.get_meta("lightstyle_texture")
 
 	if LIGHTSTYLE_PATTERNS.has(_style):
 		_pattern = LIGHTSTYLE_PATTERNS[_style]
@@ -162,6 +160,3 @@ func _set_lightstyle(brightness: float) -> void:
 		# Shader path: update pixel in shared 64×1 brightness texture
 		_ls_image.set_pixel(_style, 0, Color(brightness, 0, 0, 1))
 		_ls_texture.update(_ls_image)
-	elif _bsp:
-		# Legacy C++ fallback
-		_bsp.set_lightstyle(_style, brightness)

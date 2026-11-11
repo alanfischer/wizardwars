@@ -48,7 +48,7 @@ func _enter_tree() -> void:
 func _physics_process(_delta: float) -> void:
 	if _pvs_cam:
 		VisibilitySystem.set_local_position(_pvs_cam.global_position)
-		var weather: WeatherSystem = get_tree().current_scene.get("weather_system")
+		var weather: WeatherSystem = Game.weather_system
 		if weather:
 			weather.attach_player(_pvs_cam)
 		var world_env := get_tree().root.find_child("WorldEnvironment", true, false) as WorldEnvironment
