@@ -91,10 +91,6 @@ var _current_map_info := ""  # raw text of maps/<map>.txt for the MOTD panel
 var _current_map_world := ""  # raw text of maps/<map>.ww (world-map briefing)
 var _local_player_name := "Wizard"
 
-# Client join state: must wait for BOTH map and resources before loading
-var _local_map_ready := false
-var _local_resources_ready := false
-var _local_pending_map_name := ""
 
 
 
@@ -461,7 +457,7 @@ func _ready() -> void:
 	MapTransfer.map_already_cached.connect(_on_map_ready)
 	MapTransfer.map_transfer_complete.connect(_on_map_ready)
 	MapTransfer.map_transfer_failed.connect(_on_map_transfer_failed)
-	MapTransfer.resources_ready.connect(_on_resources_ready)
+	MapTransfer.ready_to_load.connect(_on_ready_to_load)
 	MapTransfer.resources_transfer_progress.connect(_on_resources_transfer_progress)
 	NetworkManager.map_change_requested.connect(_on_map_change_requested)
 	_lobby.show_menu()
@@ -730,9 +726,6 @@ func _unload_map() -> void:
 	_skybox.clear()
 	NetworkManager.clear_players()
 	_map_world.clear()
-	_local_map_ready = false
-	_local_resources_ready = false
-	_local_pending_map_name = ""
 	_client_join.clear_watchdog()  # the new map re-asks from scratch; don't resend the old map's pick
 
 
@@ -902,11 +895,8 @@ func _set_status(text: String) -> void:
 		_lobby.set_status(text)
 
 
-func _on_map_ready(map_name: String) -> void:
-	_local_pending_map_name = map_name
-	_local_map_ready = true
+func _on_map_ready(_map_name: String) -> void:
 	_set_status("Map ready, waiting for resources...")
-	_try_activate_local_player()
 
 
 func _on_map_transfer_failed() -> void:
@@ -914,12 +904,6 @@ func _on_map_transfer_failed() -> void:
 		return
 	NetworkManager._disconnect_reason = "Failed to download map from server."
 	NetworkManager.disconnect_from_game()
-
-
-func _on_resources_ready() -> void:
-	Log.info("Resources ready (transferred or cached)")
-	_local_resources_ready = true
-	_try_activate_local_player()
 
 
 func _on_resources_transfer_progress(current: int, total: int) -> void:
@@ -953,7 +937,7 @@ func _restore_carried_bots() -> void:
 
 
 ## Tear down the current map and wait for the follow-up MapTransfer map info / manifest
-## that re-triggers the normal download + _try_activate_local_player flow.
+## that re-triggers the normal download and ready_to_load.
 func _on_map_change_requested(new_map_name: String) -> void:
 	Log.info("Map change requested by server: %s" % new_map_name)
 	_capture_carry_state()
@@ -1016,17 +1000,13 @@ func change_map(new_map_name: String) -> void:
 		new_map_name, multiplayer.get_peers().size()])
 
 
-## Activate the client only when both map and resources are ready.
-func _try_activate_local_player() -> void:
-	if not _local_map_ready or not _local_resources_ready:
-		return
-	_local_map_ready = false
-	_local_resources_ready = false
-	_current_map_name = _local_pending_map_name
+## The map and its resources are both on disk.
+func _on_ready_to_load(map_name: String) -> void:
+	_current_map_name = map_name
 	# Wait a frame so the UI actually redraws before the synchronous _load_map blocks the main thread.
-	_set_status("Loading %s..." % _local_pending_map_name)
+	_set_status("Loading %s..." % map_name)
 	await get_tree().process_frame
-	_load_map(_local_pending_map_name)
+	_load_map(map_name)
 	_set_game_active(true)
 	_spawn_missed_players()
 	NetworkManager._request_entity_state.rpc_id(1)
