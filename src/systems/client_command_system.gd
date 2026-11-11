@@ -16,9 +16,6 @@ func _ready() -> void:
 	_register("sim_latency", _cmd_sim_latency, "/sim_latency <min,max | fixed_ms | 0>",       "Set simulated per-leg send latency in ms on this endpoint. 0 disables.")
 	_register("sim_loss",    _cmd_sim_loss,    "/sim_loss <0-100>",                           "Set simulated packet loss % (unreliable sends) on this endpoint.")
 	_register("sim_spike",   _cmd_sim_spike,   "/sim_spike <ms[,interval_s[,duration_s]] | 0>", "Configure WiFi spike simulation. 0 disables.")
-	_register("motd",        _cmd_motd,        "/motd",                                       "Re-show the current map's description.")
-	_register("mapinfo",     _cmd_motd,        "/mapinfo",                                    "Re-show the current map's description.")
-	_register("intro",       _cmd_intro,       "/intro",                                      "Re-show the controls card for new players.")
 	_register("interp_diag", _cmd_interp_diag, "/interp_diag [on|off|dump]",                  "Measure how well the entity snapshot stream feeds interpolation. Reports to the client log.")
 	_register("bind",       _cmd_bind,       "/bind <key> <control>",                        "Put a control on a key. /bind with no argument lists the controls.")
 	_register("unbind",     _cmd_unbind,     "/unbind <control>",                            "Leave a control with no key at all.")
@@ -111,22 +108,6 @@ func _cmd_quit(_args: String) -> void:
 	if NetworkManager.is_online():
 		NetworkManager.disconnect_from_game()
 	get_tree().quit()
-
-
-func _cmd_intro(_args: String) -> void:
-	var main_scene = get_tree().current_scene
-	if main_scene and main_scene.has_method("show_intro"):
-		main_scene.show_intro()
-	else:
-		reply_err("No map loaded.")
-
-
-func _cmd_motd(_args: String) -> void:
-	var main_scene = get_tree().current_scene
-	if main_scene and main_scene.has_method("show_motd"):
-		main_scene.show_motd()
-	else:
-		reply_err("No map loaded.")
 
 
 # Sim commands only affect THIS endpoint's outgoing packets (goldnet transport, send-side);

@@ -1,17 +1,16 @@
 extends Node3D
 
 const Movement = preload("res://addons/pmove/movement.gd")
-const LocalPlayerScene = preload("res://src/local_player.tscn")
 const RemotePlayerScene = preload("res://src/remote_player.tscn")
 const BlenderMapConverterScript = preload("res://src/systems/blender_map_converter.gd")
-const IntroGuide = preload("res://src/systems/intro_guide.gd")
 const KeyBindings = preload("res://src/systems/key_bindings.gd")
 const WaypointBake = preload("res://src/bot/waypoint_bake.gd")
 const RendererTrialScript = preload("res://src/systems/renderer_trial.gd")
-const EntityRegistry = preload("res://src/entities/entity_registry.gd")
 const ClientSyncScript = preload("res://src/systems/client_sync.gd")
 const ClientPerfScript = preload("res://src/systems/client_perf.gd")
 const ClientJoinScript = preload("res://src/systems/client_join.gd")
+const MapWorldScript = preload("res://src/systems/map_world.gd")
+const LocalViewScript = preload("res://src/systems/local_view.gd")
 
 
 ## A dynamic entity's NetSync: SyncSpec derives the config and goldnet's quant/push metas from
@@ -26,23 +25,9 @@ const DYN_ENTITY_SPEC := {
 	"NetInterp:net_stamp": {"quant": "time_delta", "push": true},
 }
 
-var lightstyle_image: Image    # 64×1 FORMAT_RF, shared with shader materials
-var lightstyle_texture: ImageTexture  # shared across all BSP materials
-# Stored on the Game autoload, not here: the rest of the game reads these, and main.tscn is not
-# the current scene under the test runner. Kept as properties so main's own ~150 uses read as
-# plain fields while there is still only one copy of each — see src/systems/game.gd.
+# Read-through to the Game autoload, which holds the only copy (src/systems/game.gd).
 var _local_player: LocalPlayer:
 	get: return Game.local_player
-	set(v): Game.local_player = v
-var _decal_system: DecalSystem:
-	get: return Game.decal_system
-	set(v): Game.decal_system = v
-var weather_system: WeatherSystem:
-	get: return Game.weather_system
-	set(v): Game.weather_system = v
-var hud: HUD:
-	get: return Game.hud
-	set(v): Game.hud = v
 var _game_active: bool:
 	get: return Game.game_active
 	set(v): Game.game_active = v
@@ -80,28 +65,20 @@ var _player_spawner: MultiplayerSpawner = null
 var _dyn_spawner: MultiplayerSpawner = null
 
 var _lobby: CanvasLayer
-var _map_root: Node3D
 var _map_converter: Node
 var _resource_converter: Node
 var _blender_map_converter: Node
 var _xr_rig: Node3D
 var _xr_rig_camera: Camera3D
 var _vr_lobby_panel: VRLobbyPanel
-var _vr_hud_panel: VRHUDPanel
 var _head_probe_shape := SphereShape3D.new()
 var _xr_right_controller: XRController3D
 var _xr_left_controller: XRController3D
 var _current_map_name: String:
 	get: return Game.current_map_name
 	set(v): Game.current_map_name = v
-var _current_map_info := ""  # raw text of maps/<map>.txt for the MOTD panel
-var _current_map_world := ""  # raw text of maps/<map>.ww (world-map briefing)
 var _local_player_name := "Wizard"
 
-# Client join state: must wait for BOTH map and resources before loading
-var _local_map_ready := false
-var _local_resources_ready := false
-var _local_pending_map_name := ""
 
 
 
@@ -143,6 +120,10 @@ var _client_perf: Node
 var _client_join: Node
 ## The sky, night, VR passthrough and light-grid ambient of the loaded map (src/systems/skybox.gd).
 var _skybox: Skybox
+## Loading the map scene, its entities and per-map systems, and resetting them (src/systems/map_world.gd).
+var _map_world: Node
+## The player at this keyboard: LocalPlayer, HUD, menus, briefing (src/systems/local_view.gd).
+var _local_view: Node
 var _use_goldnet := true  # default transport: GoldNetMultiplayer (GoldSrc ack-delta). --stock opts out.
 ## Set when goldnet was wanted but the extension was not there — a broken install, not a choice.
 ## Joining on stock against a goldnet server draws the world and no entities at all, so we refuse.
@@ -350,8 +331,16 @@ func _ready() -> void:
 	_skybox.name = "Skybox"
 	_add_system(_skybox)
 	Game.skybox = _skybox
+	_map_world = MapWorldScript.new()
+	_map_world.name = "MapWorld"
+	_add_system(_map_world)
+	_local_view = LocalViewScript.new()
+	_local_view.name = "LocalView"
+	_local_view.bind(self, _client_join, _on_vr_menu_requested)
+	_add_system(_local_view)
 	_renderer_trial.log_active_renderer()
 	_parse_cmdline_args()
+	_map_world.bind(self, _skybox, not (_is_dedicated_server or _bake_waypoints))
 	ClientCommandSystem.register("scale", _cmd_scale, "/scale [0.25-1.0]",
 			"Render 3D at a fraction of window resolution. The A/B for a fill-rate-bound machine.")
 	ClientCommandSystem.register("fx", _cmd_fx, "/fx [0|1]",
@@ -451,6 +440,8 @@ func _ready() -> void:
 			ctrl.add_child(laser)
 	else:
 		_add_system(_lobby)
+	_local_view.bind_xr(_xr_rig, _xr_rig_camera, _xr_left_controller, _xr_right_controller,
+		_vr_lobby_panel)
 
 	_lobby.host_pressed.connect(_on_lobby_host)
 	_lobby.join_pressed.connect(_on_lobby_join)
@@ -458,11 +449,10 @@ func _ready() -> void:
 	_lobby.passthrough_changed.connect(_skybox.apply_vr_passthrough)
 	_lobby.quality_changed.connect(func(level: String) -> void:
 		RenderQuality.apply(level, get_viewport(), _skybox.environment())
-		WaterSurfaces.apply(_map_root, RenderQuality.water_depth_enabled(level)))
-	MapTransfer.map_already_cached.connect(_on_map_ready)
-	MapTransfer.map_transfer_complete.connect(_on_map_ready)
+		WaterSurfaces.apply(Game.map_root, RenderQuality.water_depth_enabled(level)))
+	MapTransfer.map_ready.connect(_on_map_ready)
 	MapTransfer.map_transfer_failed.connect(_on_map_transfer_failed)
-	MapTransfer.resources_ready.connect(_on_resources_ready)
+	MapTransfer.ready_to_load.connect(_on_ready_to_load)
 	MapTransfer.resources_transfer_progress.connect(_on_resources_transfer_progress)
 	NetworkManager.map_change_requested.connect(_on_map_change_requested)
 	_lobby.show_menu()
@@ -550,243 +540,27 @@ func prepare_host_map(map_name: String) -> bool:
 
 	# No usable source on this peer: fall back to any .scn already on disk, typically downloaded
 	# from another host. This is how a client-joined peer gets to re-host the map later.
-	var scn_path := "user://resources/maps/%s.scn" % map_name
-	var hash_path := "user://resources/maps/%s.hash" % map_name
+	var scn_path := "%s/%s.scn" % [MapConverter.CACHE_DIR, map_name]
+	var hash_path := "%s/%s.hash" % [MapConverter.CACHE_DIR, map_name]
 	return FileAccess.file_exists(scn_path) and FileAccess.file_exists(hash_path)
-
-
-## Everything is .scn — Blender .glb is pre-converted on the host, so the runtime loader only ever
-## deals with one format.
-const _MAP_SEARCH_PATHS := [
-	"user://resources/maps/%s.scn",  # converted on this peer OR downloaded from another
-	"exported/%s.scn",               # legacy exported scene
-]
-
-
-func _load_map_root(map_name: String) -> Node3D:
-	for tpl in _MAP_SEARCH_PATHS:
-		var path: String = tpl % map_name
-		var in_resources := path.begins_with("res://")
-		var exists := ResourceLoader.exists(path) if in_resources else FileAccess.file_exists(path)
-		if not exists:
-			continue
-		var root := _load_map_scene(path)
-		if root != null:
-			return root
-	return null
-
-
-## Shared post-load setup: entity spawning, sync body collection.
-func _register_worldspawn_pvs_groups(map_root: Node3D) -> void:
-	var ws := map_root.get_node_or_null("worldspawn") as Node3D
-	if ws == null:
-		return
-	var count := 0
-	for child in ws.get_children():
-		if child is Node3D and child.has_meta("pvs_leaves"):
-			VisibilitySystem.track_node_by_leaves(
-				child.get_instance_id(), child as Node3D,
-				child.get_meta("pvs_leaves") as PackedInt32Array)
-			count += 1
-	if count > 0:
-		Log.info("[Visibility] Tracking %d worldspawn spatial groups for PVS culling" % count)
-
-
-func _setup_map_common(map_root: Node3D) -> void:
-	# Tell multi_manager about TFC entity keys so it doesn't treat them as targets
-	MultiManager.extra_reserved_keys = PackedStringArray([
-		"goal_no", "goal_group", "goal_state", "items_allowed",
-		"maxammo_shells", "maxammo_nails", "maxammo_rockets", "maxammo_cells",
-	])
-	EntityRender.apply_color_space(map_root)
-	EntityRegistry.apply_scripts(map_root)
-	add_child(map_root)  # entity _ready runs here, info_wwdetect included
-	if GoalSystem.is_combo_chaos():
-		Log.info("Combo chaos ON: this map's weapon/ammo pickups are combo spellbooks")
-	_map_root = map_root
-	_init_spawn_groups()
 
 
 ## Server-side map load with no rendering or local player. Public for the same reason as
 ## prepare_host_map: the offline bake boots a map the same way a dedicated server does.
 func load_map_headless(map_name: String) -> void:
-	var map_root := _load_map_root(map_name)
-	if map_root == null:
+	if not _map_world.load_map(map_name):
 		push_error("[Server] Failed to load map: %s" % map_name)
 		get_tree().quit(1)
 		return
-
-	VisibilitySystem.setup(map_root)
-	_setup_map_common(map_root)
-
-	# DecalSystem must exist on the server so Godot can route place_rpc to clients.
-	# It won't render anything headless — place() exits early when textures fail to load.
-	_decal_system = DecalSystem.new()
-	_decal_system.name = "DecalSystem"
-	_decal_system.setup()
-	add_child(_decal_system)
-
-	AssetLoader.precache_resources(self)
-
-	weather_system = WeatherSystem.new()
-	weather_system.name = "WeatherSystem"
-	weather_system.map_root = map_root
-	add_child(weather_system)
-
 	Log.info("[Server] Map loaded: %d spawn points" % SpawnSystem.get_all_spawns().size())
 
 
-## Baked into the loaded .scn's metadata by MapConverter (was maps/<map>.txt, read off disk).
-## Bundled maps ship one; downloaded custom maps may not, so callers must tolerate "".
-func _read_map_info() -> String:
-	return _map_root.get_meta("map_description", "") if _map_root else ""
-
-
-## Baked into the .scn's metadata (was maps/<map>.ww). Format: world name (names
-## maps/worlds/<name>.tga), then the marker's X and Y in per-mille (0-1000) of the image.
-func _read_map_world() -> String:
-	return _map_root.get_meta("map_world_info", "") if _map_root else ""
-
-
-## Returns {} if the text is malformed or the named world image isn't bundled.
-static func _parse_map_world(text: String) -> Dictionary:
-	var lines: Array[String] = []
-	for line in text.split("\n"):
-		var s: String = line.strip_edges()
-		if not s.is_empty():
-			lines.append(s)
-	if lines.size() < 3 or not lines[1].is_valid_int() or not lines[2].is_valid_int():
-		return {}
-	var tex_path := "res://maps/worlds/%s.tga" % lines[0]
-	if not ResourceLoader.exists(tex_path):
-		return {}
-	return {
-		"texture": load(tex_path),
-		"marker": Vector2(lines[1].to_int() / 1000.0, lines[2].to_int() / 1000.0),
-	}
-
-
-## Returns false when the map has neither sheet.
-func _show_map_info_panel() -> bool:
-	var world := _parse_map_world(_current_map_world)
-	if _current_map_info.is_empty() and world.is_empty():
-		return false
-	hud.show_map_info(_current_map_name, _current_map_info,
-		world.get("texture"), world.get("marker", Vector2(-1, -1)))
-	return true
-
-
-## /intro — re-read the controls card. Deliberately doesn't touch the "seen it" tick: asking
-## for it is not the same as wanting it back at every map start.
-func show_intro() -> void:
-	if hud == null:
-		return
-	hud.show_intro(IntroGuide.body(XRManager.is_vr))
-
-
-func show_motd() -> void:
-	if hud == null:
-		return
-	if not _show_map_info_panel():
-		hud.show_center_message("No description for %s" % _current_map_name)
-
-
 func _load_map(map_name: String) -> void:
-	var map_root := _load_map_root(map_name)
-	if map_root == null:
+	if not _map_world.load_map(map_name):
 		push_warning("Failed to load map: %s (no cache, export, or BSP plugin)" % map_name)
 		return
-	_skybox.begin_map(map_root)
 
-	VisibilitySystem.setup(map_root)
-	_setup_map_common(map_root)
-	_register_worldspawn_pvs_groups(map_root)
-
-	_decal_system = DecalSystem.new()
-	_decal_system.name = "DecalSystem"
-	_decal_system.setup()
-	add_child(_decal_system)
-
-	# Built here and not with the local player below for the same reason as DecalSystem: its
-	# set_weather is an @rpc, so the node must exist at a matching path on every peer. The
-	# follow target is attached once the player exists (and never, on a dedicated server).
-	weather_system = WeatherSystem.new()
-	weather_system.name = "WeatherSystem"
-	weather_system.map_root = map_root
-	add_child(weather_system)
-
-	var watered := WaterSurfaces.apply(map_root, RenderQuality.water_depth_enabled())
-	if watered > 0:
-		Log.info("Water depth effects %s on %d liquid surfaces" % [
-				"on" if RenderQuality.water_depth_enabled() else "off", watered])
-	_skybox.build()
-
-	# Precache weapon models, sounds, sprites so first shot has no hitch
-	AssetLoader.precache_resources(self)
-
-	# Spawn player at first non-team spawn point (info_player_start)
-	var all_spawns := SpawnSystem.get_all_spawns()
-	Log.info("Spawn points found: %d" % all_spawns.size())
-	if all_spawns.size() > 0:
-		_local_player = LocalPlayerScene.instantiate()
-		# ENet is brought up before the map loads, so get_unique_id() is the real id here
-		# (offline it's 1). Consumers read peer_id directly, no fallback needed downstream.
-		_local_player.peer_id = multiplayer.get_unique_id()
-		var sp := all_spawns[0]
-		for candidate in all_spawns:
-			if candidate.team_no == 0:
-				sp = candidate
-				break
-		_local_player.position = sp.get_spawn_position()
-		_local_player.rotation.y = sp.rotation.y
-		if XRManager.is_vr and _xr_rig:
-			_local_player.xr_camera = _xr_rig_camera
-			_local_player.xr_rig = _xr_rig
-			_local_player.xr_left = _xr_left_controller
-			_local_player.xr_right = _xr_right_controller
-		add_child(_local_player)
-		# Offline the LocalPlayer IS the server-side player, so register it for get_player()
-		# lookups. Online the cache entry is the body puppet instead (_register_host_player after
-		# _load_map), and is_online() correctly skips this.
-		if not NetworkManager.is_online():
-			NetworkManager.register_player(_local_player.peer_id, _local_player)
-		_local_player.set_spectating(true)
-		if XRManager.is_vr:
-			_local_player.vr_menu_requested.connect(_on_vr_menu_requested)
-		Log.info("Player spawned at: %s, yaw: %s" % [_local_player.position, _local_player.rotation.y])
-
-		weather_system.attach_player(_local_player)
-
-		hud = HUD.create()
-		add_child(hud)
-		_local_player._hud = hud
-		hud.chat_submitted.connect(_local_player._on_chat_submitted)
-
-		# Baked into the .scn's metadata, so this works the same whether the map was converted
-		# locally or downloaded — no separate host->client transfer needed.
-		_current_map_info = _read_map_info()
-		_current_map_world = _read_map_world()
-		# A player who has never been here gets the controls card first, with the map
-		# description queued behind it. Showing it is what clears the tick, so it costs one
-		# reading and then never appears again unless the lobby (or /intro) asks for it.
-		if IntroGuide.should_show():
-			IntroGuide.set_show(false)
-			hud.show_intro(IntroGuide.body(XRManager.is_vr), _show_map_info_panel)
-		else:
-			_show_map_info_panel()
-		if XRManager.is_vr and _xr_rig_camera:
-			_vr_hud_panel = VRHUDPanel.new()
-			_vr_hud_panel.name = "VRHUDPanel"
-			_xr_rig_camera.add_child(_vr_hud_panel)
-			_vr_hud_panel.position = Vector3(0.0, -0.1, -1.2)
-			hud.move_to_vr_panel(_vr_hud_panel.viewport)
-
-		var menu: CanvasLayer = _client_join.build_menu()
-		if XRManager.is_vr and _vr_lobby_panel:
-			_vr_lobby_panel.add_ui(menu)
-		else:
-			add_child(menu)
-
+	_local_view.build()
 
 
 ## add_child for a node that lives as long as main does; see _systems.
@@ -809,15 +583,7 @@ func _release_override_materials(node: Node) -> void:
 
 
 func _unload_map() -> void:
-	if _local_player and _local_player.has_method("free_debug_render"):
-		_local_player.free_debug_render()
-	# Free explicitly — in VR it lives in the SubViewport, not as a direct child.
-	_client_join.teardown_menu()
-	# Parented to the persistent XR rig camera, so the children loop below won't catch it — without
-	# this, each map reload stacks another ghost HUD on the camera.
-	if _vr_hud_panel:
-		_vr_hud_panel.queue_free()
-		_vr_hud_panel = null
+	_local_view.teardown()
 	# A system is built once and never recreated, so freeing one would leave main holding a freed
 	# instance for the session: the spawners dangle on the next spawn(), and ClientSync drops its
 	# NetworkManager registration (tree_exiting), killing sync dispatch for good.
@@ -826,25 +592,10 @@ func _unload_map() -> void:
 			continue
 		_release_override_materials(child)
 		child.queue_free()
-	_map_root = null
 	Game.clear_world()
-	_skybox.clear()
 	NetworkManager.clear_players()
-	NetworkManager.reset_entities()
-	VisibilitySystem.teardown()
-	_local_map_ready = false
-	_local_resources_ready = false
-	_local_pending_map_name = ""
+	_map_world.clear()
 	_client_join.clear_watchdog()  # the new map re-asks from scratch; don't resend the old map's pick
-	GoalSystem.reset()
-	SpawnSystem.reset()
-	TriggerSystem.reset()
-	StatusSystem.reset()
-	BotSystem.reset()
-	SiegeSystem.reset()
-	MonsterNav.reset()
-	MatchSystem.reset()
-	PotatoC.global_vars.clear()
 
 
 ## Listen server: bring up ENet + load the map in this same process, with full client setup. The
@@ -1013,11 +764,8 @@ func _set_status(text: String) -> void:
 		_lobby.set_status(text)
 
 
-func _on_map_ready(map_name: String) -> void:
-	_local_pending_map_name = map_name
-	_local_map_ready = true
+func _on_map_ready(_map_name: String) -> void:
 	_set_status("Map ready, waiting for resources...")
-	_try_activate_local_player()
 
 
 func _on_map_transfer_failed() -> void:
@@ -1025,12 +773,6 @@ func _on_map_transfer_failed() -> void:
 		return
 	NetworkManager._disconnect_reason = "Failed to download map from server."
 	NetworkManager.disconnect_from_game()
-
-
-func _on_resources_ready() -> void:
-	Log.info("Resources ready (transferred or cached)")
-	_local_resources_ready = true
-	_try_activate_local_player()
 
 
 func _on_resources_transfer_progress(current: int, total: int) -> void:
@@ -1064,7 +806,7 @@ func _restore_carried_bots() -> void:
 
 
 ## Tear down the current map and wait for the follow-up MapTransfer map info / manifest
-## that re-triggers the normal download + _try_activate_local_player flow.
+## that re-triggers the normal download and ready_to_load.
 func _on_map_change_requested(new_map_name: String) -> void:
 	Log.info("Map change requested by server: %s" % new_map_name)
 	_capture_carry_state()
@@ -1127,17 +869,13 @@ func change_map(new_map_name: String) -> void:
 		new_map_name, multiplayer.get_peers().size()])
 
 
-## Activate the client only when both map and resources are ready.
-func _try_activate_local_player() -> void:
-	if not _local_map_ready or not _local_resources_ready:
-		return
-	_local_map_ready = false
-	_local_resources_ready = false
-	_current_map_name = _local_pending_map_name
+## The map and its resources are both on disk.
+func _on_ready_to_load(map_name: String) -> void:
+	_current_map_name = map_name
 	# Wait a frame so the UI actually redraws before the synchronous _load_map blocks the main thread.
-	_set_status("Loading %s..." % _local_pending_map_name)
+	_set_status("Loading %s..." % map_name)
 	await get_tree().process_frame
-	_load_map(_local_pending_map_name)
+	_load_map(map_name)
 	_set_game_active(true)
 	_spawn_missed_players()
 	NetworkManager._request_entity_state.rpc_id(1)
@@ -1868,72 +1606,3 @@ func respawn_all_players() -> void:
 			remote.spawn_at(sp, remote.element, true, false)
 			remote.sync_spawn_to_network(sp)
 			remote._apply_spawn_point_effects(sp)
-
-
-
-func _load_map_scene(scn_path: String) -> Node3D:
-	var scene := ResourceLoader.load(scn_path) as PackedScene
-	if scene == null:
-		push_error("Failed to load scene: %s" % scn_path)
-		return null
-	var root: Node3D = scene.instantiate()
-	_report_map_pipeline(root, scn_path)
-	# has_meta guard: get_meta(key, null) errors on absent keys (null default == no default).
-	lightstyle_image = root.get_meta("lightstyle_image") if root.has_meta("lightstyle_image") else null
-	lightstyle_texture = root.get_meta("lightstyle_texture") if root.has_meta("lightstyle_texture") else null
-	EntityRegistry.strip_unscripted(root)
-	return root
-
-
-## A GoldSrc-derived scene has to carry the stripped BSP tree, or hop has no clip hull to trace and
-## PVS is off — the map plays with render-face collision and nobody is told. A peer that downloaded
-## the .scn can't repair it (no .bsp ships to clients), so logging the pipeline version is the best
-## we can do. Blender maps have no worldspawn and never had a tree, so they're not this case.
-func _report_map_pipeline(root: Node3D, scn_path: String) -> void:
-	if root.has_meta("bsp_data") or root.get_node_or_null("worldspawn") == null:
-		return
-	Log.warn(("%s was built by pipeline v%d (current is v%d) and carries no BSP tree: "
-		+ "no clip-hull collision, PVS off. Re-download it from a host on current code.")
-		% [scn_path, int(root.get_meta(MapConverter.VERSION_META, 0)), MapConverter.CACHE_VERSION])
-
-
-
-
-
-## TFC's game mode code started only home spawns active; our generic entity spawner has no such
-## logic. Heuristic: for each team, the lowest-numbered group is the home group — keep it active
-## and disable all others.
-func _init_spawn_groups() -> void:
-	var team_groups: Dictionary = {}  # team_no -> Dictionary(group_no -> int)
-	for spawn in SpawnSystem.get_all_spawns():
-		if spawn.team_no == 0 or spawn.group_no == 0:
-			continue
-		if not team_groups.has(spawn.team_no):
-			team_groups[spawn.team_no] = {}
-		var groups: Dictionary = team_groups[spawn.team_no]
-		groups[spawn.group_no] = groups.get(spawn.group_no, 0) + 1
-
-	var any_multi := false
-	for team_no in team_groups:
-		if team_groups[team_no].size() > 1:
-			any_multi = true
-			break
-	if not any_multi:
-		return
-
-	for team_no in team_groups:
-		var groups: Dictionary = team_groups[team_no]
-		if groups.size() <= 1:
-			continue
-		# TFC convention: base spawns use the lowest group_no, forward/captured positions use higher.
-		var home_group: int = 0
-		var home_count: int = 0
-		for group_no in groups:
-			if home_group == 0 or group_no < home_group:
-				home_group = group_no
-				home_count = groups[group_no]
-		for group_no in groups:
-			if group_no != home_group:
-				SpawnSystem.remove_group(group_no)
-		Log.info("SpawnGroups: team %d home=group %d (%d spawns), disabled %d forward groups" % [
-			team_no, home_group, home_count, groups.size() - 1])

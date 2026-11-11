@@ -8,7 +8,7 @@ extends Node
 ## needs it (goldsrc_bsp.cpp), so mutating it would edit a resource the map cache may hand back
 ## on the next load. An override is per-instance and clears by assigning null.
 ##
-## In game, one node for the session: begin_map -> build -> clear per map. Tools call setup() alone.
+## In game, one node for the session: build -> clear per map. Tools call setup() alone.
 const ProceduralSkyShader = preload("res://shaders/sky_procedural.gdshader")
 ## Where the sky sorts in the transparent queue. Must match RENDER_PRIORITY_SKY in
 ## goldsrc_bsp.cpp, which is where the stock sky material gets the same number: an override
@@ -115,23 +115,11 @@ func _ready() -> void:
 	set_process(false)  # on only while a map's light grid lights the ambient
 
 
-## Before the map's entities spawn: they light themselves off the grid as they enter, and a
-## light_environment hands NightMode its lightstyle from _ready.
-func begin_map(map_root: Node3D) -> void:
+## Once the map is in the tree, its light grid loaded (MapWorld).
+func build(map_root: Node3D) -> void:
 	_map_root = map_root
-	NightMode.reset()
-	var grid := LightGrid.from_meta(map_root)
-	if grid.is_valid():
-		Log.info("Light grid loaded from map metadata")
-		AssetLoader.light_grid = grid
-		set_process(true)
-
-
-## Once the map is in the tree. After WaterSurfaces.apply, so NightMode collects the liquid
-## materials as they will be drawn.
-func build() -> void:
 	_setup_for_map()
-	NightMode.apply(_map_root)
+	set_process(AssetLoader.light_grid != null)
 
 
 func clear() -> void:
@@ -139,8 +127,6 @@ func clear() -> void:
 	_built_sky = ""
 	_map_root = null
 	set_process(false)
-	AssetLoader.light_grid = null
-	LightGrid._all_acube_materials.clear()
 
 
 ## The gameplay Environment, or null before a map has built one.
@@ -250,7 +236,6 @@ func _on_server_var_changed(key: String, _value: Variant) -> void:
 			var sky_name := NightMode.sky_for(_map_sky_name(_map_root), _map_root)
 			if sky_name != _built_sky:
 				_swap_cubemap(sky_name)
-			NightMode.apply(_map_root)
 
 
 ## Night swaps the art only: the procedural sky is measured off the day sky either way. A map

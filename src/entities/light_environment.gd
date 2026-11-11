@@ -7,7 +7,6 @@ extends EntityBase
 var _style: int = 0
 var _ls_image: Image = null
 var _ls_texture: ImageTexture = null
-var _bsp: Node = null  # fallback for legacy C++ path
 
 
 func _ready() -> void:
@@ -19,11 +18,10 @@ func _ready() -> void:
 			queue_free()
 			return
 
-	var scene := get_tree().current_scene
-	_ls_image = scene.get("lightstyle_image") if scene else null
-	_ls_texture = scene.get("lightstyle_texture") if scene else null
-	if not _ls_image:
-		_bsp = scene.get("_bsp") if scene else null
+	# The map's scene root owns a map-placed entity; a spawned one has no shared lightstyles to drive.
+	if owner and owner.has_meta("lightstyle_image"):
+		_ls_image = owner.get_meta("lightstyle_image")
+		_ls_texture = owner.get_meta("lightstyle_texture")
 	_style = parse_int(ent, "style", 0)
 	_register_for_sync()
 
@@ -44,8 +42,6 @@ func set_light_style(style_char: String) -> void:
 		if _ls_image and _ls_texture:
 			_ls_image.set_pixel(_style, 0, Color(intensity, 0, 0, 1))
 			_ls_texture.update(_ls_image)
-		elif _bsp:
-			_bsp.set_lightstyle(_style, intensity)
 	# A sun in style 0 shares its layer with the map's lights; the baked sun fraction is what
 	# fades only the sun's part of it. Models take it from there either way.
 	NightMode.set_sun_style(intensity, _style > 0)

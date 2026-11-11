@@ -14,6 +14,8 @@ var hud: HUD = null
 var local_player: LocalPlayer = null
 var decal_system: DecalSystem = null
 var weather_system: WeatherSystem = null
+## The loaded map's scene root, in the tree once its entities are scripted.
+var map_root: Node3D = null
 ## The session's sky, built once by main; drawing nothing between maps.
 var skybox: Skybox = null
 
@@ -29,6 +31,7 @@ func clear_world() -> void:
 	local_player = null
 	decal_system = null
 	weather_system = null
+	map_root = null
 
 
 ## Rattle this peer's own view, for something it already spawned for itself (a comet's impact)

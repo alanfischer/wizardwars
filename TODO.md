@@ -1,16 +1,19 @@
 # TODO
 
-- Keep peeling `main.gd`: map load/unload (`_load_map`, `_unload_map`, `load_map_headless`) is
-  next. The sky is out (`Skybox` owns it now); three clusters remain and peel separately: the map
-  world (root, PVS, entities, decals, weather, precache), the local view (player, HUD, VR HUD
-  panel, class menu) and the client map download flags. The rule the earlier peels share: gameplay
-  state comes off `Game`, node references come by injection.
+- Keep peeling `main.gd`. Map load/unload is out (`Skybox`, `MapWorld`, `LocalView`, and
+  `MapTransfer.ready_to_load`); what is left there peels separately:
+  - VR setup: the rig, controllers, laser pointers, the lobby panel and its re-attach, and the
+    head-clamped rig follow in `_process`. Living in main is why `LocalView` needs a second
+    `bind_xr` once main has resolved the rig.
+  - The unload sweep: main frees every child not in `_systems`, so each new system has to remember
+    `_add_system` and `LocalView` needs a teardown that runs first. Each owner freeing what it
+    built would shrink the sweep to the spawner-made bodies; `_release_override_materials` has to
+    go with it.
+  The rule the peels share: gameplay state comes off `Game`, node references come by injection.
 
-  Two leftovers from the sky peel. `Skybox.begin_map`/`clear` carry the map lighting too
-  (`AssetLoader.light_grid`, `LightGrid._all_acube_materials`, `NightMode.reset`/`apply`); those
-  belong with the map world. And each map still builds a new `SkyboxSky`, so the weather's `sky`
-  is re-pointed per map; one per Skybox, re-measured with `OvercastSky.apply(params)`, would end
-  the handover, but changes how storm state carries across a map change.
+  Each map still builds a new `SkyboxSky`, so the weather's `sky` is re-pointed per map; one per
+  Skybox, re-measured with `OvercastSky.apply(params)`, would end the handover, but changes how
+  storm state carries across a map change.
 
 - Give the entities that never move a presence-only sync. 19 classes call `_register_for_sync()`
   and most are scenery — `env_sprite`, `light_entity`, `ambient_generic`, `info_tfgoal`,
