@@ -18,8 +18,6 @@ var _xr_right: XRController3D
 var _vr_lobby_panel: VRLobbyPanel
 ## Parented to the persistent XR rig camera, so main's unload sweep never reaches it.
 var _vr_hud_panel: VRHUDPanel
-var _map_info := ""  # raw text of maps/<map>.txt, baked into the .scn
-var _map_world := ""  # raw text of maps/<map>.ww (world-map briefing), baked likewise
 
 
 ## `on_vr_menu` answers the VR controller's menu button with the player's class_only choice.
@@ -86,9 +84,6 @@ func build() -> void:
 	player._hud = hud
 	hud.chat_submitted.connect(player._on_chat_submitted)
 
-	var root := Game.map_root
-	_map_info = root.get_meta("map_description", "")
-	_map_world = root.get_meta("map_world_info", "")
 	# A player who has never been here gets the controls card first, with the map description
 	# queued behind it. Showing it is what clears the tick, so it costs one reading and then never
 	# appears again unless the lobby (or /intro) asks for it.
@@ -120,8 +115,6 @@ func teardown() -> void:
 	if _vr_hud_panel:
 		_vr_hud_panel.queue_free()
 		_vr_hud_panel = null
-	_map_info = ""
-	_map_world = ""
 
 
 ## Returns {} if the text is malformed or the named world image isn't bundled. Format: world name
@@ -143,12 +136,14 @@ static func _parse_map_world(text: String) -> Dictionary:
 	}
 
 
-## Returns false when the map has neither sheet.
+## Returns false when the map has neither sheet. Both are baked into the .scn by MapConverter
+## (maps/<map>.txt and maps/<map>.ww); downloaded custom maps may have neither.
 func _show_map_info_panel() -> bool:
-	var world := _parse_map_world(_map_world)
-	if _map_info.is_empty() and world.is_empty():
+	var info: String = Game.map_root.get_meta("map_description", "")
+	var world := _parse_map_world(Game.map_root.get_meta("map_world_info", ""))
+	if info.is_empty() and world.is_empty():
 		return false
-	Game.hud.show_map_info(Game.current_map_name, _map_info,
+	Game.hud.show_map_info(Game.current_map_name, info,
 		world.get("texture"), world.get("marker", Vector2(-1, -1)))
 	return true
 

@@ -62,7 +62,7 @@ func _ready() -> void:
 	# The world shaders pick their colour space per load, exactly as main.gd does it.
 	EntityRender.apply_color_space(map_root)
 
-	# PVS, as main.gd's _register_worldspawn_pvs_groups sets it up. Worldspawn is culled a
+	# PVS, as MapWorld._register_worldspawn_pvs_groups sets it up. Worldspawn is culled a
 	# spatial group at a time and only re-evaluated when the observer changes leaf, so a group
 	# appears and disappears in steps as you walk — which is what this tool has to be able to
 	# see. The liquid's depth prepass only stamps the liquid that is drawn, so a group carrying

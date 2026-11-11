@@ -13,9 +13,9 @@ extends Node
 ##
 ## No class_name — autoloaded as MapTransfer.
 
-signal map_transfer_complete(map_name: String)
+## The map named by the latest map info is on disk, cached or downloaded.
+signal map_ready(map_name: String)
 signal map_transfer_failed()
-signal map_already_cached(map_name: String)
 signal resources_transfer_progress(current: int, total: int)
 ## The map named by the latest map info and the resources of the manifest after it are both in.
 signal ready_to_load(map_name: String)
@@ -53,7 +53,7 @@ const _MAP_DOWNLOAD_MAX_ATTEMPTS := 3
 var _res_downloader: Node = null  # ResourceDownloader instance, client side
 ## The gate behind ready_to_load. Map info always precedes its manifest on the same reliable
 ## channel, so a new map info is a new transfer and clears both halves.
-var _map_in := ""
+var _map_in := false
 var _resources_in := false
 
 var _http_server: RefCounted = null
@@ -167,7 +167,7 @@ func _process(delta: float) -> void:
 ## Leaving a session: drop any in-flight download and stop serving.
 func reset() -> void:
 	_transfer_map_name = ""
-	_map_in = ""
+	_map_in = false
 	_resources_in = false
 	if _active_map_request != null:
 		_active_map_request.cancel_request()
@@ -186,7 +186,7 @@ func _send_map_info(map_name: String, map_hash: String, http_base_url: String) -
 	_transfer_map_name = map_name
 	_transfer_hash = map_hash
 	_map_download_attempts = 0
-	_map_in = ""
+	_map_in = false
 	_resources_in = false
 
 	DirAccess.make_dir_recursive_absolute(CACHE_DIR)
@@ -198,8 +198,7 @@ func _send_map_info(map_name: String, map_hash: String, http_base_url: String) -
 			f.close()
 		if local_hash == map_hash:
 			Log.info("Map cache hit for %s" % map_name)
-			map_already_cached.emit(map_name)
-			_on_map_in(map_name)
+			_on_map_in()
 			_map_cache_hit.rpc_id(1)
 			return
 
@@ -264,8 +263,7 @@ func _on_map_download_done(result: int, response_code: int, _headers: PackedStri
 	if hf != null:
 		hf.store_string(_transfer_hash)
 		hf.close()
-	map_transfer_complete.emit(_transfer_map_name)
-	_on_map_in(_transfer_map_name)
+	_on_map_in()
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -318,8 +316,9 @@ func _on_resources_download_complete() -> void:
 	_on_resources_in()
 
 
-func _on_map_in(map_name: String) -> void:
-	_map_in = map_name
+func _on_map_in() -> void:
+	map_ready.emit(_transfer_map_name)
+	_map_in = true
 	_check_ready()
 
 
@@ -330,12 +329,11 @@ func _on_resources_in() -> void:
 
 
 func _check_ready() -> void:
-	if _map_in.is_empty() or not _resources_in:
+	if not _map_in or not _resources_in:
 		return
-	var map_name := _map_in
-	_map_in = ""
+	_map_in = false
 	_resources_in = false
-	ready_to_load.emit(map_name)
+	ready_to_load.emit(_transfer_map_name)
 
 
 # --- HTTP base URL ---

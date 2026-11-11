@@ -11,36 +11,36 @@ const EntityRegistry = preload("res://src/entities/entity_registry.gd")
 ## Everything is .scn: Blender .glb is pre-converted on the host, so the runtime loader only
 ## ever deals with one format.
 const _MAP_SEARCH_PATHS := [
-	"user://resources/maps/%s.scn",  # converted on this peer OR downloaded from another
+	MapConverter.CACHE_DIR + "/%s.scn",  # converted on this peer OR downloaded from another
 	"exported/%s.scn",               # legacy exported scene
 ]
 
 var _parent: Node
 var _skybox: Skybox
-var _rendered := false  # this map is drawn here, so it carries lighting and night
+var _rendered := false  # this process draws its maps: lighting, sky, water depth, PVS render groups
 
 
-func bind(parent: Node, skybox: Skybox) -> void:
+## `rendered` is false on a dedicated server and the offline bake.
+func bind(parent: Node, skybox: Skybox, rendered: bool) -> void:
 	_parent = parent
 	_skybox = skybox
+	_rendered = rendered
 
 
 func _ready() -> void:
 	ServerVars.value_changed.connect(_on_server_var_changed)
 
 
-## Null when there is no usable .scn. `rendered` is false on a dedicated server and the offline
-## bake: no lighting, sky, water depth or PVS render groups.
-func load_map(map_name: String, rendered: bool) -> Node3D:
+## False when there is no usable .scn.
+func load_map(map_name: String) -> bool:
 	var map_root := _load_root(map_name)
 	if map_root == null:
-		return null
-	_rendered = rendered
-	if rendered:
+		return false
+	if _rendered:
 		_begin_lighting(map_root)
 	VisibilitySystem.setup(map_root)
 	_add_map(map_root)
-	if rendered:
+	if _rendered:
 		_register_worldspawn_pvs_groups(map_root)
 
 	# On the server too: place_rpc and set_weather are @rpcs, so the nodes must exist at a matching
@@ -57,7 +57,7 @@ func load_map(map_name: String, rendered: bool) -> Node3D:
 	_parent.add_child(weather)
 	Game.weather_system = weather
 
-	if rendered:
+	if _rendered:
 		var watered := WaterSurfaces.apply(map_root, RenderQuality.water_depth_enabled())
 		if watered > 0:
 			Log.info("Water depth effects %s on %d liquid surfaces" % [
@@ -66,12 +66,12 @@ func load_map(map_name: String, rendered: bool) -> Node3D:
 		NightMode.apply(map_root)  # after WaterSurfaces, so it collects the liquids as drawn
 
 	AssetLoader.precache_resources(_parent)  # so the first shot has no hitch
-	return map_root
+	return true
 
 
 ## After main has freed the map's nodes.
 func clear() -> void:
-	_rendered = false
+	_skybox.clear()
 	AssetLoader.light_grid = null
 	LightGrid._all_acube_materials.clear()
 	NetworkManager.reset_entities()
@@ -105,9 +105,7 @@ func _on_server_var_changed(key: String, _value: Variant) -> void:
 func _load_root(map_name: String) -> Node3D:
 	for tpl in _MAP_SEARCH_PATHS:
 		var path: String = tpl % map_name
-		var in_resources := path.begins_with("res://")
-		var exists := ResourceLoader.exists(path) if in_resources else FileAccess.file_exists(path)
-		if not exists:
+		if not FileAccess.file_exists(path):
 			continue
 		var scene := ResourceLoader.load(path) as PackedScene
 		if scene == null:

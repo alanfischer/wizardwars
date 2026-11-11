@@ -25,15 +25,9 @@ const DYN_ENTITY_SPEC := {
 	"NetInterp:net_stamp": {"quant": "time_delta", "push": true},
 }
 
-# Stored on the Game autoload, not here: the rest of the game reads these, and main.tscn is not
-# the current scene under the test runner. Kept as properties so main's own ~150 uses read as
-# plain fields while there is still only one copy of each — see src/systems/game.gd.
+# Read-through to the Game autoload, which holds the only copy (src/systems/game.gd).
 var _local_player: LocalPlayer:
 	get: return Game.local_player
-	set(v): Game.local_player = v
-var hud: HUD:
-	get: return Game.hud
-	set(v): Game.hud = v
 var _game_active: bool:
 	get: return Game.game_active
 	set(v): Game.game_active = v
@@ -71,8 +65,6 @@ var _player_spawner: MultiplayerSpawner = null
 var _dyn_spawner: MultiplayerSpawner = null
 
 var _lobby: CanvasLayer
-var _map_root: Node3D:
-	get: return Game.map_root
 var _map_converter: Node
 var _resource_converter: Node
 var _blender_map_converter: Node
@@ -341,7 +333,6 @@ func _ready() -> void:
 	Game.skybox = _skybox
 	_map_world = MapWorldScript.new()
 	_map_world.name = "MapWorld"
-	_map_world.bind(self, _skybox)
 	_add_system(_map_world)
 	_local_view = LocalViewScript.new()
 	_local_view.name = "LocalView"
@@ -349,6 +340,7 @@ func _ready() -> void:
 	_add_system(_local_view)
 	_renderer_trial.log_active_renderer()
 	_parse_cmdline_args()
+	_map_world.bind(self, _skybox, not (_is_dedicated_server or _bake_waypoints))
 	ClientCommandSystem.register("scale", _cmd_scale, "/scale [0.25-1.0]",
 			"Render 3D at a fraction of window resolution. The A/B for a fill-rate-bound machine.")
 	ClientCommandSystem.register("fx", _cmd_fx, "/fx [0|1]",
@@ -457,9 +449,8 @@ func _ready() -> void:
 	_lobby.passthrough_changed.connect(_skybox.apply_vr_passthrough)
 	_lobby.quality_changed.connect(func(level: String) -> void:
 		RenderQuality.apply(level, get_viewport(), _skybox.environment())
-		WaterSurfaces.apply(_map_root, RenderQuality.water_depth_enabled(level)))
-	MapTransfer.map_already_cached.connect(_on_map_ready)
-	MapTransfer.map_transfer_complete.connect(_on_map_ready)
+		WaterSurfaces.apply(Game.map_root, RenderQuality.water_depth_enabled(level)))
+	MapTransfer.map_ready.connect(_on_map_ready)
 	MapTransfer.map_transfer_failed.connect(_on_map_transfer_failed)
 	MapTransfer.ready_to_load.connect(_on_ready_to_load)
 	MapTransfer.resources_transfer_progress.connect(_on_resources_transfer_progress)
@@ -549,15 +540,15 @@ func prepare_host_map(map_name: String) -> bool:
 
 	# No usable source on this peer: fall back to any .scn already on disk, typically downloaded
 	# from another host. This is how a client-joined peer gets to re-host the map later.
-	var scn_path := "user://resources/maps/%s.scn" % map_name
-	var hash_path := "user://resources/maps/%s.hash" % map_name
+	var scn_path := "%s/%s.scn" % [MapConverter.CACHE_DIR, map_name]
+	var hash_path := "%s/%s.hash" % [MapConverter.CACHE_DIR, map_name]
 	return FileAccess.file_exists(scn_path) and FileAccess.file_exists(hash_path)
 
 
 ## Server-side map load with no rendering or local player. Public for the same reason as
 ## prepare_host_map: the offline bake boots a map the same way a dedicated server does.
 func load_map_headless(map_name: String) -> void:
-	if _map_world.load_map(map_name, false) == null:
+	if not _map_world.load_map(map_name):
 		push_error("[Server] Failed to load map: %s" % map_name)
 		get_tree().quit(1)
 		return
@@ -565,7 +556,7 @@ func load_map_headless(map_name: String) -> void:
 
 
 func _load_map(map_name: String) -> void:
-	if _map_world.load_map(map_name, true) == null:
+	if not _map_world.load_map(map_name):
 		push_warning("Failed to load map: %s (no cache, export, or BSP plugin)" % map_name)
 		return
 
@@ -602,7 +593,6 @@ func _unload_map() -> void:
 		_release_override_materials(child)
 		child.queue_free()
 	Game.clear_world()
-	_skybox.clear()
 	NetworkManager.clear_players()
 	_map_world.clear()
 	_client_join.clear_watchdog()  # the new map re-asks from scratch; don't resend the old map's pick
