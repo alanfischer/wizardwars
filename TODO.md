@@ -1,20 +1,5 @@
 # TODO
 
-- Keep peeling `main.gd`. Map load/unload is out (`Skybox`, `MapWorld`, `LocalView`, and
-  `MapTransfer.ready_to_load`); what is left there peels separately:
-  - VR setup: the rig, controllers, laser pointers, the lobby panel and its re-attach, and the
-    head-clamped rig follow in `_process`. Living in main is why `LocalView` needs a second
-    `bind_xr` once main has resolved the rig.
-  - The unload sweep: main frees every child not in `_systems`, so each new system has to remember
-    `_add_system` and `LocalView` needs a teardown that runs first. Each owner freeing what it
-    built would shrink the sweep to the spawner-made bodies; `_release_override_materials` has to
-    go with it.
-  The rule the peels share: gameplay state comes off `Game`, node references come by injection.
-
-  Each map still builds a new `SkyboxSky`, so the weather's `sky` is re-pointed per map; one per
-  Skybox, re-measured with `OvercastSky.apply(params)`, would end the handover, but changes how
-  storm state carries across a map change.
-
 - Give the entities that never move a presence-only sync. 19 classes call `_register_for_sync()`
   and most are scenery — `env_sprite`, `light_entity`, `ambient_generic`, `info_tfgoal`,
   `item_healthkit` — which take a `MoverNetPublisher` purely because the MoverSync is also the PVS

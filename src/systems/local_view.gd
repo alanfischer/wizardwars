@@ -10,30 +10,14 @@ const IntroGuide = preload("res://src/systems/intro_guide.gd")
 
 var _parent: Node
 var _client_join: Node
-var _on_vr_menu: Callable
-var _xr_rig: Node3D
-var _xr_camera: Camera3D
-var _xr_left: XRController3D
-var _xr_right: XRController3D
-var _vr_lobby_panel: VRLobbyPanel
-## Parented to the persistent XR rig camera, so main's unload sweep never reaches it.
-var _vr_hud_panel: VRHUDPanel
+var _rig: VRRig
+var _vr_hud_panel: VRHUDPanel  # on the persistent rig camera
 
 
-## `on_vr_menu` answers the VR controller's menu button with the player's class_only choice.
-func bind(parent: Node, client_join: Node, on_vr_menu: Callable) -> void:
+func bind(parent: Node, client_join: Node, rig: VRRig) -> void:
 	_parent = parent
 	_client_join = client_join
-	_on_vr_menu = on_vr_menu
-
-
-func bind_xr(rig: Node3D, camera: Camera3D, left: XRController3D, right: XRController3D,
-		lobby_panel: VRLobbyPanel) -> void:
-	_xr_rig = rig
-	_xr_camera = camera
-	_xr_left = left
-	_xr_right = right
-	_vr_lobby_panel = lobby_panel
+	_rig = rig
 
 
 func _ready() -> void:
@@ -60,11 +44,12 @@ func build() -> void:
 			break
 	player.position = sp.get_spawn_position()
 	player.rotation.y = sp.rotation.y
-	if XRManager.is_vr and _xr_rig:
-		player.xr_camera = _xr_camera
-		player.xr_rig = _xr_rig
-		player.xr_left = _xr_left
-		player.xr_right = _xr_right
+	if XRManager.is_vr:
+		player.xr_camera = _rig.camera
+		player.xr_rig = _rig
+		player.xr_left = _rig.left
+		player.xr_right = _rig.right
+		player.vr_menu_requested.connect(_on_vr_menu)
 	Game.local_player = player  # before add_child, so the player's own _ready finds itself there
 	_parent.add_child(player)
 	# Offline the LocalPlayer IS the server-side player, so register it for get_player() lookups.
@@ -72,8 +57,6 @@ func build() -> void:
 	if not NetworkManager.is_online():
 		NetworkManager.register_player(player.peer_id, player)
 	player.set_spectating(true)
-	if XRManager.is_vr:
-		player.vr_menu_requested.connect(_on_vr_menu)
 	Log.info("Player spawned at: %s, yaw: %s" % [player.position, player.rotation.y])
 
 	Game.weather_system.attach_player(player)
@@ -92,25 +75,36 @@ func build() -> void:
 		hud.show_intro(IntroGuide.body(XRManager.is_vr), _show_map_info_panel)
 	else:
 		_show_map_info_panel()
-	if XRManager.is_vr and _xr_camera:
+	if XRManager.is_vr:
 		_vr_hud_panel = VRHUDPanel.new()
 		_vr_hud_panel.name = "VRHUDPanel"
-		_xr_camera.add_child(_vr_hud_panel)
+		_rig.camera.add_child(_vr_hud_panel)
 		_vr_hud_panel.position = Vector3(0.0, -0.1, -1.2)
 		hud.move_to_vr_panel(_vr_hud_panel.viewport)
 
 	var menu: CanvasLayer = _client_join.build_menu()
-	if XRManager.is_vr and _vr_lobby_panel:
-		_vr_lobby_panel.add_ui(menu)
+	if _rig.lobby_panel:
+		_rig.lobby_panel.add_ui(menu)
 	else:
 		_parent.add_child(menu)
 
 
-## Before main's unload sweep: the pieces it cannot reach or must not leave behind.
+## The controller's menu button.
+func _on_vr_menu(class_only: bool) -> void:
+	if (class_only and _client_join.open_class_menu()) or _client_join.open_team_menu():
+		_rig.attach_panel()
+
+
 func teardown() -> void:
 	var player := Game.local_player
 	if player:
 		player.free_debug_render()
+		EntityRender.release_override_materials(player)
+		player.queue_free()
+	if Game.hud:
+		Game.hud.queue_free()
+	Game.local_player = null
+	Game.hud = null
 	_client_join.teardown_menu()  # in VR it lives in the lobby panel's SubViewport
 	if _vr_hud_panel:
 		_vr_hud_panel.queue_free()
