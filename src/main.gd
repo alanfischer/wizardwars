@@ -84,16 +84,11 @@ var _map_root: Node3D
 var _map_converter: Node
 var _resource_converter: Node
 var _blender_map_converter: Node
-var _light_grid: LightGrid
-var _world_env: WorldEnvironment
-var _skybox: Skybox
-var _built_sky := ""  # the skyname _skybox was built from: the map's own, or NightMode's
 var _xr_rig: Node3D
 var _xr_rig_camera: Camera3D
 var _vr_lobby_panel: VRLobbyPanel
 var _vr_hud_panel: VRHUDPanel
 var _head_probe_shape := SphereShape3D.new()
-var _sky_surfaces: Array[MeshInstance3D] = []
 var _xr_right_controller: XRController3D
 var _xr_left_controller: XRController3D
 var _current_map_name: String:
@@ -146,6 +141,8 @@ var _client_sync: Node
 var _client_perf: Node
 ## Team/class picking and the join watchdog (src/systems/client_join.gd).
 var _client_join: Node
+## The sky, night, VR passthrough and light-grid ambient of the loaded map (src/systems/skybox.gd).
+var _skybox: Skybox
 var _use_goldnet := true  # default transport: GoldNetMultiplayer (GoldSrc ack-delta). --stock opts out.
 ## Set when goldnet was wanted but the extension was not there — a broken install, not a choice.
 ## Joining on stock against a goldnet server draws the world and no entities at all, so we refuse.
@@ -327,11 +324,6 @@ func _parse_element_name(element_name: String) -> int:
 	return GameConsts.Element.FIRE
 
 
-## The gameplay Environment, or null before a map has built one.
-func _current_environment() -> Environment:
-	return _world_env.environment if _world_env else null
-
-
 func _ready() -> void:
 	KeyBindings.ensure_applied()
 	RenderingServer.set_debug_generate_wireframes(true)
@@ -354,6 +346,10 @@ func _ready() -> void:
 	_client_join.name = "ClientJoin"
 	_add_system(_client_join)
 	NetworkManager.register_sync_handler(_client_join)
+	_skybox = Skybox.new()
+	_skybox.name = "Skybox"
+	_add_system(_skybox)
+	Game.skybox = _skybox
 	_renderer_trial.log_active_renderer()
 	_parse_cmdline_args()
 	ClientCommandSystem.register("scale", _cmd_scale, "/scale [0.25-1.0]",
@@ -459,8 +455,9 @@ func _ready() -> void:
 	_lobby.host_pressed.connect(_on_lobby_host)
 	_lobby.join_pressed.connect(_on_lobby_join)
 	_lobby.renderer_restart_requested.connect(_on_lobby_renderer_restart)
+	_lobby.passthrough_changed.connect(_skybox.apply_vr_passthrough)
 	_lobby.quality_changed.connect(func(level: String) -> void:
-		RenderQuality.apply(level, get_viewport(), _current_environment())
+		RenderQuality.apply(level, get_viewport(), _skybox.environment())
 		WaterSurfaces.apply(_map_root, RenderQuality.water_depth_enabled(level)))
 	MapTransfer.map_already_cached.connect(_on_map_ready)
 	MapTransfer.map_transfer_complete.connect(_on_map_ready)
@@ -484,42 +481,6 @@ func _ready() -> void:
 func _on_server_var_changed(key: String, _value: Variant) -> void:
 	if key == "bsp_hulls":
 		_apply_bsp_hulls()
-	elif key == "time" and _map_root:
-		if NightMode.sky_for(_map_sky_name(_map_root), _map_root) != _built_sky:
-			_build_skybox(_map_root)
-			apply_vr_passthrough(XRManager.vr_passthrough)
-		NightMode.apply(_map_root)
-
-
-func _map_sky_name(map_root: Node3D) -> String:
-	var worldspawn := map_root.get_node_or_null("worldspawn")
-	if worldspawn and worldspawn.has_meta("entity"):
-		return worldspawn.get_meta("entity").get("skyname", "")
-	return ""
-
-
-## From the worldspawn skyname, or the night sky standing in for it. Rebuilt whole when night
-## swaps one for the other. The procedural sky is measured off the map's own sky either way, and
-## does its own night.
-func _build_skybox(map_root: Node3D) -> void:
-	if _skybox:
-		remove_child(_skybox)
-		_skybox.queue_free()
-	_built_sky = NightMode.sky_for(_map_sky_name(map_root), map_root)
-	_skybox = Skybox.new()
-	_skybox.name = "Skybox"
-	add_child(_skybox)
-	Game.skybox = _skybox
-	# Read straight off the map rather than waiting for LightEnvironment._ready: entity _ready
-	# order follows the BSP lump order, and the sky is built here, before any of them run.
-	_skybox.setup(_built_sky, map_root, _find_entity(map_root, "light_environment"),
-		_map_sky_name(map_root))
-	_world_env = _skybox.get_node_or_null("WorldEnvironment") as WorldEnvironment
-	if weather_system:
-		weather_system.sky = _skybox.overcast
-	# Skybox builds a fresh Environment per map, so the quality level has to be stamped onto this
-	# one — before precache_resources reuses the resource to warm the model shaders.
-	RenderQuality.apply(RenderQuality.load_level(), get_viewport(), _current_environment())
 
 
 ## Runs on host and client alike, because movement prediction has to run against the same geometry
@@ -735,13 +696,7 @@ func _load_map(map_name: String) -> void:
 	if map_root == null:
 		push_warning("Failed to load map: %s (no cache, export, or BSP plugin)" % map_name)
 		return
-	NightMode.reset()
-
-	# Initialize light grid before spawning entities so item models get lit
-	_light_grid = LightGrid.from_meta(map_root)
-	if _light_grid.is_valid():
-		Log.info("Light grid loaded from map metadata")
-		AssetLoader.light_grid = _light_grid
+	_skybox.begin_map(map_root)
 
 	VisibilitySystem.setup(map_root)
 	_setup_map_common(map_root)
@@ -760,15 +715,11 @@ func _load_map(map_name: String) -> void:
 	weather_system.map_root = map_root
 	add_child(weather_system)
 
-	_build_skybox(map_root)
 	var watered := WaterSurfaces.apply(map_root, RenderQuality.water_depth_enabled())
 	if watered > 0:
 		Log.info("Water depth effects %s on %d liquid surfaces" % [
 				"on" if RenderQuality.water_depth_enabled() else "off", watered])
-	_sky_surfaces.clear()
-	_collect_sky_surfaces(map_root)
-	apply_vr_passthrough(XRManager.vr_passthrough)
-	NightMode.apply(map_root)
+	_skybox.build()
 
 	# Precache weapon models, sounds, sprites so first shot has no hitch
 	AssetLoader.precache_resources(self)
@@ -877,12 +828,7 @@ func _unload_map() -> void:
 		child.queue_free()
 	_map_root = null
 	Game.clear_world()
-	_sky_surfaces.clear()
-	_light_grid = null
-	_world_env = null
-	_skybox = null
-	AssetLoader.light_grid = null
-	LightGrid._all_acube_materials.clear()
+	_skybox.clear()
 	NetworkManager.clear_players()
 	NetworkManager.reset_entities()
 	VisibilitySystem.teardown()
@@ -1228,45 +1174,6 @@ func _on_vr_menu_requested(class_only: bool) -> void:
 		_attach_vr_panel_to_camera()
 
 
-## First entity of `classname` in the map's entity list, as its raw key/value dict. Maps carry
-## duplicates of the map-wide ones (ww_feudal and ww_golem ship three light_environments each,
-## left over from compile tools), and GoldSrc uses the first, so this stops at the first too.
-func _find_entity(map_root: Node, classname: String) -> Dictionary:
-	for child in map_root.get_children():
-		if not child.has_meta("entity"):
-			continue
-		var ent: Dictionary = child.get_meta("entity")
-		if ent.get("classname", "") == classname:
-			return ent
-	return {}
-
-
-func _collect_sky_surfaces(node: Node) -> void:
-	if node is MeshInstance3D and node.has_meta("is_sky_surface"):
-		_sky_surfaces.append(node as MeshInstance3D)
-	for child in node.get_children():
-		_collect_sky_surfaces(child)
-
-
-func apply_vr_passthrough(enabled: bool) -> void:
-	if not XRManager.is_vr:
-		return
-	# xr/openxr/extensions/meta/passthrough registers XR_FB_passthrough at session creation, so the
-	# runtime starts the camera feed automatically when alpha-blend is requested.
-	var xr_interface := XRServer.find_interface("OpenXR") as XRInterface
-	if xr_interface:
-		xr_interface.environment_blend_mode = (
-			XRInterface.XR_ENV_BLEND_MODE_ALPHA_BLEND if enabled
-			else XRInterface.XR_ENV_BLEND_MODE_OPAQUE
-		)
-	get_viewport().transparent_bg = enabled
-	for surf in _sky_surfaces:
-		if is_instance_valid(surf):
-			surf.visible = not enabled
-	if _world_env and _world_env.environment:
-		_world_env.environment.background_color = Color(0.0, 0.0, 0.0, 0.0 if enabled else 1.0)
-
-
 func _process(_delta: float) -> void:
 	# Main-loop iteration rate is what polls the multiplayer peer and turns pings around, so it
 	# (not physics tps) bounds client-seen ping.
@@ -1274,9 +1181,6 @@ func _process(_delta: float) -> void:
 		_server_process_frames += 1
 	if NetworkManager.is_online() and not NetworkManager.is_host():
 		NetworkManager.interp_entities()
-	if _light_grid and _light_grid.is_valid() and _local_player and _world_env:
-		_world_env.environment.ambient_light_color = _light_grid.sample(
-			_local_player.global_position)
 	if XRManager.is_vr and _game_active and _local_player and _xr_rig and _xr_rig_camera:
 		var nominal_eye: Vector3 = _local_player.get_eye_position()
 		var allowed_eye: Vector3 = nominal_eye

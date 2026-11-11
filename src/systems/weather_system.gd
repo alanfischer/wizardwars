@@ -40,8 +40,8 @@ func _ready() -> void:
 	super._ready()
 	_light_drifts()
 	ServerVars.value_changed.connect(_on_server_var_changed)
-	# main hands over each new sky as night rebuilds it (main._build_skybox); this is the one the
-	# map started with, if it was built first.
+	# In game Skybox hands over each map's sky once it is built (Skybox._setup_for_map); a tool may
+	# have built its sky first.
 	if is_instance_valid(Game.skybox):
 		sky = Game.skybox.overcast
 	_apply_night()
