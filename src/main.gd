@@ -1,10 +1,8 @@
 extends Node3D
 
 const Movement = preload("res://addons/pmove/movement.gd")
-const LocalPlayerScene = preload("res://src/local_player.tscn")
 const RemotePlayerScene = preload("res://src/remote_player.tscn")
 const BlenderMapConverterScript = preload("res://src/systems/blender_map_converter.gd")
-const IntroGuide = preload("res://src/systems/intro_guide.gd")
 const KeyBindings = preload("res://src/systems/key_bindings.gd")
 const WaypointBake = preload("res://src/bot/waypoint_bake.gd")
 const RendererTrialScript = preload("res://src/systems/renderer_trial.gd")
@@ -12,6 +10,7 @@ const ClientSyncScript = preload("res://src/systems/client_sync.gd")
 const ClientPerfScript = preload("res://src/systems/client_perf.gd")
 const ClientJoinScript = preload("res://src/systems/client_join.gd")
 const MapWorldScript = preload("res://src/systems/map_world.gd")
+const LocalViewScript = preload("res://src/systems/local_view.gd")
 
 
 ## A dynamic entity's NetSync: SyncSpec derives the config and goldnet's quant/push metas from
@@ -80,15 +79,12 @@ var _blender_map_converter: Node
 var _xr_rig: Node3D
 var _xr_rig_camera: Camera3D
 var _vr_lobby_panel: VRLobbyPanel
-var _vr_hud_panel: VRHUDPanel
 var _head_probe_shape := SphereShape3D.new()
 var _xr_right_controller: XRController3D
 var _xr_left_controller: XRController3D
 var _current_map_name: String:
 	get: return Game.current_map_name
 	set(v): Game.current_map_name = v
-var _current_map_info := ""  # raw text of maps/<map>.txt for the MOTD panel
-var _current_map_world := ""  # raw text of maps/<map>.ww (world-map briefing)
 var _local_player_name := "Wizard"
 
 
@@ -134,6 +130,8 @@ var _client_join: Node
 var _skybox: Skybox
 ## Loading the map scene, its entities and per-map systems, and resetting them (src/systems/map_world.gd).
 var _map_world: Node
+## The player at this keyboard: LocalPlayer, HUD, menus, briefing (src/systems/local_view.gd).
+var _local_view: Node
 var _use_goldnet := true  # default transport: GoldNetMultiplayer (GoldSrc ack-delta). --stock opts out.
 ## Set when goldnet was wanted but the extension was not there — a broken install, not a choice.
 ## Joining on stock against a goldnet server draws the world and no entities at all, so we refuse.
@@ -345,6 +343,10 @@ func _ready() -> void:
 	_map_world.name = "MapWorld"
 	_map_world.bind(self, _skybox)
 	_add_system(_map_world)
+	_local_view = LocalViewScript.new()
+	_local_view.name = "LocalView"
+	_local_view.bind(self, _client_join, _on_vr_menu_requested)
+	_add_system(_local_view)
 	_renderer_trial.log_active_renderer()
 	_parse_cmdline_args()
 	ClientCommandSystem.register("scale", _cmd_scale, "/scale [0.25-1.0]",
@@ -446,6 +448,8 @@ func _ready() -> void:
 			ctrl.add_child(laser)
 	else:
 		_add_system(_lobby)
+	_local_view.bind_xr(_xr_rig, _xr_rig_camera, _xr_left_controller, _xr_right_controller,
+		_vr_lobby_panel)
 
 	_lobby.host_pressed.connect(_on_lobby_host)
 	_lobby.join_pressed.connect(_on_lobby_join)
@@ -560,129 +564,12 @@ func load_map_headless(map_name: String) -> void:
 	Log.info("[Server] Map loaded: %d spawn points" % SpawnSystem.get_all_spawns().size())
 
 
-## Baked into the loaded .scn's metadata by MapConverter (was maps/<map>.txt, read off disk).
-## Bundled maps ship one; downloaded custom maps may not, so callers must tolerate "".
-func _read_map_info() -> String:
-	return _map_root.get_meta("map_description", "") if _map_root else ""
-
-
-## Baked into the .scn's metadata (was maps/<map>.ww). Format: world name (names
-## maps/worlds/<name>.tga), then the marker's X and Y in per-mille (0-1000) of the image.
-func _read_map_world() -> String:
-	return _map_root.get_meta("map_world_info", "") if _map_root else ""
-
-
-## Returns {} if the text is malformed or the named world image isn't bundled.
-static func _parse_map_world(text: String) -> Dictionary:
-	var lines: Array[String] = []
-	for line in text.split("\n"):
-		var s: String = line.strip_edges()
-		if not s.is_empty():
-			lines.append(s)
-	if lines.size() < 3 or not lines[1].is_valid_int() or not lines[2].is_valid_int():
-		return {}
-	var tex_path := "res://maps/worlds/%s.tga" % lines[0]
-	if not ResourceLoader.exists(tex_path):
-		return {}
-	return {
-		"texture": load(tex_path),
-		"marker": Vector2(lines[1].to_int() / 1000.0, lines[2].to_int() / 1000.0),
-	}
-
-
-## Returns false when the map has neither sheet.
-func _show_map_info_panel() -> bool:
-	var world := _parse_map_world(_current_map_world)
-	if _current_map_info.is_empty() and world.is_empty():
-		return false
-	hud.show_map_info(_current_map_name, _current_map_info,
-		world.get("texture"), world.get("marker", Vector2(-1, -1)))
-	return true
-
-
-## /intro — re-read the controls card. Deliberately doesn't touch the "seen it" tick: asking
-## for it is not the same as wanting it back at every map start.
-func show_intro() -> void:
-	if hud == null:
-		return
-	hud.show_intro(IntroGuide.body(XRManager.is_vr))
-
-
-func show_motd() -> void:
-	if hud == null:
-		return
-	if not _show_map_info_panel():
-		hud.show_center_message("No description for %s" % _current_map_name)
-
-
 func _load_map(map_name: String) -> void:
 	if _map_world.load_map(map_name, true) == null:
 		push_warning("Failed to load map: %s (no cache, export, or BSP plugin)" % map_name)
 		return
 
-	# Spawn player at first non-team spawn point (info_player_start)
-	var all_spawns := SpawnSystem.get_all_spawns()
-	Log.info("Spawn points found: %d" % all_spawns.size())
-	if all_spawns.size() > 0:
-		_local_player = LocalPlayerScene.instantiate()
-		# ENet is brought up before the map loads, so get_unique_id() is the real id here
-		# (offline it's 1). Consumers read peer_id directly, no fallback needed downstream.
-		_local_player.peer_id = multiplayer.get_unique_id()
-		var sp := all_spawns[0]
-		for candidate in all_spawns:
-			if candidate.team_no == 0:
-				sp = candidate
-				break
-		_local_player.position = sp.get_spawn_position()
-		_local_player.rotation.y = sp.rotation.y
-		if XRManager.is_vr and _xr_rig:
-			_local_player.xr_camera = _xr_rig_camera
-			_local_player.xr_rig = _xr_rig
-			_local_player.xr_left = _xr_left_controller
-			_local_player.xr_right = _xr_right_controller
-		add_child(_local_player)
-		# Offline the LocalPlayer IS the server-side player, so register it for get_player()
-		# lookups. Online the cache entry is the body puppet instead (_register_host_player after
-		# _load_map), and is_online() correctly skips this.
-		if not NetworkManager.is_online():
-			NetworkManager.register_player(_local_player.peer_id, _local_player)
-		_local_player.set_spectating(true)
-		if XRManager.is_vr:
-			_local_player.vr_menu_requested.connect(_on_vr_menu_requested)
-		Log.info("Player spawned at: %s, yaw: %s" % [_local_player.position, _local_player.rotation.y])
-
-		Game.weather_system.attach_player(_local_player)
-
-		hud = HUD.create()
-		add_child(hud)
-		_local_player._hud = hud
-		hud.chat_submitted.connect(_local_player._on_chat_submitted)
-
-		# Baked into the .scn's metadata, so this works the same whether the map was converted
-		# locally or downloaded — no separate host->client transfer needed.
-		_current_map_info = _read_map_info()
-		_current_map_world = _read_map_world()
-		# A player who has never been here gets the controls card first, with the map
-		# description queued behind it. Showing it is what clears the tick, so it costs one
-		# reading and then never appears again unless the lobby (or /intro) asks for it.
-		if IntroGuide.should_show():
-			IntroGuide.set_show(false)
-			hud.show_intro(IntroGuide.body(XRManager.is_vr), _show_map_info_panel)
-		else:
-			_show_map_info_panel()
-		if XRManager.is_vr and _xr_rig_camera:
-			_vr_hud_panel = VRHUDPanel.new()
-			_vr_hud_panel.name = "VRHUDPanel"
-			_xr_rig_camera.add_child(_vr_hud_panel)
-			_vr_hud_panel.position = Vector3(0.0, -0.1, -1.2)
-			hud.move_to_vr_panel(_vr_hud_panel.viewport)
-
-		var menu: CanvasLayer = _client_join.build_menu()
-		if XRManager.is_vr and _vr_lobby_panel:
-			_vr_lobby_panel.add_ui(menu)
-		else:
-			add_child(menu)
-
+	_local_view.build()
 
 
 ## add_child for a node that lives as long as main does; see _systems.
@@ -705,15 +592,7 @@ func _release_override_materials(node: Node) -> void:
 
 
 func _unload_map() -> void:
-	if _local_player and _local_player.has_method("free_debug_render"):
-		_local_player.free_debug_render()
-	# Free explicitly — in VR it lives in the SubViewport, not as a direct child.
-	_client_join.teardown_menu()
-	# Parented to the persistent XR rig camera, so the children loop below won't catch it — without
-	# this, each map reload stacks another ghost HUD on the camera.
-	if _vr_hud_panel:
-		_vr_hud_panel.queue_free()
-		_vr_hud_panel = null
+	_local_view.teardown()
 	# A system is built once and never recreated, so freeing one would leave main holding a freed
 	# instance for the session: the spawners dangle on the next spawn(), and ClientSync drops its
 	# NetworkManager registration (tree_exiting), killing sync dispatch for good.
