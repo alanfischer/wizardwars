@@ -68,12 +68,7 @@ var _lobby: CanvasLayer
 var _map_converter: Node
 var _resource_converter: Node
 var _blender_map_converter: Node
-var _xr_rig: Node3D
-var _xr_rig_camera: Camera3D
-var _vr_lobby_panel: VRLobbyPanel
-var _head_probe_shape := SphereShape3D.new()
-var _xr_right_controller: XRController3D
-var _xr_left_controller: XRController3D
+@onready var _vr_rig: VRRig = $XRRig
 var _current_map_name: String:
 	get: return Game.current_map_name
 	set(v): Game.current_map_name = v
@@ -308,7 +303,7 @@ func _parse_element_name(element_name: String) -> int:
 func _ready() -> void:
 	KeyBindings.ensure_applied()
 	RenderingServer.set_debug_generate_wireframes(true)
-	_systems.append($XRRig)
+	_systems.append(_vr_rig)
 	_renderer_trial = RendererTrialScript.new()
 	_renderer_trial.name = "RendererTrial"
 	_add_system(_renderer_trial)
@@ -336,7 +331,7 @@ func _ready() -> void:
 	_add_system(_map_world)
 	_local_view = LocalViewScript.new()
 	_local_view.name = "LocalView"
-	_local_view.bind(self, _client_join, _on_vr_menu_requested)
+	_local_view.bind(self, _client_join, _vr_rig)
 	_add_system(_local_view)
 	_renderer_trial.log_active_renderer()
 	_parse_cmdline_args()
@@ -397,14 +392,6 @@ func _ready() -> void:
 		_start_dedicated_server()
 		return
 
-	_xr_rig = get_node("XRRig")
-	_xr_rig_camera = _xr_rig.get_node_or_null("XRCamera3D") as Camera3D
-	_xr_right_controller = get_node_or_null("XRRig/RightController")
-	_xr_left_controller = get_node_or_null("XRRig/LeftController")
-	_head_probe_shape.radius = 0.12
-	if XRManager.is_vr:
-		_xr_rig.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
-
 	# The stored picture-quality level has to be in force before the lobby can offer to change it,
 	# and before precache_resources warms shaders against the main viewport's framebuffer format.
 	RenderQuality.apply(RenderQuality.load_level(), get_viewport())
@@ -413,35 +400,8 @@ func _ready() -> void:
 	_lobby.name = "LobbyUI"
 
 	Log.info("XRManager.is_vr = %s" % XRManager.is_vr)
-	if XRManager.is_vr:
-		_vr_lobby_panel = VRLobbyPanel.new()
-		_vr_lobby_panel.name = "VRLobbyPanel"
-		if _xr_rig_camera:
-			_xr_rig_camera.add_child(_vr_lobby_panel)
-			_vr_lobby_panel.position = Vector3(0.0, 0.0, -2.0)
-		else:
-			_add_system(_vr_lobby_panel)
-		_vr_lobby_panel.add_ui(_lobby)
-
-		for ctrl in [_xr_right_controller, _xr_left_controller]:
-			if ctrl == null:
-				continue
-			var laser := MeshInstance3D.new()
-			laser.name = "LaserPointer"
-			var laser_mesh := BoxMesh.new()
-			laser_mesh.size = Vector3(0.003, 0.003, 4.0)
-			laser.mesh = laser_mesh
-			var laser_mat := StandardMaterial3D.new()
-			laser_mat.albedo_color = Color(1.0, 0.2, 0.2, 0.6)
-			laser_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-			laser_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			laser.material_override = laser_mat
-			laser.position = Vector3(0.0, 0.0, -2.0)
-			ctrl.add_child(laser)
-	else:
+	if not _vr_rig.host_lobby(_lobby):
 		_add_system(_lobby)
-	_local_view.bind_xr(_xr_rig, _xr_rig_camera, _xr_left_controller, _xr_right_controller,
-		_vr_lobby_panel)
 
 	_lobby.host_pressed.connect(_on_lobby_host)
 	_lobby.join_pressed.connect(_on_lobby_join)
@@ -569,32 +529,19 @@ func _add_system(node: Node) -> void:
 	add_child(node)
 
 
-## The map .scn stays cached, so its meshes outlive the nodes that drew them, but a per-instance
-## override material dies with its node — leaving RenderingServer reading a freed RID ("material is null").
-func _release_override_materials(node: Node) -> void:
-	if node is GeometryInstance3D:
-		(node as GeometryInstance3D).material_override = null
-	if node is MeshInstance3D:
-		var mi := node as MeshInstance3D
-		for i in mi.get_surface_override_material_count():
-			mi.set_surface_override_material(i, null)
-	for child in node.get_children():
-		_release_override_materials(child)
-
-
 func _unload_map() -> void:
 	_local_view.teardown()
-	# A system is built once and never recreated, so freeing one would leave main holding a freed
-	# instance for the session: the spawners dangle on the next spawn(), and ClientSync drops its
-	# NetworkManager registration (tree_exiting), killing sync dispatch for good.
-	for child in get_children():
-		if child in _systems:
-			continue
-		_release_override_materials(child)
-		child.queue_free()
-	Game.clear_world()
 	NetworkManager.clear_players()
 	_map_world.clear()
+	# What is left under Main is transient: the spawners' bodies and everything gameplay parents to
+	# the current scene (effects, projectiles, gibs, sounds). A system is never freed — main would
+	# hold a freed instance for the session: the spawners dangle on the next spawn(), and ClientSync
+	# drops its NetworkManager registration (tree_exiting), killing sync dispatch for good.
+	for child in get_children():
+		if child in _systems or child.is_queued_for_deletion():
+			continue
+		EntityRender.release_override_materials(child)
+		child.queue_free()
 	_client_join.clear_watchdog()  # the new map re-asks from scratch; don't resend the old map's pick
 
 
@@ -720,10 +667,7 @@ func _set_game_active(active: bool) -> void:
 	else:
 		if _lobby:
 			_lobby.show_menu()
-		if _vr_lobby_panel and _xr_rig_camera and _vr_lobby_panel.get_parent() != _xr_rig_camera:
-			_vr_lobby_panel.reparent(_xr_rig_camera, false)
-			_vr_lobby_panel.position = Vector3(0.0, 0.0, -2.0)
-			_vr_lobby_panel.rotation = Vector3.ZERO
+		_vr_rig.attach_panel()
 
 
 func _on_disconnected(reason: String) -> void:
@@ -892,24 +836,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		opened = _client_join.open_team_menu()
 	elif event.is_action_pressed("class_menu"):
 		opened = _client_join.open_class_menu()
-	if opened and XRManager.is_vr:
-		_attach_vr_panel_to_camera()
-
-
-func _attach_vr_panel_to_camera() -> void:
-	if _vr_lobby_panel == null or _xr_rig_camera == null:
-		return
-	if _vr_lobby_panel.get_parent() != _xr_rig_camera:
-		_vr_lobby_panel.reparent(_xr_rig_camera, false)
-	_vr_lobby_panel.position = Vector3(0.0, 0.0, -2.0)
-	_vr_lobby_panel.rotation = Vector3.ZERO
-
-
-func _on_vr_menu_requested(class_only: bool) -> void:
-	if not _vr_lobby_panel:
-		return
-	if (class_only and _client_join.open_class_menu()) or _client_join.open_team_menu():
-		_attach_vr_panel_to_camera()
+	if opened:
+		_vr_rig.attach_panel()
 
 
 func _process(_delta: float) -> void:
@@ -919,36 +847,6 @@ func _process(_delta: float) -> void:
 		_server_process_frames += 1
 	if NetworkManager.is_online() and not NetworkManager.is_host():
 		NetworkManager.interp_entities()
-	if XRManager.is_vr and _game_active and _local_player and _xr_rig and _xr_rig_camera:
-		var nominal_eye: Vector3 = _local_player.get_eye_position()
-		var allowed_eye: Vector3 = nominal_eye
-		if XRManager.advanced_head_tracking:
-			# Roomscale: the capsule already tracks the head horizontally, so the camera's
-			# remaining XZ lean is only the residual — how far the head has out-run a blocked
-			# capsule. Sphere-cast the full 3D offset so walls AND ceilings both clamp the result.
-			var head_local := _xr_rig_camera.position
-			var residual: Vector3 = _local_player.get_vr_head_residual()
-			var desired_eye: Vector3 = Vector3(
-				nominal_eye.x + residual.x,
-				_local_player.global_position.y + head_local.y,
-				nominal_eye.z + residual.z
-			)
-			if desired_eye.distance_squared_to(nominal_eye) > 0.0001:
-				var space := get_world_3d().direct_space_state
-				var params := PhysicsShapeQueryParameters3D.new()
-				params.shape = _head_probe_shape
-				params.transform = Transform3D(Basis.IDENTITY, nominal_eye)
-				params.motion = desired_eye - nominal_eye
-				params.collision_mask = GameConsts.MASK_WORLD_AND_CLIP
-				var motion: PackedFloat32Array = space.cast_motion(params)
-				var safe_frac := 1.0 if motion.is_empty() else motion[0]
-				allowed_eye = nominal_eye.lerp(desired_eye, safe_frac)
-		_xr_rig.global_position = allowed_eye - _xr_rig.global_basis * _xr_rig_camera.position
-	if _vr_lobby_panel and _vr_lobby_panel.visible:
-		if _xr_right_controller and _xr_right_controller.get_is_active():
-			_vr_lobby_panel.update_pointer(_xr_right_controller)
-		elif _xr_left_controller and _xr_left_controller.get_is_active():
-			_vr_lobby_panel.update_pointer(_xr_left_controller)
 
 
 ## The lobby asked to switch renderers now rather than at the next launch, and the player has

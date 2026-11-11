@@ -24,16 +24,6 @@ var game_active := false
 var current_map_name := ""
 
 
-## Map unload. The two flags belong to the load path, not here: game_active is false for the whole
-## changeover, and current_map_name is overwritten by the incoming map rather than blanked between.
-func clear_world() -> void:
-	hud = null
-	local_player = null
-	decal_system = null
-	weather_system = null
-	map_root = null
-
-
 ## Rattle this peer's own view, for something it already spawned for itself (a comet's impact)
 ## and so has nothing to broadcast. Picks the same way the server does for everyone else
 ## (NetworkManager.shakes), then goes through LocalPlayer.shake_view like the RPC does — it owns

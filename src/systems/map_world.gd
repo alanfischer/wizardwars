@@ -69,8 +69,17 @@ func load_map(map_name: String) -> bool:
 	return true
 
 
-## After main has freed the map's nodes.
+## Frees the map and the per-map systems it built, then resets what they left in the autoloads.
 func clear() -> void:
+	if Game.map_root:
+		EntityRender.release_override_materials(Game.map_root)
+		Game.map_root.queue_free()
+	for node: Node in [Game.decal_system, Game.weather_system]:
+		if node:
+			node.queue_free()
+	Game.map_root = null
+	Game.decal_system = null
+	Game.weather_system = null
 	_skybox.clear()
 	AssetLoader.light_grid = null
 	LightGrid._all_acube_materials.clear()

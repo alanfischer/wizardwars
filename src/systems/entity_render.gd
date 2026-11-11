@@ -200,3 +200,17 @@ func convert_shader_to_standard(shader_mat: ShaderMaterial) -> StandardMaterial3
 		mat.set_texture(BaseMaterial3D.TEXTURE_ALBEDO, tex)
 		mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	return mat
+
+
+## Before freeing a node that draws a cached mesh (the map .scn, MDL models): the mesh outlives the
+## node, but a per-instance override material dies with it, leaving RenderingServer reading a
+## freed RID ("material is null").
+func release_override_materials(node: Node) -> void:
+	if node is GeometryInstance3D:
+		(node as GeometryInstance3D).material_override = null
+	if node is MeshInstance3D:
+		var mi := node as MeshInstance3D
+		for i in mi.get_surface_override_material_count():
+			mi.set_surface_override_material(i, null)
+	for child in node.get_children():
+		release_override_materials(child)
