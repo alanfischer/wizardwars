@@ -7,6 +7,8 @@ signal renderer_restart_requested(renderer: String)
 ## Emitted with the new level whenever the quality dropdown changes. Unlike the renderer, this
 ## one lands live, so the listener just applies it.
 signal quality_changed(level: String)
+## The VR passthrough toggle, already saved; the listener shows the room through the sky.
+signal passthrough_changed(enabled: bool)
 
 const ACCENT := Color(0.4, 0.6, 1.0)
 const BG_COLOR := Color(0.0, 0.0, 0.0, 1.0)
@@ -429,9 +431,7 @@ func _build_vr_rows(vbox: VBoxContainer) -> void:
 			func(pressed: bool) -> void:
 				XRManager.vr_passthrough = pressed
 				XRManager.save_settings()
-				var main_node := get_tree().get_root().get_node_or_null("Main")
-				if main_node and main_node.has_method("apply_vr_passthrough"):
-					main_node.apply_vr_passthrough(pressed))
+				passthrough_changed.emit(pressed))
 		passthrough_check.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		vr_options_row.add_child(passthrough_check)
 

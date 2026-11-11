@@ -1,11 +1,16 @@
 # TODO
 
 - Keep peeling `main.gd`: map load/unload (`_load_map`, `_unload_map`, `load_map_headless`) is
-  next. It spans four clusters that peel separately: the sky (`_skybox`, `_world_env`,
-  `_sky_surfaces`, the night rebuild, VR passthrough, the light-grid ambient), the map world (root,
-  PVS, entities, decals, weather, precache), the local view (player, HUD, VR HUD panel, class menu)
-  and the client map download flags. The rule the earlier peels share: gameplay state comes off
-  `Game`, node references come by injection.
+  next. The sky is out (`Skybox` owns it now); three clusters remain and peel separately: the map
+  world (root, PVS, entities, decals, weather, precache), the local view (player, HUD, VR HUD
+  panel, class menu) and the client map download flags. The rule the earlier peels share: gameplay
+  state comes off `Game`, node references come by injection.
+
+  Two leftovers from the sky peel. `Skybox.begin_map`/`clear` carry the map lighting too
+  (`AssetLoader.light_grid`, `LightGrid._all_acube_materials`, `NightMode.reset`/`apply`); those
+  belong with the map world. And each map still builds a new `SkyboxSky`, so the weather's `sky`
+  is re-pointed per map; one per Skybox, re-measured with `OvercastSky.apply(params)`, would end
+  the handover, but changes how storm state carries across a map change.
 
 - Give the entities that never move a presence-only sync. 19 classes call `_register_for_sync()`
   and most are scenery — `env_sprite`, `light_entity`, `ambient_generic`, `info_tfgoal`,
