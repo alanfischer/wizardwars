@@ -22,15 +22,17 @@ the teams. It runs on macOS, Windows, Linux and Meta Quest (VR).
 
 ## Libraries
 
-The engine-side work lives in four GDExtensions, each its own MIT-licensed repo, pulled in as
-submodules under `extern/` and linked into `addons/`:
+The engine-side work lives in five libraries, each its own MIT-licensed repo, pulled in as
+submodules under `extern/` and linked into `addons/`. goldsrc, hop and goldnet are GDExtensions
+(C++, built by `build_extension.sh`); pmove and overcast are plain GDScript:
 
 | Library | What it does |
 |---|---|
 | [goldsrc-godot](https://github.com/alanfischer/goldsrc-godot) | Loads GoldSrc assets: BSP maps (lightmaps, clip hulls, entities), MDL models, SPR sprites, WAD textures |
 | [hop-godot](https://github.com/alanfischer/hop-godot) | The [hop](https://github.com/alanfischer/hop) physics engine as Godot's `PhysicsServer3D`, with exact BSP hull traces |
 | [goldnet-godot](https://github.com/alanfischer/goldnet-godot) | GoldSrc/Quake-style netcode as a drop-in `MultiplayerAPI`: delta snapshots against acked baselines, input as a command stream. Core protocol in [goldnet](https://github.com/alanfischer/goldnet) |
-| [pmove-godot](https://github.com/alanfischer/pmove-godot) | GoldSrc player movement plus client-side prediction (GDScript) |
+| [pmove-godot](https://github.com/alanfischer/pmove-godot) | GoldSrc player movement plus client-side prediction |
+| [overcast-godot](https://github.com/alanfischer/overcast-godot) | Sky, clouds and weather: the procedural sky and time of day, rain, snow, lightning, wet and snowy ground, cloud shadows. See [Weather](#weather) |
 
 Vendored in `addons/`:
 
@@ -72,7 +74,8 @@ list, and a mistyped flag is reported rather than ignored.
 Maps convert from `.bsp` to a cached `.scn` the first time they load; `./convert.sh` does all
 of them ahead of time. The cache is keyed on `CACHE_VERSION` in `src/systems/map_converter.gd`
 (and `MDL_CACHE_VERSION` in `resource_converter.gd` for models) — bump it when a change alters
-what conversion produces, or stale caches win. `./clean_cache.sh` wipes them.
+what conversion produces, or stale caches win. Maps are also keyed on a hash of goldsrc-godot's
+source, so a change there reconverts them on its own. `./clean_cache.sh` wipes them.
 
 ### Maps
 
@@ -91,7 +94,7 @@ connected). It needs the Android export templates and SDK set up in the editor.
 | Path | Contents |
 |---|---|
 | `src/` | The game. `main.gd` is the entry point; `systems/` holds the autoloads (networking, goals, spawning, sound, bots…), `wizards/` the classes, `weapons/`, `projectiles/`, `entities/` (GoldSrc entity behaviours), `bot/`, `tests/` |
-| `extern/` | The four library submodules |
+| `extern/` | The five library submodules |
 | `addons/` | Godot plugins: symlinks into `extern/`, plus TwoVoIP and OpenXR |
 | `maps/`, `models/`, `sounds/`, `sprites/`, `sky/`, `*.wad` | Game assets in their GoldSrc formats |
 | `tools/` | Asset tools (`mdl.py`, `spr.py`, `wad.py`, `bsp.py`), the `*_art.py` generators that made the replacement art, one-off map patches (`ww_*.py`), `probe_*.gd` debug scenes, and the screenshot scenes behind the README (`readme_shots`) and the player docs (`doc_shots`) |
@@ -109,6 +112,8 @@ The Python tools need a venv with `numpy`, `scipy` and `pillow`; the sound gener
 | `run_tests.sh` | The test suite, headless |
 | `convert.sh` | Convert GoldSrc assets (BSP/MDL/SPR/WAD) to Godot format |
 | `clean_cache.sh` | Delete converted maps and resources so they rebuild |
+| `clean_logs.sh` | Empty the local `client.log` and `server.log` |
+| `test_network.sh` | A dedicated server plus several clients, with optional simulated latency and loss |
 | `deploy_quest.sh` | Build the Quest APK and install it over ADB |
 | `build.sh` | Export client and/or server binaries |
 | `package.sh` | Bundle converted assets into the Linux server package |
@@ -130,11 +135,13 @@ The Python tools need a venv with `numpy`, `scipy` and `pillow`; the sound gener
 
 ```bash
 ./release.sh                     # full release (converts assets, builds all, uploads, restarts server)
-./release.sh --map ww_castle     # restart server on a specific map (default: ww_2fort)
+./release.sh --map ww_hunt       # restart server on a specific map (default: ww_2fort)
 ./release.sh --no-restart        # upload without restarting the server
+./release.sh --all-maps          # ship every BSP, not just the rotation
+./release.sh --rebuild-ext       # rebuild the GDExtensions even if their sources look unchanged
 ```
 
-This converts assets, builds macOS/Windows/Linux clients and the Linux server, packages everything, rsyncs to the release server, and restarts the game server.
+This converts assets, builds macOS/Windows/Linux clients and the Linux server, packages everything, rsyncs to the release server, and restarts the game server. Only the maps in `maps/mapcycle.txt` ship by default, and any other map on the server is deleted.
 
 Where it ships comes from `release.env` in the project root, which is gitignored so the source never names the server:
 
@@ -161,7 +168,7 @@ GODOT=/path/to/Godot ./run_tests.sh
 ```
 
 Each `extern/*-godot` submodule is its own project and tests itself, so its suite runs in its
-own repo (`extern/pmove-godot/run_tests.sh`, and likewise for hop, goldnet and goldsrc) rather
+own repo (`extern/pmove-godot/run_tests.sh`, and likewise for hop, goldnet, goldsrc and overcast) rather
 than on every WizardWars test pass.
 
 ## class_name and preload
