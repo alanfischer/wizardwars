@@ -16,12 +16,13 @@ const DEFAULT_LEVEL := "medium"
 ## maps are nothing but hard geometric edges. Glow changes how the game LOOKS rather than how
 ## cleanly it draws, so it stays off until asked for. The procedural sky is not a
 ## quality setting: it comes with dynamic weather (Skybox.procedural); High only ray-marches its
-## clouds (OvercastClouds.set_volumetric).
+## clouds (OvercastClouds.set_volumetric). The real-time sun (MapSun) is off everywhere until the
+## maps are ready for hard shadows: players and props cast them in places hlrad never would.
 const LEVELS := {
-	"low": ["Low — no antialiasing, sun baked in", Viewport.MSAA_DISABLED, false, false, false, false],
-	"medium": ["Medium — 2x antialiasing, sun shadows", Viewport.MSAA_2X, false, false, false, true],
-	"high": ["High — 4x antialiasing, glow, water, volumetric clouds, sun shadows",
-		Viewport.MSAA_4X, true, true, true, true],
+	"low": ["Low — no antialiasing", Viewport.MSAA_DISABLED, false, false, false, false],
+	"medium": ["Medium — 2x antialiasing", Viewport.MSAA_2X, false, false, false, false],
+	"high": ["High — 4x antialiasing, glow, water, volumetric clouds",
+		Viewport.MSAA_4X, true, true, true, false],
 }
 
 ## Nothing in the scene renders above 1.0: the world shader clamps albedo x lightmap to it

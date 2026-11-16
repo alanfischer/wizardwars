@@ -20,7 +20,7 @@ const MIN_NOON_ELEVATION := deg_to_rad(30.0)
 
 static var _light: DirectionalLight3D
 static var _info: Dictionary = {}
-static var _enabled := true
+static var _enabled := false
 
 
 ## After the map's root is in the tree, before the sky is built (Skybox asks moving()).

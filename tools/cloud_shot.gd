@@ -5,8 +5,8 @@ extends Node3D
 ## fireballs would (ICE=1 glazes the wet ground over first, so they thaw holes in it), FIRE=1 to light a fire satchel's spiral where the snow lies deepest under the
 ## "ground" view and shoot it before and after. PERF=1 instead prints the GPU frame time looking
 ## up, with the volumetric clouds off and on. LOOK="yaw pitch [rise]" shoots one view instead, yaw
-## from the sun's, from rise metres over the spawn. SUN=0 keeps the sun baked rather than MapSun's
-## real-time one; CONVERT=1 reconverts the map first; CLEAR=1 clears the sky of cloud. DAY=n shoots the views n times across a day,
+## from the sun's, from rise metres over the spawn. SUN=1 lights it with MapSun's real-time sun
+## rather than the baked one; CONVERT=1 reconverts the map first; CLEAR=1 clears the sky of cloud. DAY=n shoots the views n times across a day,
 ## midnight to midnight, as day_0000.png on.
 
 func _ready() -> void:
@@ -31,7 +31,7 @@ func _ready() -> void:
 		OvercastClouds.set_volumetric(OS.get_environment("VOL") == "1")
 		var ws := map.get_node_or_null("worldspawn")
 		var sky_name: String = ws.get_meta("entity").get("skyname", "") if ws else ""
-		MapSun.set_enabled(OS.get_environment("SUN") != "0")
+		MapSun.set_enabled(OS.get_environment("SUN") == "1")
 		MapSun.setup(map)
 		sky.setup(sky_name, map, _find(map, "light_environment"))
 		if sky.overcast:
