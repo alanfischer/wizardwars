@@ -217,7 +217,7 @@ func _on_server_var_changed(key: String, _value: Variant) -> void:
 		_apply_rain()
 	elif key == "wind" or key == "wind_dir":
 		_apply_wind()
-	elif key == "time" or key == "moon":
+	elif key in NightMode.VARS:
 		_apply_night()
 
 

@@ -231,12 +231,10 @@ static func procedural() -> bool:
 func _on_server_var_changed(key: String, _value: Variant) -> void:
 	if key == "dynamic_weather":
 		apply_enhanced(procedural())
-	elif key == "moon":
-		if overcast:
-			overcast.moon_phase = NightMode.moon()
-	elif key == "time":
+	elif key in NightMode.VARS:
 		if overcast:
 			overcast.time_of_day = NightMode.hours()
+			overcast.moon_phase = NightMode.moon()
 		if _map_root:
 			var sky_name := NightMode.sky_for(_map_sky_name(_map_root), _map_root)
 			if sky_name != _built_sky:

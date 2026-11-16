@@ -75,6 +75,8 @@ static func moon() -> float:
 	return clampf(float(ServerVars.get_value("moon", 0.5)), 0.0, 1.0)
 
 
+## The server vars the night's light goes by.
+const VARS := ["time", "moon"]
 const MOONS := {"new": 0.0, "crescent": 0.12, "half": 0.25, "gibbous": 0.37, "full": 0.5}
 
 
@@ -83,7 +85,8 @@ static func parse_moon(text: String) -> String:
 	var t := text.strip_edges().to_lower()
 	if MOONS.has(t):
 		return str(MOONS[t])
-	return str(float(t)) if t.is_valid_float() and float(t) >= 0.0 and float(t) <= 1.0 else ""
+	var phase := float(t)
+	return str(phase) if t.is_valid_float() and phase >= 0.0 and phase <= 1.0 else ""
 
 
 ## 0 by day to 1 at full night, at the server's time.
@@ -144,7 +147,7 @@ static func set_flash(flash: Vector3) -> void:
 ## The time of day's linear-light multiplier on the sky's light: ones by day, warm at dusk,
 ## moonlight at night (OvercastSky.scene_light_at).
 static func night_light() -> Vector3:
-	var c := OvercastSky.scene_light_at(hours(), OvercastSky.DUSK_LIGHT, OvercastSky.MOON_LIGHT, moon())
+	var c := OvercastSky.scene_light_at(hours(), moon())
 	return Vector3(c.r, c.g, c.b).max(Vector3.ZERO)
 
 
