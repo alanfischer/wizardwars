@@ -7,7 +7,8 @@ extends Node3D
 ## up, with the volumetric clouds off and on. LOOK="yaw pitch [rise]" shoots one view instead, yaw
 ## from the sun's, from rise metres over the spawn. SUN=1 lights it with MapSun's real-time sun
 ## rather than the baked one; CONVERT=1 reconverts the map first; CLEAR=1 clears the sky of cloud. DAY=n shoots the views n times across a day,
-## midnight to midnight, as day_0000.png on.
+## midnight to midnight, as day_0000.png on. MOON=0.25 sets the moon's phase, and LOOK=moon shoots
+## it close.
 
 func _ready() -> void:
 	ServerVars.set_from_string("dynamic_weather", "1")
@@ -40,6 +41,8 @@ func _ready() -> void:
 			sky.overcast.cloud_amount = 0.0
 		if OS.get_environment("TIME") != "":
 			ServerVars.set_from_string("time", OS.get_environment("TIME"))
+		if OS.get_environment("MOON") != "":
+			ServerVars.set_from_string("moon", OS.get_environment("MOON"))
 		NightMode.apply(map)
 		var weather: WeatherSystem = null
 		if OS.get_environment("RAIN") != "":
@@ -124,7 +127,11 @@ func _ready() -> void:
 				print("PERF %s %v %s %.2f ms/frame" % [map_name, DisplayServer.window_get_size(), "volumetric" if vol else "flat", ms])
 			get_tree().quit()
 			return
-		if OS.get_environment("LOOK") != "":
+		if OS.get_environment("LOOK") == "moon":
+			var m: Vector3 = sky.overcast.moon_dir()
+			cam.fov = 30.0
+			views = [[rad_to_deg(atan2(-m.x, -m.z)), rad_to_deg(asin(m.y)), "moon"]]
+		elif OS.get_environment("LOOK") != "":
 			var look := OS.get_environment("LOOK").split(" ")
 			cam.global_position.y += float(look[2]) if look.size() > 2 else 0.0
 			views = [[sun_yaw + float(look[0]), float(look[1]), "look"]]

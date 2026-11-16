@@ -96,6 +96,14 @@ func test_time_reads_as_hours_names_and_clock_times() -> void:
 	assert_eq(NightMode.night_light(), Vector3.ONE, "noon is the map as lit")
 	ServerVars.set_from_string("time", "0")
 	assert_almost_eq(NightMode.amount(), 1.0, 1e-6, "midnight is full night")
+	var full := NightMode.night_light()
+	assert_eq(NightMode.parse_moon("new"), "0.0", "a moon by name")
+	assert_eq(NightMode.parse_moon("0.3"), "0.3", "or by phase")
+	assert_eq(NightMode.parse_moon("2"), "", "but not past its month")
+	ServerVars.set_from_string("moon", "0")
+	assert_lt(NightMode.night_light().x, full.x, "a new moon leaves midnight darker")
+	assert_gt(NightMode.night_light().x, 0.0, "though never black")
+	ServerVars.set_from_string("moon", "0.5")
 	ServerVars.set_from_string("time", "12")
 
 

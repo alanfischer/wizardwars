@@ -109,7 +109,7 @@ func _begin_lighting(map_root: Node3D) -> void:
 
 
 func _on_server_var_changed(key: String, _value: Variant) -> void:
-	if key == "time" and _rendered and Game.map_root:
+	if key in ["time", "moon"] and _rendered and Game.map_root:
 		NightMode.apply(Game.map_root)
 
 

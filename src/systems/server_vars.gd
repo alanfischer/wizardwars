@@ -54,6 +54,9 @@ func _register_defaults() -> void:
 	# on maps lit by a light_environment, the map's own lights left lit. Replicated: it is what every
 	# client draws. See NightMode.
 	register("time", 12.0, Type.FLOAT)
+	# The moon's phase, 0 new through 0.5 full to 1 new again: where it stands at night, how much of
+	# it shows, and how much it lights. Replicated with the time. See NightMode.
+	register("moon", 0.5, Type.FLOAT)
 	# Rain 0.01 (light) … 1 (downpour) on any map; values above 1 increase drop density proportionally.
 	# 0 leaves the weather to the map (ww_chasm's PotatoC), but for under dynamic weather. Lightning strikes while it rains unless turned off. Both replicated: they are what
 	# every client sees, and the host times the strikes. See WeatherSystem.

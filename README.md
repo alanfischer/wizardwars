@@ -225,8 +225,14 @@ the procedural sky does its own sunset, stars and moon instead (overcast-godot's
 It is also the **Map** row's Time slider on the pause panel (Escape), which sends the same admin
 command:
 
+The `moon` server var is the moon's phase, `0` new through `0.5` full (the default) and back to
+new at `1`. Under dynamic weather the moon trails the sun across the sky by that share of a day and
+shows the crescent or disc that goes with it; on every sky-lit map the night is darker the less of
+it is lit or up.
+
 ```
 /time 18:30          # or hours (/time 21), or noon, dusk, night, dawn
+/moon crescent       # or new, half, gibbous, full, or a phase 0 to 1
 ./run.sh --map ww_2fort --time dusk
 ```
 

@@ -96,8 +96,9 @@ static func update(hours: float, style: float) -> Dictionary:
 	var noon := noon_dir()
 	var sun := OvercastSky.sun_at(noon, hours)
 	var night := OvercastSky.night_at(hours)
-	var dir := OvercastSky.light_toward(sun, night)
-	var strength := OvercastSky.light_strength_of(night)
+	var phase := NightMode.moon()
+	var dir := OvercastSky.light_toward(sun, night, OvercastSky.moon_at(noon, hours, phase))
+	var strength := OvercastSky.light_strength_of(night, OvercastSky.moonlight_at(hours, phase))
 	# Down behind the horizon, nothing.
 	strength *= smoothstep(-0.02, 0.06, dir.y)
 	if not moving():

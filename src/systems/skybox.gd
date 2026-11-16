@@ -89,6 +89,7 @@ func setup(sky_name: String, map_root: Node = null, sun_ent: Dictionary = {}, da
 	# background; an override replaces the material outright, so it has to carry it too.
 	overcast.render_priority = PRIORITY
 	overcast.time_of_day = NightMode.hours()
+	overcast.moon_phase = NightMode.moon()
 
 	if map_root != null:
 		warn_if_baked_priority_is_stale()
@@ -230,6 +231,9 @@ static func procedural() -> bool:
 func _on_server_var_changed(key: String, _value: Variant) -> void:
 	if key == "dynamic_weather":
 		apply_enhanced(procedural())
+	elif key == "moon":
+		if overcast:
+			overcast.moon_phase = NightMode.moon()
 	elif key == "time":
 		if overcast:
 			overcast.time_of_day = NightMode.hours()
