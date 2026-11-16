@@ -84,7 +84,7 @@ void light() {
 	if (LIGHT_IS_DIRECTIONAL && sun_unbaked > 0.0) {
 		// MapSun's sun, added to the ambient cube where the grid baked it, in the same gamma terms.
 		float ndl = max(dot(NORMAL, LIGHT), 0.0);
-		vec3 sun = sun_model * ndl * ATTENUATION * cloud_sunlight(world_pos) * sun_unbaked;
+		vec3 sun = sun_model * ndl * ATTENUATION * cloud_sunlight(world_pos);
 		vec3 lit = min(lit_in + base_in * sun * 1.5, vec3(1.0));
 		vec3 added = linear_output ? gs_to_linear(lit) - gs_to_linear(lit_in) : lit - lit_in;
 		DIFFUSE_LIGHT += added / max(ALBEDO, vec3(1e-3));

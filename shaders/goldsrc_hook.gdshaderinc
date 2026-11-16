@@ -26,11 +26,6 @@ uniform float sun_baked = 1.0;
 
 #define GOLDSRC_LIGHT
 
-// The world shader has its own gs_to_linear, declared after this file.
-vec3 hook_to_linear(vec3 c) {
-	return mix(c / 12.92, pow((max(c, vec3(0.0)) + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
-}
-
 // share: the sky's share of the luxel in x, the sun's direct share in y.
 vec3 goldsrc_lightmap(vec3 lm, vec2 share, vec3 world_pos) {
 	vec3 sky = sky_light;
@@ -74,7 +69,7 @@ void goldsrc_light(inout vec3 diffuse, vec3 light_dir, vec3 light_color, float a
 #if CURRENT_RENDERER == RENDERER_COMPATIBILITY
 	vec3 added = out_lit - lit_srgb;
 #else
-	vec3 added = hook_to_linear(out_lit) - hook_to_linear(lit_srgb);
+	vec3 added = overcast_to_linear(out_lit) - overcast_to_linear(lit_srgb);
 #endif
 	diffuse += added / max(albedo, vec3(1e-3));
 }

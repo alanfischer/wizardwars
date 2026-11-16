@@ -14,9 +14,9 @@ extends Object
 const SHADOW_DISTANCE := 60.0
 ## Layers it lights: models (1) and the BSP (2).
 const CULL_MASK := 3
-## The layer of what casts its shadows: what hlrad let block the sun, the world and brush entities
-## flagged opaque (zhlt_lightflags 2). Never models, which the original never shadowed with.
-const CASTER_LAYER := 3
+## Layers that cast its shadows: the BSP, whose meshes cast only where hlrad let them block the sun
+## (GoldSrcBSP). Never models, which the original never shadowed with.
+const CASTER_MASK := 2
 ## The lowest a noon sun goes. A sun compiled near the horizon (ww_ravine's has pitch 0) has no
 ## arc to cross the sky on, so it keeps its bearing and climbs to this.
 const MIN_NOON_ELEVATION := deg_to_rad(30.0)
@@ -38,21 +38,10 @@ static func setup(map_root: Node3D) -> void:
 	_light.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	_light.directional_shadow_max_distance = SHADOW_DISTANCE
 	_light.light_cull_mask = CULL_MASK
-	_light.shadow_caster_mask = 1 << (CASTER_LAYER - 1)
+	_light.shadow_caster_mask = CASTER_MASK
 	_light.light_specular = 0.0
 	map_root.add_child(_light)
 	_light.visible = moving()
-	for node in map_root.get_children():
-		var ent: Dictionary = node.get_meta("entity", {})
-		if node.name == "worldspawn" or int(ent.get("zhlt_lightflags", "0")) & 2:
-			_mark_casters(node)
-
-
-static func _mark_casters(node: Node) -> void:
-	for child in node.get_children():
-		if child is MeshInstance3D:
-			(child as MeshInstance3D).set_layer_mask_value(CASTER_LAYER, true)
-		_mark_casters(child)
 
 
 ## The map frees the light; this forgets it.
@@ -107,9 +96,8 @@ static func update(hours: float, style: float) -> Dictionary:
 	var noon := noon_dir()
 	var sun := OvercastSky.sun_at(noon, hours)
 	var night := OvercastSky.night_at(hours)
-	# The moon takes over opposite once night is half in, coming up from nothing.
-	var dir := -sun if night > 0.5 else sun
-	var strength := 1.0 if night <= 0.5 else smoothstep(0.5, 0.8, night)
+	var dir := OvercastSky.light_toward(sun, night)
+	var strength := OvercastSky.light_strength_of(night)
 	# Down behind the horizon, nothing.
 	strength *= smoothstep(-0.02, 0.06, dir.y)
 	if not moving():
@@ -125,7 +113,5 @@ static func update(hours: float, style: float) -> Dictionary:
 	var grid := AssetLoader.light_grid
 	if grid:
 		# The grid holds gamma: a linear multiplier goes in through the curve.
-		var g := grid.sun_color()
-		out["model"] = Vector3(g.x * pow(tint.x, NightMode.LIGHTMAP_GAMMA), g.y * pow(tint.y, NightMode.LIGHTMAP_GAMMA),
-			g.z * pow(tint.z, NightMode.LIGHTMAP_GAMMA))
+		out["model"] = grid.sun_color() * NightMode.to_gamma(tint)
 	return out

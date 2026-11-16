@@ -18,11 +18,18 @@ const NIGHT_SKIES := ["fullmoon", "night", "space", "space2"]
 ## brightness^(1/gamma). Matches goldsrc_bsp.cpp's LIGHTMAP_GAMMA and the shaders' 0.55.
 const LIGHTMAP_GAMMA := 0.55
 
+
+## A linear multiplier as it goes onto lightmap-gamma light.
+static func to_gamma(v: Vector3) -> Vector3:
+	return Vector3(pow(v.x, LIGHTMAP_GAMMA), pow(v.y, LIGHTMAP_GAMMA), pow(v.z, LIGHTMAP_GAMMA))
+
 static var _root: Node
 static var _world_mats: Array[ShaderMaterial] = []
 static var _liquid_mats: Array[ShaderMaterial] = []
 ## A lightning flash on top of everything else, as linear light added to the sky's share.
 static var _flash := Vector3.ZERO
+## What the world's materials last took of MapSun, so a lightning strike's frames don't resend it.
+static var _sun_pushed := {}
 ## The light_environment's lightstyle, as a brightness (1.0 = 'm').
 static var _sun_style := 1.0
 ## Whether the sun was compiled onto a style of its own (ww_chasm), which the lightstyle texture
@@ -84,6 +91,7 @@ static func reset() -> void:
 	_root = null
 	_world_mats.clear()
 	_liquid_mats.clear()
+	_sun_pushed = {}
 	_flash = Vector3.ZERO
 	_sun_style = 1.0
 	_sun_has_layer = false
@@ -103,6 +111,7 @@ static func apply(map_root: Node) -> void:
 	_root = map_root
 	_world_mats.clear()
 	_liquid_mats.clear()
+	_sun_pushed = {}
 	if map_root:
 		_collect(map_root)
 	_push()
@@ -130,16 +139,18 @@ static func _push() -> void:
 	# A sunless map's liquid has no night to match: leave the whole map as it was.
 	var liquid := night + _flash if has_sun(_root) else Vector3.ONE
 	var sun := MapSun.update(hours(), style)
-	var unbaked := 1.0 if MapSun.moving() else 0.0
+	sun["unbaked"] = 1.0 if MapSun.moving() else 0.0
+	var sun_changed := sun != _sun_pushed
+	_sun_pushed = sun
 	for mat in _world_mats:
 		mat.set_shader_parameter("sky_light", world)
-		mat.set_shader_parameter("sun_unbaked", unbaked)
-		mat.set_shader_parameter("sun_light", sun["world"])
-		mat.set_shader_parameter("sun_baked", sun["baked"])
+		if sun_changed:
+			mat.set_shader_parameter("sun_unbaked", sun["unbaked"])
+			mat.set_shader_parameter("sun_light", sun["world"])
+			mat.set_shader_parameter("sun_baked", sun["baked"])
 	for mat in _liquid_mats:
 		mat.set_shader_parameter("sky_light", liquid)
-	LightGrid.set_sky_light(night * style + _flash)
-	LightGrid.set_sun(unbaked, sun["model"], sun["baked"])
+	LightGrid.set_lighting(night * style + _flash, sun["unbaked"], sun["model"], sun["baked"])
 
 
 ## Descends into MeshInstance3Ds too: a BSP nests submodel meshes under their parent mesh.

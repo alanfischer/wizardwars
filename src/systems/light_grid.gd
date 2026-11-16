@@ -75,7 +75,7 @@ static func from_meta(root: Node3D) -> LightGrid:
 		grid._sun_texture.create(format, grid._dims.x, grid._dims.z, grid._dims.y, false, sun_slices)
 		var c: Color = data.get("sun_color", Color.BLACK)
 		grid._sun_color = Vector3(c.r, c.g, c.b)
-		grid._sun_dir = data.get("sun_dir", Vector3.UP)
+		grid._sun_dir = (root.get_meta("sun", {}) as Dictionary).get("dir", Vector3.UP)
 	return grid
 
 
@@ -126,15 +126,11 @@ func sample(world_pos: Vector3) -> Color:
 static var _all_acube_materials: Array = []  # Array[WeakRef]
 
 
-## A linear multiplier on the sky's share of model lighting. See NightMode.
-static func set_sky_light(sky_light: Vector3) -> void:
+## Model lighting, from NightMode: `sky_light` a linear multiplier on the sky's share; MapSun's sun,
+## `unbaked` 1 taking the grid's baked sun out for `sun_model` with shadows, and `baked` how much
+## of the baked one stays (MapSun.update).
+static func set_lighting(sky_light: Vector3, unbaked: float, sun_model: Vector3, baked: float) -> void:
 	_sky_light = sky_light
-	_broadcast()
-
-
-## MapSun's sun on models: `unbaked` 1 takes the grid's baked sun out for `sun_model` with shadows;
-## `baked` is how much of the baked one stays (MapSun.update).
-static func set_sun(unbaked: float, sun_model: Vector3, baked: float) -> void:
 	_sun_unbaked = unbaked
 	_sun_model = sun_model
 	_sun_baked = baked
