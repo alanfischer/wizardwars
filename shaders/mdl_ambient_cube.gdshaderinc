@@ -42,6 +42,9 @@ const float GLOW_FLOOR = 0.35;  // what the faces get, against the silhouette's 
 
 varying vec3 world_normal;
 varying vec3 world_pos;
+// For light(): the surface as lit before any real-time light, gamma.
+varying vec3 lit_in;
+varying vec3 base_in;
 
 void vertex() {
 	world_normal = (MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz;
@@ -67,6 +70,8 @@ void fragment() {
 		lit_srgb = min(lit_srgb + glow_color * glow_strength * mix(GLOW_FLOOR, 1.0, shell), vec3(1.0));
 	}
 	EMISSION = linear_output ? gs_to_linear(lit_srgb) : lit_srgb;
+	lit_in = lit_srgb;
+	base_in = base_srgb;
 	// Set ALBEDO for light() to use — real-time lights add on top of ambient cube
 	ALBEDO = albedo.rgb;
 	ROUGHNESS = 1.0;
@@ -76,11 +81,21 @@ void fragment() {
 }
 
 void light() {
-	// Receive contributions from OmniLight3D / SpotLight3D (crystal lights, etc.)
-	//
-	// Half-lambert, the falloff GoldSrc and Source both shaded models with: the wrap carries light
-	// around past the terminator instead of cutting it dead there, which is what keeps a model
-	// readable when one point light is all the room has. Squared so the lit side does not go milky.
-	float ndl = dot(NORMAL, LIGHT) * 0.5 + 0.5;
-	DIFFUSE_LIGHT += LIGHT_COLOR * ATTENUATION * ndl * ndl;
+	if (LIGHT_IS_DIRECTIONAL && sun_unbaked > 0.0) {
+		// MapSun's sun, added to the ambient cube where the grid baked it, in the same gamma terms.
+		float ndl = max(dot(NORMAL, LIGHT), 0.0);
+		vec3 sun = sun_model * ndl * ATTENUATION * cloud_sunlight(world_pos) * sun_unbaked;
+		vec3 lit = min(lit_in + base_in * sun * 1.5, vec3(1.0));
+		vec3 added = linear_output ? gs_to_linear(lit) - gs_to_linear(lit_in) : lit - lit_in;
+		DIFFUSE_LIGHT += added / max(ALBEDO, vec3(1e-3));
+	} else {
+		// OmniLight3D / SpotLight3D (crystal lights, etc.), and a portrait's own light.
+		//
+		// Half-lambert, the falloff GoldSrc and Source both shaded models with: the wrap carries
+		// light around past the terminator instead of cutting it dead there, which is what keeps a
+		// model readable when one point light is all the room has. Squared so the lit side does not
+		// go milky.
+		float ndl = dot(NORMAL, LIGHT) * 0.5 + 0.5;
+		DIFFUSE_LIGHT += LIGHT_COLOR * ATTENUATION * ndl * ndl;
+	}
 }

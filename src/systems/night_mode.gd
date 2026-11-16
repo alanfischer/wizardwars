@@ -7,7 +7,8 @@ extends Object
 ## How much of each lightmap luxel the sky put there is baked at conversion (GoldSrcBSP's
 ## compute_sun_fractions: lm_sun on world materials, sun_slices in the light grid for models).
 ## Everything here comes down to one linear-light multiplier on that share, `sky_light`. A map
-## with no light_environment has no share to turn, so it is left exactly as it was.
+## with no light_environment has no share to turn, so it is left exactly as it was. Where MapSun
+## lights the sun itself, its direct share comes out of the bake and the light puts it back.
 
 ## Past half night the map's cubemap sky gives way to this one, unless the map's own already reads
 ## as night. The procedural sky (dynamic weather) does its own night, off the map's day sky.
@@ -128,11 +129,16 @@ static func _push() -> void:
 	var world := (night if _sun_has_layer else night * style) + _flash
 	# A sunless map's liquid has no night to match: leave the whole map as it was.
 	var liquid := night + _flash if has_sun(_root) else Vector3.ONE
+	var sun := MapSun.update(hours(), style)
+	var unbaked := 1.0 if MapSun.moving() else 0.0
 	for mat in _world_mats:
 		mat.set_shader_parameter("sky_light", world)
+		mat.set_shader_parameter("sun_unbaked", unbaked)
+		mat.set_shader_parameter("sun_light", sun["world"])
 	for mat in _liquid_mats:
 		mat.set_shader_parameter("sky_light", liquid)
 	LightGrid.set_sky_light(night * style + _flash)
+	LightGrid.set_sun(unbaked, sun["model"])
 
 
 ## Descends into MeshInstance3Ds too: a BSP nests submodel meshes under their parent mesh.

@@ -21,12 +21,19 @@ var _textures_3d: Array[ImageTexture3D]  # 6 ImageTexture3D
 # Grid transform for shader
 var _grid_size: Vector3  # world-space extent
 
-# The sky's share of each cell's light (NightMode); null on maps without a sun
+# The sky's share of each cell's light (NightMode) in r, whether the sun reached it in g; null on
+# maps without a sun
 var _sun_images: Array
 var _sun_texture: ImageTexture3D
+# The sun as the grid baked it into its faces (ambient_cube.gdshaderinc)
+var _sun_color := Vector3.ZERO
+var _sun_dir := Vector3.UP
 
 ## NightMode's multiplier on the sky's share, applied to every material the grid binds from then on.
 static var _sky_light := Vector3.ONE
+## MapSun's real-time sun: whether it is on, and its light on models (gamma, as the grid holds it).
+static var _sun_unbaked := 0.0
+static var _sun_model := Vector3.ZERO
 
 
 static func from_meta(root: Node3D) -> LightGrid:
@@ -63,7 +70,11 @@ static func from_meta(root: Node3D) -> LightGrid:
 	if sun_slices.size() == grid._dims.y:
 		grid._sun_images = sun_slices
 		grid._sun_texture = ImageTexture3D.new()
-		grid._sun_texture.create(Image.FORMAT_L8, grid._dims.x, grid._dims.z, grid._dims.y, false, sun_slices)
+		var format: Image.Format = (sun_slices[0] as Image).get_format()
+		grid._sun_texture.create(format, grid._dims.x, grid._dims.z, grid._dims.y, false, sun_slices)
+		var c: Color = data.get("sun_color", Color.BLACK)
+		grid._sun_color = Vector3(c.r, c.g, c.b)
+		grid._sun_dir = data.get("sun_dir", Vector3.UP)
 	return grid
 
 
@@ -117,13 +128,35 @@ static var _all_acube_materials: Array = []  # Array[WeakRef]
 ## A linear multiplier on the sky's share of model lighting. See NightMode.
 static func set_sky_light(sky_light: Vector3) -> void:
 	_sky_light = sky_light
+	_broadcast()
+
+
+## MapSun's sun on models: `unbaked` 1 takes the grid's baked sun out for `sun_model` with shadows.
+static func set_sun(unbaked: float, sun_model: Vector3) -> void:
+	_sun_unbaked = unbaked
+	_sun_model = sun_model
+	_broadcast()
+
+
+static func _broadcast() -> void:
 	var alive: Array = []
 	for wr: WeakRef in _all_acube_materials:
 		var mat: ShaderMaterial = wr.get_ref() as ShaderMaterial
 		if mat:
-			mat.set_shader_parameter("sky_light", sky_light)
+			_set_lighting(mat)
 			alive.append(wr)
 	_all_acube_materials = alive
+
+
+static func _set_lighting(mat: ShaderMaterial) -> void:
+	mat.set_shader_parameter("sky_light", _sky_light)
+	mat.set_shader_parameter("sun_unbaked", _sun_unbaked)
+	mat.set_shader_parameter("sun_model", _sun_model)
+
+
+## The sun's colour as the grid baked it onto the faces, gamma.
+func sun_color() -> Vector3:
+	return _sun_color
 
 
 static func _track_material(mat: ShaderMaterial) -> void:
@@ -158,7 +191,9 @@ func _set_grid_on_material(mat: ShaderMaterial) -> void:
 	mat.set_shader_parameter("grid_size", _grid_size)
 	if _sun_texture:
 		mat.set_shader_parameter("acube_sun", _sun_texture)
-	mat.set_shader_parameter("sky_light", _sky_light)
+		mat.set_shader_parameter("grid_sun_color", _sun_color)
+		mat.set_shader_parameter("grid_sun_dir", _sun_dir)
+	_set_lighting(mat)
 	LightGrid._track_material(mat)
 
 

@@ -62,6 +62,7 @@ func load_map(map_name: String) -> bool:
 		if watered > 0:
 			Log.info("Water depth effects %s on %d liquid surfaces" % [
 					"on" if RenderQuality.water_depth_enabled() else "off", watered])
+		MapSun.setup(map_root)  # before the sky, which follows the sun only if it moves
 		_skybox.build(map_root)
 		NightMode.apply(map_root)  # after WaterSurfaces, so it collects the liquids as drawn
 
@@ -81,6 +82,7 @@ func clear() -> void:
 	Game.decal_system = null
 	Game.weather_system = null
 	_skybox.clear()
+	MapSun.clear()
 	AssetLoader.light_grid = null
 	LightGrid._all_acube_materials.clear()
 	NetworkManager.reset_entities()

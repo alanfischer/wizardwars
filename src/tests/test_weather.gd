@@ -322,10 +322,14 @@ shader_type spatial;
 varying vec3 world_pos;
 void vertex() { world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
 void fragment() {
-	vec3 lit = goldsrc_lightmap(vec3(0.5), 1.0, world_pos);
+	vec3 lit = goldsrc_lightmap(vec3(0.5), vec2(1.0, 0.5), world_pos);
 	vec3 albedo = vec3(0.5);
 	goldsrc_surface(lit, albedo, vec3(1.0), 1.0, world_pos, vec3(0.0, 1.0, 0.0), NORMAL, VIEW);
 	ALBEDO = albedo + lit;
+}
+void light() {
+	goldsrc_light(DIFFUSE_LIGHT, LIGHT, LIGHT_COLOR, ATTENUATION, LIGHT_IS_DIRECTIONAL, NORMAL, ALBEDO,
+		vec3(1.0), vec3(0.5), world_pos, 2.0);
 }
 """
 	var declared := {}
@@ -333,6 +337,7 @@ void fragment() {
 		declared[u["name"]] = true
 	assert_true(declared.has("puddle_scale"), "the hook wets the ground")
 	assert_true(declared.has("snow_scale"), "and lays snow on it")
+	assert_true(declared.has("sun_unbaked"), "and can hand the sun to a real-time light")
 
 
 func test_fire_melts_the_lying_snow_where_it_lands() -> void:

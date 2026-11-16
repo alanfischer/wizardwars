@@ -10,18 +10,18 @@ extends Object
 const SETTINGS_PATH := "user://settings.cfg"  # shared with LobbyUI and RendererTrial
 const DEFAULT_LEVEL := "medium"
 
-## setting value -> [label, msaa, glow, water depth, volumetric clouds]. Ordered cheapest first;
-## the lobby lists them in this order. 2x is the default because multisampling is resolved in
+## setting value -> [label, msaa, glow, water depth, volumetric clouds, sun shadows]. Ordered
+## cheapest first; the lobby lists them in this order. 2x is the default because multisampling is resolved in
 ## tile memory on the mobile GPUs (Quest) and is close to free on any desktop part, while BSP
 ## maps are nothing but hard geometric edges. Glow changes how the game LOOKS rather than how
 ## cleanly it draws, so it stays off until asked for. The procedural sky is not a
 ## quality setting: it comes with dynamic weather (Skybox.procedural); High only ray-marches its
 ## clouds (OvercastClouds.set_volumetric).
 const LEVELS := {
-	"low": ["Low — no antialiasing", Viewport.MSAA_DISABLED, false, false, false],
-	"medium": ["Medium — 2x antialiasing", Viewport.MSAA_2X, false, false, false],
-	"high": ["High — 4x antialiasing, glow, water, volumetric clouds",
-		Viewport.MSAA_4X, true, true, true],
+	"low": ["Low — no antialiasing, sun baked in", Viewport.MSAA_DISABLED, false, false, false, false],
+	"medium": ["Medium — 2x antialiasing, sun shadows", Viewport.MSAA_2X, false, false, false, true],
+	"high": ["High — 4x antialiasing, glow, water, volumetric clouds, sun shadows",
+		Viewport.MSAA_4X, true, true, true, true],
 }
 
 ## Nothing in the scene renders above 1.0: the world shader clamps albedo x lightmap to it
@@ -75,6 +75,8 @@ static func apply(level: String, viewport: Viewport, env: Environment = null) ->
 	var preset: Array = LEVELS.get(level, LEVELS[DEFAULT_LEVEL])
 	viewport.msaa_3d = preset[1]
 	OvercastClouds.set_volumetric(preset[4])
+	if MapSun.enabled() != preset[5]:
+		MapSun.set_enabled(preset[5])
 	if env:
 		env.glow_enabled = preset[2]
 		env.glow_hdr_threshold = GLOW_HDR_THRESHOLD

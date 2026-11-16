@@ -83,6 +83,7 @@ func setup(sky_name: String, map_root: Node = null, sun_ent: Dictionary = {}, da
 
 	var params := _params.duplicate()
 	params["drawing"] = false
+	params.merge(_sun_params(MapSun.moving()), true)
 	overcast = SkyboxSky.new(self, params)
 	# The stock sky material carries this so the sky draws before the world and reads as a true
 	# background; an override replaces the material outright, so it has to carry it too.
@@ -250,6 +251,20 @@ func _swap_cubemap(sky_name: String) -> void:
 	_built_sky = sky_name
 	_apply_sky_cubemap()
 	Log.info("Skybox swapped to %s" % sky_name)
+
+
+## Whether the sky's sun crosses it with the time (MapSun lights it) or stays where it was baked.
+## The sky's colours come from the air only for a sun that sets: a fixed one would hold noon.
+func follow_sun(moving: bool) -> void:
+	if overcast:
+		overcast.apply(_sun_params(moving))
+
+
+func _sun_params(moving: bool) -> Dictionary:
+	var params := {"sun_follows_time": moving, "atmosphere": 1.0 if moving else 0.0}
+	# The real-time sun's noon, which a sun compiled too low to arc from climbs to.
+	params["sun_dir"] = MapSun.noon_dir() if moving else _params.get("sun_dir", Vector3.UP)
+	return params
 
 
 ## Swap the procedural sky in or out. Safe to call repeatedly and before/without a map.
