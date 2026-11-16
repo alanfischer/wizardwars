@@ -13,6 +13,9 @@ uniform vec3 sky_light = vec3(1.0);
 // surface facing it, linear lightmap units, colour and time of day in it.
 uniform float sun_unbaked = 0.0;
 uniform vec3 sun_light = vec3(0.0);
+// How much of the lightmap's direct-sun share stays: 1 as compiled, less as the sky's sun sinks
+// with no real-time one (MapSun.update), 0 with one.
+uniform float sun_baked = 1.0;
 
 // WeatherSystem (overcast-godot): wet ground and where rain reaches, lying snow, and the clouds'
 // shadows on open ground — the same clouds the sky draws.
@@ -35,7 +38,7 @@ vec3 goldsrc_lightmap(vec3 lm, vec2 share, vec3 world_pos) {
 	if (share.x > 0.0 && sun_unbaked <= 0.0) {
 		sky *= cloud_sunlight(world_pos);
 	}
-	float direct = share.y * sun_unbaked;
+	float direct = share.y * (1.0 - sun_baked);
 	if (sky == vec3(1.0) && direct <= 0.0) {
 		return lm;  // the sun as compiled
 	}

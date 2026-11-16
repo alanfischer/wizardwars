@@ -135,10 +135,11 @@ static func _push() -> void:
 		mat.set_shader_parameter("sky_light", world)
 		mat.set_shader_parameter("sun_unbaked", unbaked)
 		mat.set_shader_parameter("sun_light", sun["world"])
+		mat.set_shader_parameter("sun_baked", sun["baked"])
 	for mat in _liquid_mats:
 		mat.set_shader_parameter("sky_light", liquid)
 	LightGrid.set_sky_light(night * style + _flash)
-	LightGrid.set_sun(unbaked, sun["model"])
+	LightGrid.set_sun(unbaked, sun["model"], sun["baked"])
 
 
 ## Descends into MeshInstance3Ds too: a BSP nests submodel meshes under their parent mesh.

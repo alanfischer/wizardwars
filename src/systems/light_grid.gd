@@ -34,6 +34,7 @@ static var _sky_light := Vector3.ONE
 ## MapSun's real-time sun: whether it is on, and its light on models (gamma, as the grid holds it).
 static var _sun_unbaked := 0.0
 static var _sun_model := Vector3.ZERO
+static var _sun_baked := 1.0
 
 
 static func from_meta(root: Node3D) -> LightGrid:
@@ -131,10 +132,12 @@ static func set_sky_light(sky_light: Vector3) -> void:
 	_broadcast()
 
 
-## MapSun's sun on models: `unbaked` 1 takes the grid's baked sun out for `sun_model` with shadows.
-static func set_sun(unbaked: float, sun_model: Vector3) -> void:
+## MapSun's sun on models: `unbaked` 1 takes the grid's baked sun out for `sun_model` with shadows;
+## `baked` is how much of the baked one stays (MapSun.update).
+static func set_sun(unbaked: float, sun_model: Vector3, baked: float) -> void:
 	_sun_unbaked = unbaked
 	_sun_model = sun_model
+	_sun_baked = baked
 	_broadcast()
 
 
@@ -152,6 +155,7 @@ static func _set_lighting(mat: ShaderMaterial) -> void:
 	mat.set_shader_parameter("sky_light", _sky_light)
 	mat.set_shader_parameter("sun_unbaked", _sun_unbaked)
 	mat.set_shader_parameter("sun_model", _sun_model)
+	mat.set_shader_parameter("sun_baked", _sun_baked)
 
 
 ## The sun's colour as the grid baked it onto the faces, gamma.
