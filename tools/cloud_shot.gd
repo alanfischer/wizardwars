@@ -6,7 +6,8 @@ extends Node3D
 ## "ground" view and shoot it before and after. PERF=1 instead prints the GPU frame time looking
 ## up, with the volumetric clouds off and on. LOOK="yaw pitch [rise]" shoots one view instead, yaw
 ## from the sun's, from rise metres over the spawn. SUN=0 keeps the sun baked rather than MapSun's
-## real-time one; CONVERT=1 reconverts the map first.
+## real-time one; CONVERT=1 reconverts the map first. DAY=n shoots the views n times across a day,
+## midnight to midnight, as day_0000.png on.
 
 func _ready() -> void:
 	ServerVars.set_from_string("dynamic_weather", "1")
@@ -125,9 +126,15 @@ func _ready() -> void:
 			var look := OS.get_environment("LOOK").split(" ")
 			cam.global_position.y += float(look[2]) if look.size() > 2 else 0.0
 			views = [[sun_yaw + float(look[0]), float(look[1]), "look"]]
+		var day := int(OS.get_environment("DAY"))
 		for v in views:
 			cam.rotation_degrees = Vector3(v[1], v[0], 0)
-			await _shoot("%s/%s_%s.png" % [out, map_name, v[2]])
+			if day <= 0:
+				await _shoot("%s/%s_%s.png" % [out, map_name, v[2]])
+			for i in day:
+				ServerVars.set_from_string("time", str(24.0 * i / day))
+				NightMode.apply(map)
+				await _shoot("%s/%s_%s_day_%04d.png" % [out, map_name, v[2], i], 2)
 		map.queue_free()
 		sky.queue_free()
 		if weather:
