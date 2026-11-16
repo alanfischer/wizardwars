@@ -6,7 +6,7 @@ extends Node3D
 ## "ground" view and shoot it before and after. PERF=1 instead prints the GPU frame time looking
 ## up, with the volumetric clouds off and on. LOOK="yaw pitch [rise]" shoots one view instead, yaw
 ## from the sun's, from rise metres over the spawn. SUN=0 keeps the sun baked rather than MapSun's
-## real-time one; CONVERT=1 reconverts the map first. DAY=n shoots the views n times across a day,
+## real-time one; CONVERT=1 reconverts the map first; CLEAR=1 clears the sky of cloud. DAY=n shoots the views n times across a day,
 ## midnight to midnight, as day_0000.png on.
 
 func _ready() -> void:
@@ -36,6 +36,8 @@ func _ready() -> void:
 		sky.setup(sky_name, map, _find(map, "light_environment"))
 		if sky.overcast:
 			sky.overcast.set_weather(storm, sky.overcast.snowy)
+		if OS.get_environment("CLEAR") == "1":
+			sky.overcast.cloud_amount = 0.0
 		if OS.get_environment("TIME") != "":
 			ServerVars.set_from_string("time", OS.get_environment("TIME"))
 		NightMode.apply(map)
