@@ -283,6 +283,14 @@ overcast_shadow={
 "type": "float",
 "value": 0.0
 }
+overcast_veil={
+"type": "float",
+"value": 0.0
+}
+overcast_sheet={
+"type": "float",
+"value": 0.0
+}
 overcast_sun_dir={
 "type": "vec3",
 "value": Vector3(0, 1, 0)
