@@ -217,7 +217,7 @@ func _on_server_var_changed(key: String, _value: Variant) -> void:
 		_apply_rain()
 	elif key == "wind" or key == "wind_dir":
 		_apply_wind()
-	elif key == "time":
+	elif key in NightMode.VARS:
 		_apply_night()
 
 
@@ -299,9 +299,8 @@ func _share_ground() -> void:
 
 ## The night darkens the rain and the haze the way it darkens the sky's light (NightMode).
 static func sky_light_now() -> Color:
-	var n := NightMode.night_light()
-	var g := NightMode.LIGHTMAP_GAMMA
-	return Color(pow(n.x, g), pow(n.y, g), pow(n.z, g))
+	var n := NightMode.to_gamma(NightMode.night_light())
+	return Color(n.x, n.y, n.z)
 
 
 func _process(delta: float) -> void:

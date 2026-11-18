@@ -96,6 +96,14 @@ func test_time_reads_as_hours_names_and_clock_times() -> void:
 	assert_eq(NightMode.night_light(), Vector3.ONE, "noon is the map as lit")
 	ServerVars.set_from_string("time", "0")
 	assert_almost_eq(NightMode.amount(), 1.0, 1e-6, "midnight is full night")
+	var full := NightMode.night_light()
+	assert_eq(NightMode.parse_moon("new"), "0.0", "a moon by name")
+	assert_eq(NightMode.parse_moon("0.3"), "0.3", "or by phase")
+	assert_eq(NightMode.parse_moon("2"), "", "but not past its month")
+	ServerVars.set_from_string("moon", "0")
+	assert_lt(NightMode.night_light().x, full.x, "a new moon leaves midnight darker")
+	assert_gt(NightMode.night_light().x, 0.0, "though never black")
+	ServerVars.set_from_string("moon", "0.5")
 	ServerVars.set_from_string("time", "12")
 
 
@@ -322,10 +330,14 @@ shader_type spatial;
 varying vec3 world_pos;
 void vertex() { world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
 void fragment() {
-	vec3 lit = goldsrc_lightmap(vec3(0.5), 1.0, world_pos);
+	vec3 lit = goldsrc_lightmap(vec3(0.5), vec2(1.0, 0.5), world_pos);
 	vec3 albedo = vec3(0.5);
 	goldsrc_surface(lit, albedo, vec3(1.0), 1.0, world_pos, vec3(0.0, 1.0, 0.0), NORMAL, VIEW);
 	ALBEDO = albedo + lit;
+}
+void light() {
+	goldsrc_light(DIFFUSE_LIGHT, LIGHT, LIGHT_COLOR, ATTENUATION, LIGHT_IS_DIRECTIONAL, NORMAL, ALBEDO,
+		vec3(1.0), vec3(0.5), world_pos, 2.0);
 }
 """
 	var declared := {}
@@ -333,6 +345,7 @@ void fragment() {
 		declared[u["name"]] = true
 	assert_true(declared.has("puddle_scale"), "the hook wets the ground")
 	assert_true(declared.has("snow_scale"), "and lays snow on it")
+	assert_true(declared.has("sun_unbaked"), "and can hand the sun to a real-time light")
 
 
 func test_fire_melts_the_lying_snow_where_it_lands() -> void:

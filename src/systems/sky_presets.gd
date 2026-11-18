@@ -94,6 +94,9 @@ static func build(sky_name: String, faces: Array[Image], sun_dir := Vector3.ZERO
 	for key in overrides:
 		if key != "grade":
 			params[key] = overrides[key]
+	# Cirrus shows without the low layer now; a cloudless sky had none.
+	if params["cloud_amount"] <= 0.0 and not overrides.has("cirrus_amount"):
+		params["cirrus_amount"] = 0.0
 	# "grade" pushes the gradient somewhere the art does not go; clouds keep the art's colours.
 	if overrides.has("grade"):
 		for key in ["zenith_color", "horizon_color"]:

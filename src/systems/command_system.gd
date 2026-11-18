@@ -134,6 +134,7 @@ func _register_builtins() -> void:
 	_register("bsp_hulls", _cmd_bsp_hulls, Perm.ADMIN, "/bsp_hulls [on|off]", "Toggle GoldSrc BSP hull collision (off = trimesh/convex colliders).")
 	_register("combo_chaos", _cmd_combo_chaos, Perm.ADMIN, "/combo_chaos [auto|on|off]", "Trade a map's weapon/ammo pickups and resupply grenades for random combo spellbooks (auto = whatever the map asks for).")
 	_register("time", _cmd_time, Perm.ADMIN, "/time [hours|h:mm|noon|dusk|night|dawn]", "Time of day on sky-lit maps: warm light toward dusk (18:00), moonlight at night. The map's own lights stay lit.")
+	_register("moon", _cmd_moon, Perm.ADMIN, "/moon [0-1|new|crescent|half|gibbous|full]", "The moon's phase, 0 new through 0.5 full to 1 new again: it trails the sun across the sky by that share of a day, and lights the night by how much of it shows.")
 	_register("rain", _cmd_rain, Perm.ADMIN, "/rain [amount]", "Rain on any map, 0.01 light to 1 a downpour; values above 1 add drop density. 0 leaves the weather to the map.")
 	_register("dynamicweather", _cmd_dynamic_weather, Perm.ADMIN, "/dynamicweather [on|off]", "Showers come and go on their own, light to heavy, in a shifting wind; the map's own weather is ignored. Setting /rain turns it off.")
 	_register("temperature", _cmd_temperature, Perm.ADMIN, "/temperature [°C]", "Degrees C at the ground: what falls is snow below -1, rain above 3, sleet between, and snow lies while it is freezing.")
@@ -776,6 +777,16 @@ func _cmd_dynamic_weather(sender_id: int, args: String) -> void:
 func _rain_text() -> String:
 	var v := float(ServerVars.get_value("rain", 0.0))
 	return "the map's own" if is_zero_approx(v) else ("%.2f (%.1fx drops)" % [v, v] if v > 1.0 else "%.2f" % v)
+
+
+func _cmd_moon(sender_id: int, args: String) -> void:
+	if not args.strip_edges().is_empty():
+		var value := NightMode.parse_moon(args)
+		if value.is_empty():
+			_reply_err(sender_id, "Usage: /moon [0-1|new|crescent|half|gibbous|full]")
+			return
+		ServerVars.set_from_string("moon", value)
+	_reply_ok(sender_id, "moon: %s" % NightMode.moon())
 
 
 func _cmd_temperature(sender_id: int, args: String) -> void:

@@ -21,6 +21,15 @@ uniform vec3 grid_size = vec3(1.0);  // world-space extent (cell_size * dims), d
 // lightmap shader does the same with lm_sun.
 uniform sampler3D acube_sun : filter_linear, hint_default_black;
 uniform vec3 sky_light = vec3(1.0);
+// MapSun: 1 when a real-time sun lights the map. The grid's faces hold the sun as baked,
+// grid_sun_color by their alignment with grid_sun_dir where acube_sun's g says the sun reached;
+// that comes out, and the model's light() adds sun_model back with shadows.
+uniform float sun_unbaked = 0.0;
+uniform vec3 grid_sun_color = vec3(0.0);
+uniform vec3 grid_sun_dir = vec3(0.0, 1.0, 0.0);
+uniform vec3 sun_model = vec3(0.0);
+// How much of the grid's baked direct sun stays, linear: as sun_baked on the world.
+uniform float sun_baked = 1.0;
 // Shadows of the procedural sky's clouds, the same ones the map takes.
 #include "res://addons/overcast/shaders/clouds.gdshaderinc"
 
@@ -45,8 +54,15 @@ vec3 ambient_cube(vec3 world_pos, vec3 world_normal) {
 	vec3 ambient = wn2.x * (wn.x >= 0.0 ? texture(acube_pos_x, uvw).rgb : texture(acube_neg_x, uvw).rgb)
 	             + wn2.y * (wn.y >= 0.0 ? texture(acube_pos_y, uvw).rgb : texture(acube_neg_y, uvw).rgb)
 	             + wn2.z * (wn.z >= 0.0 ? texture(acube_pos_z, uvw).rgb : texture(acube_neg_z, uvw).rgb);
-	float sun_share = texture(acube_sun, uvw).r;
-	vec3 sky = sun_share > 0.0 ? sky_light * cloud_sunlight(world_pos) : sky_light;
+	vec2 sun = texture(acube_sun, uvw).rg;
+	float sun_share = sun.x;
+	if (sun_baked < 1.0 && sun.y > 0.0) {
+		// The grid is gamma: the share that stays is taken through the curve.
+		vec3 toward = max(sign(wn) * grid_sun_dir, vec3(0.0));
+		float gone = 1.0 - pow(max(sun_baked, 0.0), 0.55);
+		ambient = max(ambient - grid_sun_color * dot(wn2, toward) * sun.y * gone, vec3(0.0));
+	}
+	vec3 sky = sun_share > 0.0 && sun_unbaked <= 0.0 ? sky_light * cloud_sunlight(world_pos) : sky_light;
 	ambient *= pow(max(mix(vec3(1.0), sky, sun_share), vec3(0.0)), vec3(0.55));
 	return max(ambient, vec3(0.05));
 }

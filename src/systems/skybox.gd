@@ -83,11 +83,13 @@ func setup(sky_name: String, map_root: Node = null, sun_ent: Dictionary = {}, da
 
 	var params := _params.duplicate()
 	params["drawing"] = false
+	params.merge(_sun_params(), true)
 	overcast = SkyboxSky.new(self, params)
 	# The stock sky material carries this so the sky draws before the world and reads as a true
 	# background; an override replaces the material outright, so it has to carry it too.
 	overcast.render_priority = PRIORITY
 	overcast.time_of_day = NightMode.hours()
+	overcast.moon_phase = NightMode.moon()
 
 	if map_root != null:
 		warn_if_baked_priority_is_stale()
@@ -229,9 +231,10 @@ static func procedural() -> bool:
 func _on_server_var_changed(key: String, _value: Variant) -> void:
 	if key == "dynamic_weather":
 		apply_enhanced(procedural())
-	elif key == "time":
+	elif key in NightMode.VARS:
 		if overcast:
 			overcast.time_of_day = NightMode.hours()
+			overcast.moon_phase = NightMode.moon()
 		if _map_root:
 			var sky_name := NightMode.sky_for(_map_sky_name(_map_root), _map_root)
 			if sky_name != _built_sky:
@@ -250,6 +253,16 @@ func _swap_cubemap(sky_name: String) -> void:
 	_built_sky = sky_name
 	_apply_sky_cubemap()
 	Log.info("Skybox swapped to %s" % sky_name)
+
+
+## The sky's sun crosses it with the time wherever the map has one to split out of its lightmaps
+## (MapSun.has_sun), which fade to match; otherwise it stays where it was baked. The sky's
+## colours come from the air only for a sun that sets: a fixed one would hold noon.
+func _sun_params() -> Dictionary:
+	if not MapSun.has_sun():
+		return {"atmosphere": 0.0}
+	# Its noon, which a sun compiled too low to arc from climbs to.
+	return {"sun_follows_time": true, "atmosphere": 1.0, "sun_dir": MapSun.noon_dir()}
 
 
 ## Swap the procedural sky in or out. Safe to call repeatedly and before/without a map.

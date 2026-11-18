@@ -5,7 +5,10 @@ extends Node3D
 ## fireballs would (ICE=1 glazes the wet ground over first, so they thaw holes in it), FIRE=1 to light a fire satchel's spiral where the snow lies deepest under the
 ## "ground" view and shoot it before and after. PERF=1 instead prints the GPU frame time looking
 ## up, with the volumetric clouds off and on. LOOK="yaw pitch [rise]" shoots one view instead, yaw
-## from the sun's, from rise metres over the spawn.
+## from the sun's, from rise metres over the spawn. SUN=1 lights it with MapSun's real-time sun
+## rather than the baked one; CONVERT=1 reconverts the map first; CLEAR=1 clears the sky of cloud. DAY=n shoots the views n times across a day,
+## midnight to midnight, as day_0000.png on. MOON=0.25 sets the moon's phase, and LOOK=moon shoots
+## it close.
 
 func _ready() -> void:
 	ServerVars.set_from_string("dynamic_weather", "1")
@@ -14,6 +17,11 @@ func _ready() -> void:
 	for map_name in OS.get_environment("MAPS").split(","):
 		# The converted scene the game plays, which carries the sun-share bake cloud shadows need.
 		var scn := "user://resources/maps/%s.scn" % map_name
+		if OS.get_environment("CONVERT") == "1":
+			var converter := MapConverter.new()
+			add_child(converter)
+			converter.convert(map_name)
+			converter.queue_free()
 		var map: Node3D = load(scn if ResourceLoader.exists(scn) else "res://maps/%s.bsp" % map_name).instantiate()
 		EntityRender.apply_color_space(map)
 		add_child(map)
@@ -24,11 +32,18 @@ func _ready() -> void:
 		OvercastClouds.set_volumetric(OS.get_environment("VOL") == "1")
 		var ws := map.get_node_or_null("worldspawn")
 		var sky_name: String = ws.get_meta("entity").get("skyname", "") if ws else ""
+		MapSun.set_enabled(OS.get_environment("SUN") == "1")
+		MapSun.setup(map)
 		sky.setup(sky_name, map, _find(map, "light_environment"))
 		if sky.overcast:
 			sky.overcast.set_weather(storm, sky.overcast.snowy)
+		if OS.get_environment("CLEAR") == "1":
+			sky.overcast.cloud_amount = 0.0
+			sky.overcast.cirrus_amount = 0.0
 		if OS.get_environment("TIME") != "":
 			ServerVars.set_from_string("time", OS.get_environment("TIME"))
+		if OS.get_environment("MOON") != "":
+			ServerVars.set_from_string("moon", OS.get_environment("MOON"))
 		NightMode.apply(map)
 		var weather: WeatherSystem = null
 		if OS.get_environment("RAIN") != "":
@@ -113,13 +128,23 @@ func _ready() -> void:
 				print("PERF %s %v %s %.2f ms/frame" % [map_name, DisplayServer.window_get_size(), "volumetric" if vol else "flat", ms])
 			get_tree().quit()
 			return
-		if OS.get_environment("LOOK") != "":
+		if OS.get_environment("LOOK") == "moon":
+			var m: Vector3 = sky.overcast.moon_dir()
+			cam.fov = 30.0
+			views = [[rad_to_deg(atan2(-m.x, -m.z)), rad_to_deg(asin(m.y)), "moon"]]
+		elif OS.get_environment("LOOK") != "":
 			var look := OS.get_environment("LOOK").split(" ")
 			cam.global_position.y += float(look[2]) if look.size() > 2 else 0.0
 			views = [[sun_yaw + float(look[0]), float(look[1]), "look"]]
+		var day := int(OS.get_environment("DAY"))
 		for v in views:
 			cam.rotation_degrees = Vector3(v[1], v[0], 0)
-			await _shoot("%s/%s_%s.png" % [out, map_name, v[2]])
+			if day <= 0:
+				await _shoot("%s/%s_%s.png" % [out, map_name, v[2]])
+			for i in day:
+				ServerVars.set_from_string("time", str(24.0 * i / day))
+				NightMode.apply(map)
+				await _shoot("%s/%s_%s_day_%04d.png" % [out, map_name, v[2], i], 2)
 		map.queue_free()
 		sky.queue_free()
 		if weather:
