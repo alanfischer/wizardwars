@@ -65,7 +65,7 @@ const OVERRIDES := {
 	"seascape": {"cloud_amount": 0.28, "horizon_falloff": 1.4},
 	"osaka": {"cloud_amount": 0.35},
 	"forest256_": {"cloud_amount": 0.5},
-	"firey_": {"cloud_amount": 0.6, "cloud_speed": 0.06},
+	"firey_": {"cloud_amount": 0.6, "cloud_speedup": 7.0},
 }
 
 ## Used when a map has no usable light_environment — six of the thirty do, and a dropped-in map
