@@ -267,9 +267,9 @@ overcast_scale={
 "type": "float",
 "value": 2.2
 }
-overcast_speed={
-"type": "float",
-"value": 0.035
+overcast_cloud_drift={
+"type": "vec2",
+"value": Vector2(0, 0)
 }
 overcast_softness={
 "type": "float",
@@ -302,6 +302,26 @@ overcast_volumetric={
 overcast_volume={
 "type": "sampler3D",
 "value": ""
+}
+overcast_cover_map={
+"type": "sampler2D",
+"value": ""
+}
+overcast_cover_map_frame={
+"type": "vec4",
+"value": Vector4(1, 0, 1, 1)
+}
+overcast_cover_map_place={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+overcast_cover_map_was={
+"type": "sampler2D",
+"value": ""
+}
+overcast_cover_map_was_place={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
 }
 overcast_height={
 "type": "float",
