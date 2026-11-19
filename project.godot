@@ -315,10 +315,6 @@ overcast_cover_map_place={
 "type": "vec4",
 "value": Vector4(0, 0, 0, 0)
 }
-overcast_cover_map_was={
-"type": "sampler2D",
-"value": ""
-}
 overcast_cover_map_was_place={
 "type": "vec4",
 "value": Vector4(0, 0, 0, 0)
