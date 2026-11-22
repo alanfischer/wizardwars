@@ -7,8 +7,8 @@ step is ~40% of the main thread, about 4-7 ms per 60 Hz tick on an M1 Max, mostl
 order of size (script profiler, debug build, so absolute numbers run high):
 
 - Player movement, ~0.9 ms per tick for 9 players. PlayerMovementContext.get_modifiers is ~40 us
-  a call: hull contact probes, check_water, the ladder check and the wet-footing query run for
-  every command.
+  a call, most of it (headless debug) the hull probe ~17 us (hop's body_test_motion), the ladder query ~9 us
+  (it queries with the capsule; water's sphere is ~4).
 - Bots, ~0.6 ms per tick in BotBrain.tick (_drop_depth, _probe, waypoint path_ids).
 - VisibilitySystem._physics_process, ~0.55 ms: _refresh_entry_aabb on ~430 entries a tick
   compares transforms of entities that never move. The set_notify_transform wake that
