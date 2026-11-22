@@ -278,9 +278,12 @@ func take_heat(at: Vector3, radius: float, amount: float) -> void:
 
 
 ## The ground at `feet` for footing, alike on every peer: how wet and how icy, in the steps the
-## server sends them in.
+## server sends them in. Dry ground is sure footing whatever ice it holds, so it reads as none.
 func footing(feet: Vector3) -> Vector2:
-	return Vector2(ground.wetness_at(feet), ground.ice_at(feet)).snapped(Vector2.ONE / WET_STEPS)
+	var wet := snappedf(ground.wetness_at(feet), 1.0 / WET_STEPS)
+	if wet <= 0.0:
+		return Vector2.ZERO
+	return Vector2(wet, snappedf(ground.ice_at(feet), 1.0 / WET_STEPS))
 
 
 ## The ground's wetness, ice and snow cover, in the steps the server sends them in.
