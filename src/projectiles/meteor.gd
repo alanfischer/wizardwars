@@ -66,10 +66,7 @@ func _ready() -> void:
 		sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		sprite.pixel_size = GameConsts.SCALE_FACTOR * 2.5
 		sprite.transparent = true
-		var mat := AssetLoader.get_sprite_material_template().duplicate()
-		if sprite.texture:
-			mat.albedo_texture = sprite.texture
-		sprite.material_override = mat
+		AssetLoader.style_effect_sprite(sprite)
 		add_child(sprite)
 
 	_create_light(Color(0.5, 0.6, 1.0), 4.0, 7.0)

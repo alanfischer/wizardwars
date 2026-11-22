@@ -4,7 +4,7 @@ extends Node3D
 ## Dust puff kicked up where a rolling stone lands, fading out over a second.
 
 var _effect := EffectBehavior.new()
-var _mat: StandardMaterial3D
+var _mat: Material
 var _register := false
 
 
@@ -28,7 +28,7 @@ func _build() -> void:
 	var dust := _effect.add_sprite("sprites/stmbal1.spr")
 	if dust:
 		_mat = dust.material_override
-		_mat.albedo_color = Color(1.0, 0.85, 0.4, 1.0)
+		AssetLoader.set_sprite_tint(_mat, Color(1.0, 0.85, 0.4, 1.0))
 
 
 func _ready() -> void:
@@ -37,5 +37,5 @@ func _ready() -> void:
 		_effect.finish()
 		return
 	var tween := create_tween()
-	tween.tween_property(_mat, "albedo_color:a", 0.0, 1.0)
+	tween.tween_property(_mat, AssetLoader.sprite_alpha_property(_mat), 0.0, 1.0)
 	tween.tween_callback(_effect.finish)

@@ -11,6 +11,8 @@ signal conversion_complete(success: bool)
 ## Bump whenever the MDL pipeline's output changes, so cached models reconvert instead of
 ## keeping the shape an older importer built — the cache keys off this, not off the .mdl.
 const MDL_CACHE_VERSION := 2
+## Bump when GoldSrcSPR.build_scene's output changes. 2: goldsrc's GPU flipbook animator.
+const SPR_CACHE_VERSION := 2
 const MDL_VERSION_META := &"cache_version"
 const MDL_VERSION_PROPERTY := "metadata/cache_version"  # how the meta is named in packed state
 
@@ -153,7 +155,9 @@ func _spr_cache_hit(base_dir: String, source_md5: String) -> bool:
 	if source_md5.is_empty():
 		return true
 	var meta = JSON.parse_string(FileAccess.get_file_as_string(meta_path))
-	return meta is Dictionary and meta.get("source_md5", "") == source_md5
+	if not meta is Dictionary or int(meta.get("cache_version", 1)) != SPR_CACHE_VERSION:
+		return false
+	return meta.get("source_md5", "") == source_md5
 
 
 func _convert_spr(spr_path: String, base_dir: String, source_md5: String) -> bool:
@@ -192,6 +196,7 @@ func _convert_spr(spr_path: String, base_dir: String, source_md5: String) -> boo
 		"height": height,
 		"origins": origins,
 		"source_md5": source_md5,
+		"cache_version": SPR_CACHE_VERSION,
 	}
 	var f := FileAccess.open("%s/meta.json" % base_dir, FileAccess.WRITE)
 	if f:

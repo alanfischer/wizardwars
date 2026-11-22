@@ -85,11 +85,7 @@ func add_sprite(path: String, billboard := BaseMaterial3D.BILLBOARD_ENABLED, sca
 		if sap:
 			sap.fps = fps
 			sap.loop_animation = loop
-	var mat := AssetLoader.get_sprite_material_template(billboard).duplicate()
-	if sprite.texture:
-		mat.albedo_texture = sprite.texture
-	sprite.material_override = mat
-	_liquid_sorted.append(mat)
+	_liquid_sorted.append(AssetLoader.style_effect_sprite(sprite, billboard))
 	_host.add_child(sprite)
 	return sprite
 

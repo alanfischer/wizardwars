@@ -210,11 +210,7 @@ func _make_floating_sprite(sprite_path: String, height: float, tint := Color.WHI
 	sprite.pixel_size = GameConsts.SCALE_FACTOR
 	sprite.transparent = true
 	sprite.position = Vector3(0, height, 0)
-	var mat := AssetLoader.get_sprite_material_template().duplicate()
-	if sprite.texture:
-		mat.albedo_texture = sprite.texture
-	mat.albedo_color = tint
-	sprite.material_override = mat
+	AssetLoader.set_sprite_tint(AssetLoader.style_effect_sprite(sprite), tint)
 	return sprite
 
 

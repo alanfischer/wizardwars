@@ -41,7 +41,9 @@ func _ready() -> void:
 	# used additively in the map), so patch the baked material if only the entity says additive.
 	if rendermode == 5:
 		var mat := sprite.material_override
-		if mat is StandardMaterial3D:
+		if sap and sap.has_method(&"restyle"):
+			sap.restyle(sap.billboard_mode, BaseMaterial3D.BLEND_MODE_ADD, false)
+		elif mat is StandardMaterial3D:
 			AssetLoader.set_additive_blend(mat as StandardMaterial3D)
 		elif mat == null:
 			var new_mat := StandardMaterial3D.new()
