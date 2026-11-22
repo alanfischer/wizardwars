@@ -10,6 +10,26 @@ overcast-godot v0.1.0, pmove-godot v0.1.0, hop and goldnet cores v0.1.0) and WW 
 - pmove-godot: Asset Library, with a GIF of the demo.
 - overcast-godot: the screenshots, in a showcase thread.
 
+## Performance: the physics tick
+
+ww_2fort, 8 bots, release export under gl_compatibility (2026-11-22, after WW #77): the physics
+step is ~40% of the main thread, about 4-7 ms per 60 Hz tick on an M1 Max, mostly GDScript. In
+order of size (script profiler, debug build, so absolute numbers run high):
+
+- Player movement, ~0.9 ms per tick for 9 players. PlayerMovementContext.get_modifiers is ~40 us
+  a call: hull contact probes, check_water, the ladder check and the wet-footing query run for
+  every command.
+- Bots, ~0.6 ms per tick in BotBrain.tick (_drop_depth, _probe, waypoint path_ids).
+- VisibilitySystem._physics_process, ~0.55 ms: _refresh_entry_aabb on ~430 entries a tick
+  compares transforms of entities that never move. The set_notify_transform wake that
+  MoverNetPublisher uses (WW #77) fits here too.
+- hop's _flush_queries, ~4.5% of the thread: a state-sync callback to every kinematic body each
+  flush whether it moved or not (plus a Callable::is_valid per body), and the area overlap tests.
+- send_entity_transforms still sweeps all synced entities every tick for freed ones.
+
+Smaller, per frame rather than per tick: BlobShadow casts a ray per shadow every frame, and the
+voice mic's _process runs whenever the mic is open.
+
 ## Map fidelity
 
 - Alternate textures (`+a`..`+j`) never switch. GoldSrc draws a brush entity's alternate
