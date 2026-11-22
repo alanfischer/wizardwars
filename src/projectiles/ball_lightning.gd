@@ -57,10 +57,7 @@ func _ready() -> void:
 		if sap:
 			sap.fps = SPRITE_FPS
 			sap.loop_animation = true
-		var mat := AssetLoader.get_sprite_material_template().duplicate()
-		if sprite.texture:
-			mat.albedo_texture = sprite.texture
-		sprite.material_override = mat
+		AssetLoader.style_effect_sprite(sprite)
 		add_child(sprite)
 
 	_create_light(Color(0.8, 0.5, 1.0), 3.0, 5.0)

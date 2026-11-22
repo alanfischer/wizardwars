@@ -1,5 +1,5 @@
 class_name MoverNetPublisher
-extends Node
+extends Node3D
 
 ## The mover transform replication protocol as one composed unit: the five replicated shadow props,
 ## the MultiplayerSynchronizer that carries them, and the publish/apply funnel at each end.
@@ -54,6 +54,7 @@ var _entity_id := -1
 # 30-70% off with a separately-timed clock). Reset to 0 on idle for a fresh baseline.
 var _last_moving_publish_msec := 0
 var _sync: MultiplayerSynchronizer = null
+var _awake := false  # in NetworkManager's publish set until a publish finds it idle
 
 
 ## The publisher of `node`, or null if it doesn't stream a transform. The one place the node name
@@ -78,6 +79,21 @@ func setup(entity_id: int) -> void:
 	_target.add_child(_sync)
 	_sync.synchronized.connect(_on_synchronized)
 	_sync.delta_synchronized.connect(_on_synchronized)
+	# A Node3D child hears every change to the entity's global transform, a parent's move included.
+	set_notify_transform(true)
+	_wake()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSFORM_CHANGED:
+		_wake()
+
+
+func _wake() -> void:
+	if _awake or publish_suppressed:
+		return
+	_awake = true
+	NetworkManager.wake_mover(self)
 
 
 ## Withhold until the peer has loaded the map (an early send poisons the path cache),
@@ -106,16 +122,19 @@ func set_externally_driven(on: bool) -> void:
 			clear_buffer()
 	elif not on:
 		mover_net_stamp = 0
+		_wake()
 
 
-## Server: publish the mover's authoritative transform into the shadow props, once per net tick.
-## Only refreshes on real change, so an idle mover's byte-identical triplet lets ack-delta netcode
-## (goldnet) skip it entirely. Stamp freezes at the last real movement's server time.
+## Server: publish the mover's authoritative transform into the shadow props, once per net tick
+## while awake. Only refreshes on real change, so an idle mover's byte-identical triplet lets
+## ack-delta netcode (goldnet) skip it entirely. Stamp freezes at the last real movement's server
+## time. Returns false once there is nothing left to send, which puts the mover back to sleep.
 const _MOVER_MOVED_EPS_SQ := 1e-6  # (0.001 units)² position / radians rotation
 
-func publish() -> void:
+func publish() -> bool:
 	if publish_suppressed:
-		return  # a parent contraption drives this mover; don't stream its transform
+		_awake = false
+		return false  # a parent contraption drives this mover; don't stream its transform
 	var pos := _target.global_position
 	var rot := _target.global_rotation
 	if pos.distance_squared_to(mover_net_pos) <= _MOVER_MOVED_EPS_SQ \
@@ -129,7 +148,8 @@ func publish() -> void:
 			mover_net_stamp = Time.get_ticks_msec()
 			NetworkManager.mark_entity_dirty(_target)
 		_last_moving_publish_msec = 0  # idle: the next real move starts a fresh dt baseline
-		return  # idle — shadow frozen so idle movers cost nothing on the wire
+		_awake = false
+		return false  # idle — shadow frozen so idle movers cost nothing on the wire
 	# dt is measured against mover_net_stamp's own clock (Time.get_ticks_msec()), not a separate
 	# finer timer or the nominal tick interval: only that clock agrees with what the client
 	# actually receives, so cross-checking "delta / stamp delta" against velocity matches up.
@@ -156,6 +176,7 @@ func publish() -> void:
 	mover_net_stamp = stamp_now
 	_last_moving_publish_msec = stamp_now
 	NetworkManager.mark_entity_dirty(_target)
+	return true
 
 
 ## Client: feed the replicated transform into the shared entity interp buffer.

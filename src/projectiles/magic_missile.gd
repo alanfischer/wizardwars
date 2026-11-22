@@ -35,8 +35,8 @@ func _ready() -> void:
 	var color: Color = GameConsts.DAMAGE_TYPE_COLORS.get(damage_type, PLAIN_COLOR)
 
 	var sprite := _create_sprite("sprites/flare6.spr")
-	if sprite and sprite.material_override is BaseMaterial3D:
-		(sprite.material_override as BaseMaterial3D).albedo_color = color
+	if sprite:
+		AssetLoader.set_sprite_tint(sprite.material_override, color)
 
 	_create_light(color)
 

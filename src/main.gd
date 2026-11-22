@@ -478,6 +478,15 @@ func _start_dedicated_server() -> void:
 	Log.info("[Server] Dedicated server ready, waiting for clients...")
 
 
+## A map's first draw compiles its shaders and AssetLoader's warmup set: take it under the
+## lobby's loading status, not as the first live frame.
+func _draw_warmup_frames() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	for i in 2:
+		await RenderingServer.frame_post_draw
+
+
 ## Both BSP and Blender produce .scn output, but via different converters.
 func _is_blender_map(map_name: String) -> bool:
 	return FileAccess.file_exists(ProjectSettings.globalize_path("res://maps/%s.glb" % map_name))
@@ -595,6 +604,7 @@ func _on_lobby_host(map_name: String) -> void:
 	MapTransfer.load_resource_manifest()
 	ServerBrowser.start_beacon(map_name, map_hash)
 
+	await _draw_warmup_frames()
 	_set_game_active(true)
 	MatchSystem.begin_map(map_name)
 	Log.info("[ListenServer] Hosting %s as peer %d" % [map_name, host_id])
@@ -795,6 +805,8 @@ func change_map(new_map_name: String) -> void:
 	MapTransfer.load_resource_manifest()
 	ServerBrowser.start_beacon(new_map_name, map_hash)
 
+	if not _is_dedicated_server:
+		await _draw_warmup_frames()
 	_set_game_active(true)
 	_spawn_missed_players()
 	# Listen-server: re-register our own body puppet (the previous registration was wiped by
@@ -820,6 +832,7 @@ func _on_ready_to_load(map_name: String) -> void:
 	_set_status("Loading %s..." % map_name)
 	await get_tree().process_frame
 	_load_map(map_name)
+	await _draw_warmup_frames()
 	_set_game_active(true)
 	_spawn_missed_players()
 	NetworkManager._request_entity_state.rpc_id(1)

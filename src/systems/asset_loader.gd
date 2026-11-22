@@ -553,8 +553,21 @@ func precache_model(path: String) -> void:
 
 
 ## Precache a sprite (loads PNGs into memory).
+## Also stages the sprite for _warm_gpu_shaders, as imported and in the effect look both ways up.
+var _sprite_warmup_nodes := {}
 func precache_sprite(path: String) -> void:
 	load_sprite(path)
+	if _sprite_warmup_nodes.has(path) or DisplayServer.get_name() == "headless":
+		return
+	var looks: Array[Sprite3D] = []
+	for billboard in [-1, BaseMaterial3D.BILLBOARD_ENABLED, BaseMaterial3D.BILLBOARD_FIXED_Y]:
+		var sprite := load_sprite_node(path)
+		if sprite == null:
+			break
+		if billboard >= 0:
+			style_effect_sprite(sprite, billboard)
+		looks.append(sprite)
+	_sprite_warmup_nodes[path] = looks
 
 
 ## Runtime WAV file loader — parses RIFF headers and creates AudioStreamWAV.
@@ -640,7 +653,11 @@ func set_additive_blend(mat: BaseMaterial3D) -> void:
 ## Recursively clear fog on any additive material already baked into a node tree
 ## (imported .scn sprites, BSP-embedded sprites) — same reason as set_additive_blend().
 func fix_additive_fog(node: Node) -> void:
-	if node is GeometryInstance3D:
+	var sap := node.get_node_or_null(^"SpriteAnimationPlayer") if node is Sprite3D else null
+	if sap and sap.has_method(&"restyle"):
+		if sap.blend_mode == BaseMaterial3D.BLEND_MODE_ADD:
+			sap.restyle(sap.billboard_mode, sap.blend_mode, false)
+	elif node is GeometryInstance3D:
 		var gi := node as GeometryInstance3D
 		_clear_fog_if_additive(gi.material_override)
 		if gi is MeshInstance3D:
@@ -752,7 +769,38 @@ func get_beam_material() -> StandardMaterial3D:
 		_material_cache["beam"] = create_beam_material()
 	return _material_cache["beam"]
 
-## Template for animated sprite materials — caller must .duplicate() then set albedo_texture.
+## Give a spell sprite the additive effect look on a material of its own, which is returned for the
+## caller to tint or liquid-sort. An imported sprite keeps goldsrc's flipbook and is restyled; the
+## static PNG fallback gets a copy of the template below.
+func style_effect_sprite(sprite: Sprite3D, billboard := BaseMaterial3D.BILLBOARD_ENABLED) -> Material:
+	var sap := sprite.get_node_or_null(^"SpriteAnimationPlayer")
+	if sap and sap.has_method(&"restyle"):
+		sap.alpha_scissor = false
+		sap.restyle(billboard, BaseMaterial3D.BLEND_MODE_ADD, false)
+		var own: ShaderMaterial = sap.unique_material()
+		own.render_priority = EFFECT_PRIORITY
+		return own
+	var mat := get_sprite_material_template(billboard).duplicate()
+	if sprite.texture:
+		mat.albedo_texture = sprite.texture
+	sprite.material_override = mat
+	return mat
+
+
+## Tint a material from style_effect_sprite, whichever kind it is.
+func set_sprite_tint(mat: Material, color: Color) -> void:
+	if mat is ShaderMaterial:
+		(mat as ShaderMaterial).set_shader_parameter(&"albedo", color)
+	elif mat is BaseMaterial3D:
+		(mat as BaseMaterial3D).albedo_color = color
+
+
+## The property a tween drives to fade that tint's alpha.
+func sprite_alpha_property(mat: Material) -> NodePath:
+	return ^"shader_parameter/albedo:a" if mat is ShaderMaterial else ^"albedo_color:a"
+
+
+## Template for the static sprite fallback's material — caller must .duplicate() then set albedo_texture.
 func get_sprite_material_template(billboard := BaseMaterial3D.BILLBOARD_ENABLED) -> StandardMaterial3D:
 	var key := "sprite_template_%d" % billboard
 	if not _material_cache.has(key):
@@ -1193,6 +1241,10 @@ func _warm_gpu_shaders(scene_root: Node) -> void:
 		vp.add_child(faded)
 		set_model_alpha(faded, 0.5)
 	_model_warmup_nodes.clear()
+	for path in _sprite_warmup_nodes:
+		for sprite: Sprite3D in _sprite_warmup_nodes[path]:
+			vp.add_child(sprite)
+	_sprite_warmup_nodes.clear()
 
 	scene_root.add_child(vp)
 	# Keep alive a few frames so every pass (incl. one-shot particles) actually draws.

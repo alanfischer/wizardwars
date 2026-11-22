@@ -172,11 +172,7 @@ func _create_sprite(sprite_path: String, sprite_scale := 1.0) -> Sprite3D:
 	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	sprite.pixel_size = GameConsts.SCALE_FACTOR * sprite_scale
 	sprite.transparent = true
-	var mat := AssetLoader.get_sprite_material_template().duplicate()
-	if sprite.texture:
-		mat.albedo_texture = sprite.texture
-	sprite.material_override = mat
-	_liquid_sorted.append(mat)
+	_liquid_sorted.append(AssetLoader.style_effect_sprite(sprite))
 	add_child(sprite)
 	return sprite
 
