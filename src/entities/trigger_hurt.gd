@@ -45,22 +45,28 @@ func _ready() -> void:
 	_area.body_entered.connect(_on_body_entered)
 	_area.body_exited.connect(_on_body_exited)
 	_timer = 0.0
+	# Ticks only while something it can hurt is inside, like the original's HurtTouch.
+	set_physics_process(false)
 
 
 func _physics_process(delta: float) -> void:
 	if not _active or not _area:
+		set_physics_process(false)
 		return
 	# Host-only: damage ticks and trigger firing are authoritative.
 	# Client receives trigger toggle (_active state) via host broadcast.
 	if _is_network_client():
+		set_physics_process(false)
 		return
 	_timer -= delta
 	if _timer > 0.0:
 		return
 	_timer = _delay
 	var hit := false
+	var occupied := false
 	for body in _area.get_overlapping_bodies():
 		if body is CharacterBody3D and body.has_method("take_damage"):
+			occupied = true
 			if not body.is_alive:
 				continue
 			if _req_team != 0 and body.get("team") != null and body.team != _req_team:
@@ -71,12 +77,15 @@ func _physics_process(delta: float) -> void:
 	if hit and not _target_fired and not _target_key.is_empty():
 		_target_fired = true
 		TriggerSystem.fire(_target_key, self, TriggerSystem.Type.TOGGLE)
+	if not occupied:
+		set_physics_process(false)
 
 
 func _on_body_entered(body: Node3D) -> void:
 	if not _active or _is_network_client():
 		return
 	if body is CharacterBody3D and body.has_method("take_damage"):
+		set_physics_process(true)
 		if not body.is_alive:
 			return
 		if _req_team != 0 and body.get("team") != null and body.team != _req_team:
@@ -119,6 +128,8 @@ func _on_body_exited(body: Node3D) -> void:
 
 func trigger(_activator: Node, _type: TriggerSystem.Type) -> void:
 	_active = not _active
+	if _active:
+		set_physics_process(true)
 
 
 # Map Half-Life damagetype bitflags to GameConsts.DamageType.

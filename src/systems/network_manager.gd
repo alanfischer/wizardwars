@@ -189,6 +189,7 @@ const PLAYER_STATUS_FLAGS := {
 }
 
 var _synced_entities: Dictionary = {}  # id -> Node; map bodies, projectiles, corpses, creatures, etc.
+var _awake_movers: Dictionary = {}  # MoverNetPublisher -> true: moved since it last went idle
 # Server-side per-peer PVS visibility, pushed into each synchronizer's native peer_visibility map once
 # per net tick. Replaces visibility filters, which goldnet can't read (is_visible_to isn't
 # GDExtension-visible). Keyed by MultiplayerSynchronizer -> predicate Callable(peer)->bool.
@@ -1902,18 +1903,23 @@ func _resolve_transform_node(node) -> Node3D:
 const _MOVER_NET_PROP := &"_mover_net"  # cached StringName, avoids re-hashing per entity per tick
 
 
+func wake_mover(pub: MoverNetPublisher) -> void:
+	_awake_movers[pub] = true
+
+
 func send_entity_transforms() -> void:
 	# Each mover streams its transform through its own MultiplayerSynchronizer; this just writes the
 	# authoritative shadow state for the synchronizer to ship.
+	for pub in _awake_movers.keys():
+		if not is_instance_valid(pub):
+			_awake_movers.erase(pub)
+		elif not pub.publish():
+			_awake_movers.erase(pub)
 	var stale: Array[int] = []
 	for id in _synced_entities:
 		var node = _synced_entities[id]
 		if not (node and is_instance_valid(node)):
 			stale.append(id)
-			continue
-		var pub = node.get(_MOVER_NET_PROP)
-		if pub:
-			pub.publish()
 	for id in stale:
 		_erase_entity(id)
 
