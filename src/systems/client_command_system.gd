@@ -12,7 +12,7 @@ var _commands: Dictionary = {}  # name -> {callable, usage, help}
 
 
 func _ready() -> void:
-	_register("help",        _cmd_help,        "/help",                                       "List client commands. Also shows server commands if online.")
+	_register("help",        _cmd_help,        "/help [command]",                             "List commands or describe one. Also covers server commands if online.")
 	_register("sim_latency", _cmd_sim_latency, "/sim_latency <min,max | fixed_ms | 0>",       "Set simulated per-leg send latency in ms on this endpoint. 0 disables.")
 	_register("sim_loss",    _cmd_sim_loss,    "/sim_loss <0-100>",                           "Set simulated packet loss % (unreliable sends) on this endpoint.")
 	_register("sim_spike",   _cmd_sim_spike,   "/sim_spike <ms[,interval_s[,duration_s]] | 0>", "Configure WiFi spike simulation. 0 disables.")
@@ -73,12 +73,22 @@ func _reply(msg: String, color: Color) -> void:
 		hud.add_chat_message("Client", msg, false, color)
 
 
-func _cmd_help(_args: String) -> void:
-	var names: Array = []
-	for cmd_name in _commands.keys():
-		names.append("/" + cmd_name)
+func _cmd_help(args: String) -> void:
+	var requested := args.trim_prefix("/").to_lower()
+	if not requested.is_empty():
+		var entry = _commands.get(requested)
+		if entry != null:
+			reply_ok("%s — %s" % [entry["usage"], entry["help"]])
+		elif NetworkManager.is_online():
+			NetworkManager.send_request_command("/help " + requested)
+		else:
+			reply_err("Unknown command: /%s" % requested)
+		return
+	var names: Array = _commands.keys()
 	names.sort()
-	reply_ok("Client commands: " + ", ".join(names))
+	reply_ok("Client commands (%d):" % names.size())
+	for i in range(0, names.size(), CommandSystem.LIST_CHUNK):
+		reply_ok("  " + ", ".join(names.slice(i, i + CommandSystem.LIST_CHUNK)))
 	if NetworkManager.is_online():
 		NetworkManager.send_request_command("/help")
 
