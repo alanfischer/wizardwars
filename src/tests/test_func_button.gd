@@ -94,3 +94,17 @@ func test_button_without_health_ignores_damage() -> void:
 	b.take_damage(10.0, GameConsts.DamageType.PHYSICAL, null)
 	await (Engine.get_main_loop() as SceneTree).process_frame
 	assert_eq(_fired, [], "no health key → shooting it does nothing")
+
+
+## CBaseButton::TriggerAndWait sets pev->frame = 1 and ButtonReturn clears it, so the brush's
+## +0/+a textures show their alternates while it is pressed.
+func test_pressed_button_draws_alternate_textures() -> void:
+	var b: FuncButton = _button({"spawnflags": "1", "wait": "-1"})
+	var mesh := MeshInstance3D.new()
+	b.add_child(mesh)
+	b.trigger(null, TriggerSystem.Type.TOGGLE)
+	assert_eq(mesh.get_instance_shader_parameter(&"entity_frame"), 1.0, "pressed: alternate textures")
+	assert_eq(b._get_sync_state().get("frame"), 1, "and the frame goes to clients")
+	b._door_go_down()
+	assert_eq(mesh.get_instance_shader_parameter(&"entity_frame"), 0.0, "returning: normal textures")
+	assert_eq(b._get_sync_state().get("frame"), 0, "the return is synced too")

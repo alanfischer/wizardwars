@@ -62,7 +62,7 @@ func find_mesh_instances(node: Node) -> Array[MeshInstance3D]:
 
 
 ## Apply GoldSrc render properties (rendermode, renderamt, rendercolor) to a brush entity's
-## mesh materials. Duplicates materials to avoid affecting other entities.
+## mesh materials. The amount and colour are per mesh, so entities share the material copies.
 func apply_render_properties(node: Node3D, ent: Dictionary) -> void:
 	# Entities that render procedurally (env_beam) apply the properties
 	# themselves — the mesh-material path below can't reach them.
@@ -91,44 +91,74 @@ func apply_render_properties(node: Node3D, ent: Dictionary) -> void:
 	if drawn.is_empty():
 		return
 
+	var blend := &"add" if mode == 5 else &"mix"
+	var tint := Color.WHITE
+	if mode == 1: # Color
+		var rc_parts: PackedStringArray = str(ent.get("rendercolor", "255 255 255")).split(" ")
+		tint = Color(
+			float(rc_parts[0]) / 255.0,
+			float(rc_parts[1]) / 255.0 if rc_parts.size() > 1 else 1.0,
+			float(rc_parts[2]) / 255.0 if rc_parts.size() > 2 else 1.0)
 	for mesh_inst in drawn:
 		for surf_idx in mesh_inst.mesh.get_surface_count():
 			var base_mat := mesh_inst.get_active_material(surf_idx)
 			if not base_mat:
 				continue
-
 			# Solid is an alpha TEST: a masked texture already has its scissor material, and a
 			# non-masked texture at full renderamt is opaque — both keep the BSP-built
 			# lightmapped material rather than going through the conversion below.
 			if mode == 4 and (amt >= 255 or _has_alpha_texture(base_mat)):
 				continue
+			apply_render_mode(mesh_inst, surf_idx, blend, alpha, tint)
 
-			var mat: StandardMaterial3D
-			if base_mat is StandardMaterial3D:
-				mat = base_mat.duplicate()
-			elif base_mat is ShaderMaterial:
-				mat = convert_shader_to_standard(base_mat)
-			else:
-				continue
 
-			match mode:
-				1: # Color — solid color with alpha
-					var rc_parts: PackedStringArray = str(ent.get("rendercolor", "255 255 255")).split(" ")
-					mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-					mat.albedo_color = Color(
-						float(rc_parts[0]) / 255.0,
-						float(rc_parts[1]) / 255.0 if rc_parts.size() > 1 else 1.0,
-						float(rc_parts[2]) / 255.0 if rc_parts.size() > 2 else 1.0,
-						alpha)
-				2, 4: # Texture, and Solid below full renderamt — no mask to test against
-					mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-					mat.albedo_color.a = alpha
-				5: # Additive — additive blend with alpha
-					mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-					AssetLoader.set_additive_blend(mat)
-					mat.albedo_color.a = alpha
+## Draws one surface unlit, faded to `alpha` and tinted, mixed or added: through the BSP material's
+## render-mode copy where goldsrc built one, which keeps its animation and alternates, else
+## through an unlit StandardMaterial3D.
+func apply_render_mode(mesh_inst: MeshInstance3D, surf_idx: int, blend: StringName, alpha: float,
+		tint := Color.WHITE) -> void:
+	var base_mat := mesh_inst.get_active_material(surf_idx)
+	var copy := render_mode_material(base_mat, blend)
+	if copy:
+		mesh_inst.set_surface_override_material(surf_idx, copy)
+		mesh_inst.set_instance_shader_parameter(&"entity_renderamt", alpha)
+		mesh_inst.set_instance_shader_parameter(&"entity_rendercolor", Vector3(tint.r, tint.g, tint.b))
+		return
+	var mat: StandardMaterial3D
+	if base_mat is StandardMaterial3D:
+		mat = base_mat.duplicate()
+	elif base_mat is ShaderMaterial:
+		mat = convert_shader_to_standard(base_mat)
+	else:
+		return
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	if blend == &"add":
+		AssetLoader.set_additive_blend(mat)
+	if tint != Color.WHITE:
+		mat.albedo_color = tint
+	mat.albedo_color.a = alpha
+	mesh_inst.set_surface_override_material(surf_idx, mat)
 
-			mesh_inst.set_surface_override_material(surf_idx, mat)
+
+## A BSP world material's copy on goldsrc's render-mode shader for `blend` ("mix" or "add"), made
+## once and shared by every entity drawing that material so; null if it has none. Taking a copy
+## back to its own material lets a second env_render change the blend.
+func render_mode_material(mat: Material, blend: StringName) -> ShaderMaterial:
+	if mat and mat.has_meta(&"render_base_id"):
+		mat = instance_from_id(mat.get_meta(&"render_base_id")) as Material
+	var world := mat as ShaderMaterial
+	if world == null or world.shader == null or not world.shader.has_meta(&"render_shaders"):
+		return null
+	var key := StringName("render_" + blend)
+	if world.has_meta(key):
+		return world.get_meta(key)
+	var copy := world.duplicate() as ShaderMaterial
+	for meta in copy.get_meta_list():
+		copy.remove_meta(meta)
+	copy.shader = world.shader.get_meta(&"render_shaders")[blend]
+	copy.set_meta(&"render_base_id", world.get_instance_id())  # an id: a reference would cycle
+	world.set_meta(key, copy)
+	return copy
 
 
 ## Apply GoldSrc render properties to a POINT entity's studio model. The brush path above

@@ -9,6 +9,8 @@ var _state_dirty := false
 # Client PVS presence: deactivated (hidden + collision off) when the server reports a
 # mover left our PVS, so it doesn't linger as a stale ghost. Active = _present AND _game_visible.
 var _present := true
+var _texture_frame := 0  # GoldSrc pev->frame on a brush entity: nonzero draws the +a..+j alternates
+var _frame_changed := false
 @warning_ignore("unused_private_class_variable")
 var _transform_node: Node3D = null
 var _entity := EntityBehavior.new()
@@ -240,15 +242,38 @@ func _apply_active_state() -> void:
 					shape.set_deferred("disabled", not active)
 
 
+## Brush textures with an alternate sequence (+0name with +aname) draw it while this is nonzero,
+## through goldsrc's entity_frame instance uniform. Synced to clients.
+func set_texture_frame(frame: int) -> void:
+	if frame == _texture_frame:
+		return
+	_texture_frame = frame
+	_frame_changed = true
+	_apply_texture_frame(self)
+	_sync_notify()
+
+
+func _apply_texture_frame(node: Node) -> void:
+	for child in node.get_children():
+		if child is MeshInstance3D:
+			child.set_instance_shader_parameter(&"entity_frame", float(_texture_frame))
+		_apply_texture_frame(child)
+
+
 func _get_sync_state() -> Dictionary:
+	var s := {}
 	if _state_dirty or _game_visible != _initial_visible:
-		return {"visible": _game_visible}
-	return {}
+		s["visible"] = _game_visible
+	if _frame_changed:
+		s["frame"] = _texture_frame
+	return s
 
 
 func _apply_sync_state(state: Dictionary) -> void:
 	if "visible" in state:
 		set_entity_visible(state["visible"])
+	if "frame" in state:
+		set_texture_frame(state["frame"])
 
 
 func _sync_notify() -> void:

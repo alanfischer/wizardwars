@@ -81,17 +81,7 @@ func _ready() -> void:
 					water_mat.set_shader_parameter("water_alpha", alpha)
 			continue
 		for surf_idx in mi.mesh.get_surface_count():
-			var base_mat: Material = mi.get_active_material(surf_idx)
-			var mat: StandardMaterial3D = null
-			if base_mat is StandardMaterial3D:
-				mat = base_mat.duplicate()
-			elif base_mat is ShaderMaterial:
-				mat = EntityRender.convert_shader_to_standard(base_mat)
-			if mat == null:
-				continue
-			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			mat.albedo_color.a = alpha
-			mi.set_surface_override_material(surf_idx, mat)
+			EntityRender.apply_render_mode(mi, surf_idx, &"mix", alpha)
 
 
 ## Wire up door movement, but only for a brush something can actually trigger. Water is
