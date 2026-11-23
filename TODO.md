@@ -6,11 +6,11 @@ ww_2fort, 8 bots, release export under gl_compatibility (2026-11-22, after WW #7
 step is ~40% of the main thread, about 4-7 ms per 60 Hz tick on an M1 Max, mostly GDScript. In
 order of size (script profiler, debug build, so absolute numbers run high):
 
-- Player movement, ~0.9 ms per tick for 9 players. PlayerMovementContext.get_modifiers is ~35 us
-  a call (headless debug). The physics-server part is down to the hull probe's body_test_motion
-  ~7 us (BSP hull walks) and ~1.5 us per area query. The rest is pmove GDScript: HullContacts
-  ~10 us around that probe (reading its contacts ~4, corrections + unstick ~4, carry ~2),
-  LadderWater.apply ~4, weapon modifiers ~3.
+- Player movement, ~0.94 ms per tick for 8 bots (headless debug, after pmove's walk_move
+  early-out). Per player-tick: simulate_tick ~55 us, mostly one move_and_slide ~20 us; get_modifiers
+  ~50 us (hull probe ~18 of which body_test_motion ~7, water and ladder queries ~4.5 each,
+  LadderWater.apply ~3, wet footing ~4, weapons ~3, status ~2.5); fire_frame and
+  LagCompensation.record ~6 each. No single piece left is big; it is GDScript spread thin.
 - VisibilitySystem._physics_process, ~0.55 ms: _refresh_entry_aabb on ~430 entries a tick
   compares transforms of entities that never move. The set_notify_transform wake that
   MoverNetPublisher uses (WW #77) fits here too.
