@@ -1817,10 +1817,20 @@ func register_synced_entity(node: Node, vis_node: Node3D = null) -> int:
 	var id := _next_entity_id
 	_next_entity_id += 1
 	_bind_synced_entity(id, node)
+	node.tree_exiting.connect(_drop_entity_if_gone.bind(id), CONNECT_DEFERRED)
 	var track := vis_node if vis_node != null else node as Node3D
 	if track != null:
 		VisibilitySystem.track_node(id, track)
 	return id
+
+
+## Deferred from the node's tree_exiting, so a freed node reads freed; a reparent keeps its entry.
+func _drop_entity_if_gone(id: int) -> void:
+	if not _synced_entities.has(id):
+		return
+	var node = _synced_entities[id]
+	if not is_instance_valid(node) or (node as Node).is_queued_for_deletion():
+		_erase_entity(id)
 
 
 ## Ensures a late joiner's _next_entity_id doesn't collide with entities created while it was
@@ -1915,13 +1925,6 @@ func send_entity_transforms() -> void:
 			_awake_movers.erase(pub)
 		elif not pub.publish():
 			_awake_movers.erase(pub)
-	var stale: Array[int] = []
-	for id in _synced_entities:
-		var node = _synced_entities[id]
-		if not (node and is_instance_valid(node)):
-			stale.append(id)
-	for id in stale:
-		_erase_entity(id)
 
 
 ## A dry buffer dead-reckons a straight line knowing nothing of the world, so an entity that stopped

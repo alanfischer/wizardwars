@@ -11,10 +11,17 @@ order of size (script profiler, debug build, so absolute numbers run high):
   ~50 us (hull probe ~18 of which body_test_motion ~7, water and ladder queries ~4.5 each,
   LadderWater.apply ~3, wet footing ~4, weapons ~3, status ~2.5); fire_frame and
   LagCompensation.record ~6 each. No single piece left is big; it is GDScript spread thin.
-- send_entity_transforms still sweeps all synced entities every tick for freed ones.
+- Bots, ~1.0 ms per tick for 8 (bot_brain.tick ~0.18 self, ledge probes _drop_depth/_probe ~0.12).
+  The A* re-path is a hitch rather than a cost: path_ids re-stamps all ~9.7k waypoint weights on
+  nearly every query (~7 ms debug, about once a second across 8 bots). Almost every query brings
+  a new salt or avoid set, not merely another bot's, so one AStar3D per bot would not help.
 
 Smaller, per frame rather than per tick: BlobShadow casts a ray per shadow every frame, and the
 voice mic's _process runs whenever the mic is open.
+
+A headless dedicated server still runs visual-only _process work, ~0.9 ms per tick's worth:
+BoneMerge ~0.28, BlobShadow ~0.24, puppet visual smoothing (_interpolate_from_buffer) ~0.28,
+WeatherSystem ~0.06, voice mic ~0.05. Check what hitboxes read before skipping BoneMerge.
 
 ## Map fidelity
 
