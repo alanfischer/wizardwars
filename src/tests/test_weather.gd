@@ -47,6 +47,26 @@ func test_drifts_lie_on_neither_the_maps_liquids_nor_its_sky() -> void:
 		n.free()
 
 
+func test_a_sky_lid_is_no_cover() -> void:
+	var weather := WeatherSystem.new()
+	weather.rain_floor = OvercastRainFloor.create(Image.create_empty(2, 2, false, Image.FORMAT_RF),
+		Vector3(-1, 0, -1), Vector2(2, 2), 10.0)
+	var bodies: Array[AnimatableBody3D] = []
+	for layer in [1, GameConsts.MASK_WORLD_SKY, 0]:
+		var body := AnimatableBody3D.new()
+		body.collision_layer = layer
+		var mesh := MeshInstance3D.new()
+		mesh.mesh = BoxMesh.new()
+		body.add_child(mesh)
+		weather.add_child(body)
+		weather._cover_if_solid(body)
+		bodies.append(body)
+	assert_true(weather.has_cover(bodies[0]), "a solid brush keeps the rain off")
+	assert_false(weather.has_cover(bodies[1]), "an all-sky brush ({blue lid) does not")
+	assert_false(weather.has_cover(bodies[2]), "nor does one that is not solid")
+	weather.free()
+
+
 func test_dynamic_weather_leaves_the_maps_weather_unused() -> void:
 	var weather := WeatherSystem.new()
 	weather._current_type = 1

@@ -153,7 +153,8 @@ func _pools(shader: Shader) -> bool:
 ## The bake leaves out brush entities (doors, plats and trains move; breakables break), so each
 ## solid one is a cover that keeps the rain off whatever of the map is under it, wherever it has
 ## got to. A func_illusionary is not solid, and rain falls through it as it did in GoldSrc, which
-## traced for solid.
+## traced for solid. Nor is a brush the importer put on the sky layer alone: all sky and {blue
+## faces, the invisible lid that boxes a map like ww_ravine in, which rain falls through like the sky.
 func _cover_movers(node: Node) -> void:
 	for child in node.get_children():
 		if child is AnimatableBody3D:
@@ -168,7 +169,8 @@ func _on_node_added(node: Node) -> void:
 
 
 func _cover_if_solid(body: AnimatableBody3D) -> void:
-	if is_instance_valid(body) and body.collision_layer != 0 and not has_cover(body):
+	if is_instance_valid(body) and body.collision_layer & ~GameConsts.MASK_WORLD_SKY != 0 \
+			and not has_cover(body):
 		add_cover(body)
 
 
