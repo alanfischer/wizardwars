@@ -12,7 +12,8 @@ signal conversion_complete(success: bool)
 ## keeping the shape an older importer built — the cache keys off this, not off the .mdl.
 const MDL_CACHE_VERSION := 2
 ## Bump when GoldSrcSPR.build_scene's output changes. 2: goldsrc's GPU flipbook animator.
-const SPR_CACHE_VERSION := 2
+## 3: fps and frame as instance uniforms, the material put on at load, the AnimationLibrary meta.
+const SPR_CACHE_VERSION := 3
 const MDL_VERSION_META := &"cache_version"
 const MDL_VERSION_PROPERTY := "metadata/cache_version"  # how the meta is named in packed state
 
