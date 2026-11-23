@@ -66,7 +66,7 @@ func _ready() -> void:
 		set_notify_transform(true)
 
 
-## The physics server writes an unchanged pose back after a velocity write, so only a real change wakes.
+## Rewriting an unchanged transform still notifies (a mover may every tick), so only a real change wakes.
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_TRANSFORM_CHANGED and _velocity_tracked and not _velocity_awake \
 			and global_transform != _mover_last_xform:
