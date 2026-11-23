@@ -21,6 +21,20 @@ class EntityEntry:
 	var aabb_tries: int = 0  # frames spent retrying an empty visual-AABB compute (see _AABB_MAX_TRIES)
 	var last_xform: Transform3D = Transform3D()
 	var game_visible: bool = true
+	var watcher: Watcher = null
+
+## An internal child of a tracked node that wakes its entry when the node moves or re-enters the
+## tree, so an entity that never moves is never polled.
+class Watcher extends Node3D:
+	var system: Object = null
+	var entity_id := -1
+
+	func _init() -> void:
+		set_notify_transform(true)
+
+	func _notification(what: int) -> void:
+		if entity_id != -1 and (what == NOTIFICATION_TRANSFORM_CHANGED or what == NOTIFICATION_ENTER_TREE):
+			system._wake(entity_id)
 
 ## Per-worldspawn-leaf-set tracking record (static geometry groups).
 class LeafEntry:
@@ -71,6 +85,10 @@ var _peer_leaf: Dictionary = {}     # peer_id → int, last observer leaf seen (
 # leaf set re-registered this tick, newly tracked, or game visibility toggled. Consumed and
 # cleared by _cull_local. See the invariant documented there.
 var _dirty: Dictionary = {}
+
+# entity_id set of entries _physics_process polls: moved, newly tracked, or still settling bounds.
+var _awake: Dictionary = {}
+var _awake_next: Dictionary = {}
 
 # True once set_local_position() has been called at least once. Prevents the
 # server (which has no local player) from running PVS-based visibility toggling
@@ -134,6 +152,7 @@ func teardown() -> void:
 	_player_entries.clear()
 	_peer_observers.clear()
 	_dirty.clear()
+	_awake.clear()
 	_entity_epoch.clear()
 	_player_epoch.clear()
 	_peer_epoch.clear()
@@ -276,9 +295,18 @@ func track_node(entity_id: int, node: Node) -> void:
 	entry.local_aabb_computed = false
 	entry.last_xform = n.global_transform if in_tree else Transform3D()
 	entry.game_visible = true
+	entry.watcher = Watcher.new()
+	entry.watcher.system = self
+	entry.watcher.entity_id = entity_id
+	n.add_child(entry.watcher, false, Node.INTERNAL_MODE_BACK)
 	_entities[entity_id] = entry
 	_entity_epoch[entity_id] = int(_entity_epoch.get(entity_id, 0)) + 1
 	_dirty[entity_id] = true  # never culled yet — needs an initial evaluation
+	_awake[entity_id] = true
+
+
+func _wake(entity_id: int) -> void:
+	_awake[entity_id] = true
 
 
 ## Called by EntityBase.set_entity_visible to keep game-intended visibility in sync.
@@ -300,6 +328,7 @@ func set_entity_local_aabb(entity_id: int, local_aabb: AABB) -> void:
 	entry.local_aabb = local_aabb
 	entry.local_aabb_computed = true
 	entry.last_xform = Transform3D()  # force re-push of the world AABB
+	_awake[entity_id] = true
 
 
 func untrack_node(entity_id: int) -> void:
@@ -309,8 +338,12 @@ func untrack_node(entity_id: int) -> void:
 	var h: int = entry.handle
 	if _vm and h != -1:
 		_vm.unregister_entity(h)
+	if is_instance_valid(entry.watcher):
+		entry.watcher.entity_id = -1
+		entry.watcher.queue_free()
 	_entities.erase(entity_id)
 	_dirty.erase(entity_id)
+	_awake.erase(entity_id)
 	# Untracking flips the answer to "always send", and the epoch dicts must not outlive their
 	# entries (projectiles churn through ids), so drop it rather than bumping it. A re-tracked id
 	# always comes with a NEW synchronizer, and the send filter caches per synchronizer, so a
@@ -414,15 +447,25 @@ func track_node_by_leaves(node_id: int, node: Node3D, leaves: PackedInt32Array) 
 	_last_culled_leaf = _LEAF_NONE
 
 
-## _physics_process: update entity AABBs every frame (server + client) so server-side
+## _physics_process: update the AABBs of entities that moved (server + client) so server-side
 ## PVS filtering stays accurate for moving entities. Visual culling is client-only.
 func _physics_process(_delta: float) -> void:
 	if not _vm:
 		return
-	for entity_id: int in _entities:
-		if _refresh_entry_aabb(_entities[entity_id]):
+	var awake := _awake
+	_awake = _awake_next
+	for entity_id: int in awake:
+		var entry: EntityEntry = _entities.get(entity_id)
+		if entry == null:
+			continue
+		if _refresh_entry_aabb(entry):
 			_dirty[entity_id] = true
 			_entity_epoch[entity_id] = int(_entity_epoch.get(entity_id, 0)) + 1
+		# Still settling its bounds: keep polling. Out of the tree, the watcher re-wakes it on entry.
+		if not entry.local_aabb_computed and is_instance_valid(entry.node) and entry.node.is_inside_tree():
+			_awake[entity_id] = true
+	awake.clear()
+	_awake_next = awake
 	for peer_id: int in _player_entries:
 		# Players are never locally culled, but the server DOES gate sends on their leaf set,
 		# so the return value that _cull_local uses for entities still has to be recorded here.

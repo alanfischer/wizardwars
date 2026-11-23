@@ -121,3 +121,52 @@ func test_beam_footprint_spans_its_endpoints() -> void:
 	assert_false(world.grow(0.001).has_point(Vector3.ZERO), "and is nowhere near the world origin")
 	TriggerSystem.unregister("pvs_beam_s", s)
 	TriggerSystem.unregister("pvs_beam_e", e)
+
+
+class StubVM:
+	var next_handle := 1
+	var updates := 0
+
+	func register_entity(_aabb: AABB) -> int:
+		next_handle += 1
+		return next_handle
+	func update_entity_aabb(_h: int, _aabb: AABB) -> void: updates += 1
+	func unregister_entity(_h: int) -> void: pass
+
+
+## A tracked entity is polled only while it settles its bounds or after it moves; a still one
+## costs nothing, and a move (its own or a parent's) wakes it and bumps its epoch.
+func test_still_entity_sleeps_and_moves_wake_it() -> void:
+	var vs = load("res://src/systems/visibility_system.gd").new()
+	var stub := StubVM.new()
+	vs._vm = stub
+	var parent := Node3D.new()
+	var n := Node3D.new()
+	var mi := MeshInstance3D.new()
+	mi.mesh = BoxMesh.new()
+	n.add_child(mi)
+	parent.add_child(n)
+	_root().add_child(parent)
+	_spawned.append(parent)
+	var id := 999003
+	vs.track_node(id, n)
+	assert_eq(n.get_child_count(), 1, "the watcher is internal, invisible to entity code")
+	for i in 4:
+		vs._physics_process(0.0)
+	assert_true(vs._entities[id].local_aabb_computed, "bounds settled")
+	assert_false(vs._awake.has(id), "a still, settled entity drops out of the poll")
+	var epoch: int = vs.entity_epoch(id)
+	n.global_position += Vector3(5, 0, 0)
+	await _physics_frame()
+	assert_true(vs._awake.has(id), "moving the node wakes it")
+	vs._physics_process(0.0)
+	assert_gt(vs.entity_epoch(id), epoch, "and the move re-registers its leaf set")
+	assert_false(vs._awake.has(id), "then it sleeps again")
+	epoch = vs.entity_epoch(id)
+	parent.global_position += Vector3(0, 0, 5)
+	await _physics_frame()
+	assert_true(vs._awake.has(id), "a parent's move wakes it too")
+	vs._physics_process(0.0)
+	assert_gt(vs.entity_epoch(id), epoch, "and re-registers it")
+	vs.untrack_node(id)
+	vs.free()
