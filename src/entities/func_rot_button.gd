@@ -49,6 +49,7 @@ func is_player_usable() -> bool:
 
 func _door_hit_top() -> void:
 	state = State.AT_TOP
+	set_texture_frame(1)  # CBaseButton::TriggerAndWait: use alternate textures
 	_fire_target()
 	# Buttons always return after wait (no SF_NO_AUTO_RETURN check)
 	if wait_time >= 0.0:
@@ -57,6 +58,11 @@ func _door_hit_top() -> void:
 				if is_instance_valid(self) and state == State.AT_TOP:
 					_door_go_down(),
 			CONNECT_ONE_SHOT)
+
+
+func _door_go_down() -> void:
+	set_texture_frame(0)  # CBaseButton::ButtonReturn
+	super()
 
 
 ## A button with a "health" key is pressed by any hit, whatever the amount —
