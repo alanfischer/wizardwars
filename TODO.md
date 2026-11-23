@@ -11,8 +11,6 @@ order of size (script profiler, debug build, so absolute numbers run high):
   ~50 us (hull probe ~18 of which body_test_motion ~7, water and ladder queries ~4.5 each,
   LadderWater.apply ~3, wet footing ~4, weapons ~3, status ~2.5); fire_frame and
   LagCompensation.record ~6 each. No single piece left is big; it is GDScript spread thin.
-- hop's _flush_queries, ~4.5% of the thread: a state-sync callback to every kinematic body each
-  flush whether it moved or not (plus a Callable::is_valid per body), and the area overlap tests.
 - send_entity_transforms still sweeps all synced entities every tick for freed ones.
 
 Smaller, per frame rather than per tick: BlobShadow casts a ray per shadow every frame, and the
