@@ -957,7 +957,7 @@ func _cmd_help(sender_id: int, args: String) -> void:
 				continue
 			names.append(cmd_name)  # no slash: the chat wraps after one
 		names.sort()
-		_reply_list(sender_id, "Commands, /help <name> for more", names)
+		_reply_list(sender_id, "Server commands, /help <name> for more", names)
 		return
 	var requested := args.strip_edges().to_lower()
 	if requested.begins_with("/"):
