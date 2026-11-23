@@ -18,8 +18,9 @@ const CULL_MASK := 3
 ## (GoldSrcBSP). Never models, which the original never shadowed with.
 const CASTER_MASK := 2
 ## The lowest a noon sun goes. A sun compiled near the horizon (ww_ravine's has pitch 0) has no
-## arc to cross the sky on, so it keeps its bearing and climbs to this.
-const MIN_NOON_ELEVATION := deg_to_rad(30.0)
+## arc to cross the sky on, so it keeps its bearing and climbs to this: low, so the sky's sun stays
+## near the flat light the map was baked with.
+const MIN_NOON_ELEVATION := deg_to_rad(10.0)
 
 static var _light: DirectionalLight3D
 static var _info: Dictionary = {}
