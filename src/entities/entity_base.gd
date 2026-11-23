@@ -20,6 +20,9 @@ var _entity := EntityBehavior.new()
 # believably. Players don't use this — netmove computes its own carry.
 var _mover_last_xform: Transform3D
 var _mover_was_moving := false
+# Polled only while it moves: a transform change wakes it, and it sleeps once it reads still.
+var _velocity_tracked := false
+var _velocity_awake := false
 
 # --- MultiplayerSynchronizer transport (opt-in) ---
 # Movers that call _setup_mover_sync() get their own synchronizer instead of riding the per-tick
@@ -59,6 +62,15 @@ func _ready() -> void:
 		TriggerSystem.register(targetname, self)
 	if _anim_body and not _is_network_client():
 		_mover_last_xform = _anim_body.global_transform
+		_velocity_tracked = true
+		set_notify_transform(true)
+
+
+## The physics server writes an unchanged pose back after a velocity write, so only a real change wakes.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSFORM_CHANGED and _velocity_tracked and not _velocity_awake \
+			and global_transform != _mover_last_xform:
+		_velocity_awake = true
 		get_tree().physics_frame.connect(_sync_kinematic_velocity)
 
 
@@ -75,6 +87,8 @@ func _sync_kinematic_velocity() -> void:
 				PhysicsServer3D.BODY_STATE_LINEAR_VELOCITY, Vector3.ZERO)
 			PhysicsServer3D.body_set_state(_anim_body.get_rid(),
 				PhysicsServer3D.BODY_STATE_ANGULAR_VELOCITY, Vector3.ZERO)
+		_velocity_awake = false
+		get_tree().physics_frame.disconnect(_sync_kinematic_velocity)
 		return
 	var dt := get_physics_process_delta_time()
 	var lin := (xform.origin - _mover_last_xform.origin) / dt
