@@ -12,7 +12,7 @@ var _spawn_parent: Node
 
 var _drop_return_time: float = 0.0
 var _return_time: float = 0.0
-var _return_silent: bool = false  # _return_time was scheduled by a capture removal — return without the stinger
+var _return_silent: bool = false  # _return_time was scheduled by a capture removal — no "returned" message
 var _no_touch_time: float = 0.0
 var _inactivate_time: float = 0.0  # brush entity: auto-inactivate timer
 
@@ -39,10 +39,6 @@ func _ready() -> void:
 		_anim_body.sync_to_physics = false
 	_register_for_sync()
 	_parse_tf_properties(get_meta("entity", {}))
-
-	# Announcer words for flag events and the score stingers they lead to.
-	for word in ["doop", "flag", "returned", "captured", "enemy", "scores"]:
-		SoundSystem.precache("vox/%s.wav" % word)
 
 	_spawn_position = position
 	_spawn_rotation_y = rotation.y
@@ -246,9 +242,8 @@ func goal_remove(player: Node) -> void:
 	_broadcast(_ACTION_REMOVE)
 
 	if goal_activation & GA_RETURN_IF_REMOVE_BY_GOAL:
-		# A player-driven removal is a capture already announced by the score stinger, so
-		# the return stays silent. A null-player removal (dropped-flag pause timeout) plays
-		# the normal "flag returned" stinger.
+		# A player-driven removal is a capture, so the return shows no "returned" message.
+		# A null-player removal (dropped-flag pause timeout) shows it.
 		_return_silent = player != null
 		_return_time = Time.get_ticks_msec() / 1000.0
 
@@ -268,13 +263,10 @@ func goal_return(_player: Node, silent := false) -> void:
 	if _carrier:
 		_detach()
 	# Only a timer-driven return (_player == null, not silent) of a configured flag
-	# (noise3/noise4) plays the "flag returned" announcer + map's per-team message.
+	# (noise3/noise4) shows the map's per-team message.
 	# Incidental goalitems (e.g. the ww_hunt notepad) return silently, matching TFC.
 	var flag_return := not silent and _player == null and has_return_message()
-	# roc2's return goal speaks "your key has returned" itself; the stinger would talk over it.
-	var return_goal: Node = GoalSystem.get_goal(goal_on_return) if goal_on_return != 0 else null
-	var goal_speaks: bool = return_goal != null and return_goal.speaks_without_activator()
-	_place_item(flag_return and not goal_speaks)
+	_place_item()
 	if flag_return and not _is_network_client():
 		show_return_messages()
 
@@ -364,28 +356,6 @@ func _broadcast(action: int, peer_id: int = 0, pos: Vector3 = Vector3.ZERO) -> v
 		goal_no, action, peer_id, str(_is_network_client())])
 	if not _is_network_client():
 		NetworkManager.sync_goal_item.rpc(goal_no, action, peer_id, pos)
-		# The authority never receives its own call_remote RPC, so the host announces here;
-		# clients announce in _local_sync.
-		_announce(action, peer_id)
-
-
-## `param`: RPC's peer_id slot (grabber for GRAB, unused; announce marker for RETURN —
-## 0 = play the "flag returned" stinger, 1 = silent).
-func _announce(action: int, param: int = 0) -> void:
-	match action:
-		_ACTION_GRAB:
-			# Flags with their own speak keys (!CTF_YOUGOTFLAG etc.) announce the grab
-			# themselves — the stinger would just repeat it.
-			if speak_coverage() != GoalSystem.SPOKEN_FRIENDLY | GoalSystem.SPOKEN_ENEMY:
-				SentenceSystem.play_words(["vox/doop.wav"])
-		_ACTION_RETURN:
-			if param == 0:
-				SentenceSystem.play_words(["vox/%s.wav" % vox_word(), "vox/returned.wav"])
-
-
-## The announcer's word for this item: the original's VOX has "key" but no "keycard".
-func vox_word() -> String:
-	return "key" if str(ent.get("mdl", "")).get_file().begins_with("keycard") else "flag"
 
 
 func _get_peer_id(player: Node) -> int:
@@ -460,7 +430,7 @@ func _deferred_activate(body: Node) -> void:
 	goal_activate(body)
 
 
-func _place_item(announce := true) -> void:
+func _place_item() -> void:
 	_moved = false
 	_carrier = null
 	_carrier_peer_id = 0
@@ -476,14 +446,12 @@ func _place_item(announce := true) -> void:
 	_drop_return_time = 0.0
 	_return_time = 0.0
 	_no_touch_time = 0.0
-	# RETURN reuses the peer_id slot as a silent marker (1 = capture return, no stinger).
-	_broadcast(_ACTION_RETURN, 0 if announce else 1)
+	_broadcast(_ACTION_RETURN)
 
 
 ## Client-side visual sync — called from NetworkManager RPC.
 func _local_sync(action: int, carrier_peer_id: int, pos: Vector3) -> void:
 	Log.info("[item_tfgoal %d] _local_sync: action=%d peer=%d pos=%s" % [goal_no, action, carrier_peer_id, str(pos)])
-	_announce(action, carrier_peer_id)
 	_ensure_world_parent()
 	# The branches below reposition the item out of band, so drop stale interp history first —
 	# otherwise interp_entities keeps stamping the old trailing position over this write until a

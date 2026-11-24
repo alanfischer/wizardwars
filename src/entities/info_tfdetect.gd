@@ -66,13 +66,6 @@ func _ready() -> void:
 			if ally_team >= 1 and ally_team <= 4:
 				GoalSystem.team_allies[i] |= (1 << (ally_team - 1))
 
-	# display_item_status* declares flag HUD status → this is a CTF/flag map, so the
-	# generic "flag captured" score VOX is appropriate (see GoalSystem.announce_score).
-	for k in ent.keys():
-		if str(k).begins_with("display_item_status"):
-			GoalSystem.display_item_status = true
-			break
-
 	# WW-specific: the map asking for combo chaos, which repurposes its GoldSrc weapon and
 	# ammo pickups as random combo spellbooks. The server can still force it either way.
 	if ent.has("combo_chaos"):
