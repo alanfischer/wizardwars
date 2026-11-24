@@ -32,11 +32,6 @@ var _declared_teams: int = 0
 # e.g. team_allies[0] = 2 means team 1 (Blue) is allied with team 2 (Red).
 var team_allies: Array[int] = [0, 0, 0, 0]
 
-# True when the map declares flag HUD status (info_tfdetect display_item_status* keys) —
-# i.e. it's a CTF/flag map. Gates the "flag captured"/"enemy scores" score VOX, which is
-# nonsensical on non-flag maps (ww_hunt's escape, ww_golem, etc. announce via HUD text).
-var display_item_status: bool = false
-
 # True when the map asks for combo chaos (info_wwdetect "combo_chaos"), which turns its leftover
 # GoldSrc weapon/ammo pickups and its TFC resupply grenades into random combo spellbooks.
 # See is_combo_chaos.
@@ -146,12 +141,6 @@ func get_carriable_flags() -> Array:
 	return out
 
 
-# Listener groups a scoring goal already speaks to itself, so the generic stinger
-# would only repeat it. Set by the goal that scored (see tf_goal_base.speak_coverage).
-const SPOKEN_FRIENDLY := 1
-const SPOKEN_ENEMY := 2
-
-
 ## The board is frozen once the match is decided: it is up on everyone's screen for the whole
 ## intermission, and a goal still ticking over behind it must not move what people are reading.
 ## Every mutator below asks, so the freeze can't drift as more of them appear.
@@ -159,67 +148,25 @@ func _scoring_open() -> bool:
 	return not MatchSystem.is_intermission()
 
 
-func add_score(team: int, points: int, spoken: int = 0, word := "flag") -> void:
+func add_score(team: int, points: int) -> void:
 	if team < 0 or team > 4 or points == 0 or not _scoring_open():
 		return
 	team_scores[team] += points
 	Log.info("Team %d score: %d (+%d)" % [team, team_scores[team], points], "tfgoal")
 	if NetworkManager.is_online() and NetworkManager.is_host():
-		sync_score.rpc(team, team_scores[team], true, spoken, word)
-	announce_score(team, spoken, word)
+		sync_score.rpc(team, team_scores[team])
 	# Every scoring path in the game lands here — TF goals, PotatoC's GiveTeamPoints, a map's own
 	# win logic — so this is the one place a score limit has to be checked.
 	MatchSystem.note_team_score(team, team_scores[team])
 
 
 ## Client receive: the authority sends the absolute total, not the delta add_score applied, so
-## this cannot be add_score re-sending itself. `announce` is false for the join snapshot, which
-## must not retrigger the score stinger for points scored before the joiner arrived.
+## this cannot be add_score re-sending itself.
 @rpc("authority", "call_remote", "reliable")
-func sync_score(team: int, total: int, announce := true, spoken := 0, word := "flag") -> void:
+func sync_score(team: int, total: int) -> void:
 	if team < 0 or team >= team_scores.size():
 		return
 	team_scores[team] = total
-	if announce:
-		announce_score(team, spoken, word)
-
-
-## Most recent physics frame each phrase played. A single capture can award several
-## teams at once (a goal with increase_team1 AND increase_team2, allied teams scoring
-## together), so the listener would otherwise hear one stinger per scoring team. Keyed
-## by phrase (friendly/enemy) so those collapse to one "flag captured", while a genuine
-## friendly-and-enemy pair in the same frame still each play once.
-var _last_announce_frame: Dictionary = {}
-
-
-## VOX announcer for a score event, phrased for the local listener ("flag captured"
-## when our side scores, "enemy scores" otherwise). Runs on the authority from
-## add_score and on clients from the sync_score receive — the wording depends on
-## the listener's team, so each peer announces locally instead of syncing audio.
-## `spoken` names the listener groups the scoring goal already speaks to (TFC
-## AP_speak/team_speak/non_team_speak); those hear the map's own line instead.
-## `word` names the captured item (item_tfgoal.vox_word).
-func announce_score(team: int, spoken: int = 0, word := "flag") -> void:
-	var main := get_tree().current_scene
-	if not main:
-		return
-	var lp = Game.local_player
-	if lp == null:  # dedicated server — nobody listening
-		return
-	if not display_item_status:
-		return  # non-flag map (ww_hunt, etc.) — the goal's HUD broadcast carries the news
-	# Allied teams can score together — an ally's points are still "our" score, not "enemy".
-	var friendly: bool = lp.team == team or Teams.teams_friendly(lp.team, team)
-	if spoken & (SPOKEN_FRIENDLY if friendly else SPOKEN_ENEMY):
-		return
-	var frame := Engine.get_physics_frames()
-	if _last_announce_frame.get(friendly) == frame:
-		return  # already played this phrase this frame — don't double it
-	_last_announce_frame[friendly] = frame
-	if friendly:
-		SentenceSystem.play_words(["vox/%s.wav" % word, "vox/captured.wav"])
-	else:
-		SentenceSystem.play_words(["vox/enemy.wav", "vox/scores.wav"])
 
 
 ## The map's own name for a team, then the stock colour, then a number. Four places grew their own
@@ -434,5 +381,4 @@ func reset() -> void:
 	team_max_players = [0, 0, 0, 0]
 	class_restrictions = [0, 0, 0, 0]
 	team_allies = [0, 0, 0, 0]
-	display_item_status = false
 	map_combo_chaos = false

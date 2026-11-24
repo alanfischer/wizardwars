@@ -87,9 +87,9 @@ func play_global(sentence_name: String, base_volume_db := 0.0, base_pitch := 1.0
 	return _start(resolve(sentence_name), null, base_volume_db, base_pitch, 0.0, 0.0)
 
 
-# Goal "speak" sentences and the score/flag word stingers are both announcer lines, and
-# a capture fires both at once — queue them so they read out one after the other instead
-# of talking over each other. Map ambients (play_on/play_global) are world sounds and
+# Goal "speak" sentences are announcer lines, and a capture can fire several at once
+# (the dropoff's line, then the flag's return goal) — queue them so they read out one
+# after the other instead of talking over each other. Map ambients (play_on/play_global) are world sounds and
 # stay immediate; a looping PLAY_EVERYWHERE ambient would wedge this queue forever.
 var _announce_queue: Array = []   # item lists waiting their turn
 var _announcing: Playback = null
@@ -102,11 +102,6 @@ var _announcing: Playback = null
 @rpc("authority", "call_remote", "reliable")
 func play_speak_global(spec: String) -> void:
 	_enqueue_announce(resolve(spec) if spec.begins_with("!") else _parse_words(spec))
-
-
-## Queue a plain word list (["vox/flag.wav", "vox/captured.wav"]) as one announcer line.
-func play_words(paths: Array) -> void:
-	_enqueue_announce(paths.map(func(p): return {"path": String(p)}))
 
 
 func _enqueue_announce(items: Array) -> void:

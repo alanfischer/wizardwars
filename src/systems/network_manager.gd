@@ -2154,9 +2154,9 @@ func _request_entity_state() -> void:
 
 	if Game.weather_system:
 		Game.weather_system.send_state_to(peer_id)
-	for team in GoalSystem.team_scores.size():  # announce=false: a join snapshot, not a live score event
+	for team in GoalSystem.team_scores.size():
 		if GoalSystem.team_scores[team] != 0:
-			GoalSystem.sync_score.rpc_id(peer_id, team, GoalSystem.team_scores[team], false)
+			GoalSystem.sync_score.rpc_id(peer_id, team, GoalSystem.team_scores[team])
 	MatchSystem.apply_remote.rpc_id(peer_id, int(MatchSystem.state), MatchSystem.match_end_ms,
 		MatchSystem.intermission_end_ms, MatchSystem.winner_team, MatchSystem.winner_name,
 		MatchSystem.end_reason, MatchSystem.next_map)

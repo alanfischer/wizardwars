@@ -448,20 +448,18 @@ func process_goals(player: Node) -> void:
 
 func process_effects(player: Node) -> void:
 	# Team scoring
-	var spoken := speak_coverage()
-	var word := _scored_item_word()
 	for t in range(1, 5):
 		if team_scores[t] != 0:
-			GoalSystem.add_score(t, team_scores[t], spoken, word)
+			GoalSystem.add_score(t, team_scores[t])
 	if team_scores[0] != 0 and player:
 		# increase_team goes to APA's team (overloaded)
 		var pt: int = _get_team(player)
 		if pt > 0:
-			GoalSystem.add_score(pt, team_scores[0], spoken, word)
+			GoalSystem.add_score(pt, team_scores[0])
 	if team_score != 0 and player:
 		var pt: int = _get_team(player)
 		if pt > 0:
-			GoalSystem.add_score(pt, team_score, spoken, word)
+			GoalSystem.add_score(pt, team_score)
 
 	_apply_player_effects(player)
 
@@ -649,7 +647,7 @@ func _show_goal_messages(player: Node) -> void:
 				NetworkManager.sync_hud_text.rpc_id(pid, text, NetworkManager.HUD_CENTER, color.r, color.g, color.b, 3.0, sound)
 			if not spk.is_empty():
 				SentenceSystem.play_speak_global.rpc_id(pid, spk)
-
+## Gates the noise3/noise4 return message so incidental goalitems (no noise3/4, e.g.
 
 ## Gates the "flag returned" announcer so incidental goalitems (no noise3/4, e.g.
 ## the ww_hunt notepad) return silently, matching TFC.
@@ -714,30 +712,6 @@ func _select_tier(tiers: Array, is_ap: bool, r_team: int, ap_team: int) -> int:
 	elif not tiers[4].is_empty():
 		return 4
 	return -1
-
-
-## The announcer's word for the item this goal takes (items_allowed): "key captured" on roc2.
-func _scored_item_word() -> String:
-	var item: Node = GoalSystem.get_goal(item_is_needed) if item_is_needed != 0 else null
-	return item.vox_word() if item and item.has_method("vox_word") else "flag"
-
-
-## Fired with no activator (an item's return), every listener falls through to the non-team or
-## bare tier, so either one means everyone hears this goal.
-func speaks_without_activator() -> bool:
-	return not spk_nonteam.is_empty() or not spk_all.is_empty()
-
-
-## Listener groups this goal already speaks to (GoalSystem.SPOKEN_* bits), so a score
-## event can drop its generic stinger for anyone already hearing the map's own line.
-## A group only counts covered if EVERY listener in it is covered.
-func speak_coverage() -> int:
-	var covered := 0
-	if not spk_team.is_empty() or not spk_all.is_empty():
-		covered |= GoalSystem.SPOKEN_FRIENDLY
-	if not spk_nonteam.is_empty() or not spk_all.is_empty():
-		covered |= GoalSystem.SPOKEN_ENEMY
-	return covered
 
 
 static func _player_display_name(p: Node) -> String:

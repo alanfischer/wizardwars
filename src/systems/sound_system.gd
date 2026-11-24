@@ -265,10 +265,6 @@ func spawn_on(parent: Node3D, sound_path: String, loop := false, max_dist := 20.
 	return player
 
 
-# VOX announcer word stingers ("flag captured", etc.) live on SentenceSystem.play_words,
-# not here — they're local-only since wording is listener-dependent.
-
-
 ## Play a non-positional sound, synced to all peers.
 func play_global(sound_path: String) -> void:
 	_play_local_global(sound_path)
