@@ -16,6 +16,12 @@ func test_literal_text_without_flag_is_untouched() -> void:
 	assert_eq(GoalMessages.translate("Welcome to ww_hiddenforest"), "Welcome to ww_hiddenforest")
 
 
+func test_literal_text_starts_capitalized() -> void:
+	assert_eq(GoalMessages.translate("your key has returned"), "Your key has returned")
+	assert_eq(GoalMessages.translate("the enemy team has your flag"), "The enemy team has your grail")
+	assert_eq(GoalMessages.translate(""), "")
+
+
 func test_known_token_returns_its_table_entry() -> void:
 	assert_eq(GoalMessages.translate("#2fort_flag_carried"), "Your grail is being carried!")
 

@@ -159,14 +159,14 @@ func _scoring_open() -> bool:
 	return not MatchSystem.is_intermission()
 
 
-func add_score(team: int, points: int, spoken: int = 0) -> void:
+func add_score(team: int, points: int, spoken: int = 0, word := "flag") -> void:
 	if team < 0 or team > 4 or points == 0 or not _scoring_open():
 		return
 	team_scores[team] += points
 	Log.info("Team %d score: %d (+%d)" % [team, team_scores[team], points], "tfgoal")
 	if NetworkManager.is_online() and NetworkManager.is_host():
-		sync_score.rpc(team, team_scores[team], true, spoken)
-	announce_score(team, spoken)
+		sync_score.rpc(team, team_scores[team], true, spoken, word)
+	announce_score(team, spoken, word)
 	# Every scoring path in the game lands here — TF goals, PotatoC's GiveTeamPoints, a map's own
 	# win logic — so this is the one place a score limit has to be checked.
 	MatchSystem.note_team_score(team, team_scores[team])
@@ -176,12 +176,12 @@ func add_score(team: int, points: int, spoken: int = 0) -> void:
 ## this cannot be add_score re-sending itself. `announce` is false for the join snapshot, which
 ## must not retrigger the score stinger for points scored before the joiner arrived.
 @rpc("authority", "call_remote", "reliable")
-func sync_score(team: int, total: int, announce := true, spoken := 0) -> void:
+func sync_score(team: int, total: int, announce := true, spoken := 0, word := "flag") -> void:
 	if team < 0 or team >= team_scores.size():
 		return
 	team_scores[team] = total
 	if announce:
-		announce_score(team, spoken)
+		announce_score(team, spoken, word)
 
 
 ## Most recent physics frame each phrase played. A single capture can award several
@@ -198,7 +198,8 @@ var _last_announce_frame: Dictionary = {}
 ## the listener's team, so each peer announces locally instead of syncing audio.
 ## `spoken` names the listener groups the scoring goal already speaks to (TFC
 ## AP_speak/team_speak/non_team_speak); those hear the map's own line instead.
-func announce_score(team: int, spoken: int = 0) -> void:
+## `word` names the captured item (item_tfgoal.vox_word).
+func announce_score(team: int, spoken: int = 0, word := "flag") -> void:
 	var main := get_tree().current_scene
 	if not main:
 		return
@@ -216,7 +217,7 @@ func announce_score(team: int, spoken: int = 0) -> void:
 		return  # already played this phrase this frame — don't double it
 	_last_announce_frame[friendly] = frame
 	if friendly:
-		SentenceSystem.play_words(["vox/flag.wav", "vox/captured.wav"])
+		SentenceSystem.play_words(["vox/%s.wav" % word, "vox/captured.wav"])
 	else:
 		SentenceSystem.play_words(["vox/enemy.wav", "vox/scores.wav"])
 

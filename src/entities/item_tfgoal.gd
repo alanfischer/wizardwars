@@ -271,7 +271,10 @@ func goal_return(_player: Node, silent := false) -> void:
 	# (noise3/noise4) plays the "flag returned" announcer + map's per-team message.
 	# Incidental goalitems (e.g. the ww_hunt notepad) return silently, matching TFC.
 	var flag_return := not silent and _player == null and has_return_message()
-	_place_item(flag_return)
+	# roc2's return goal speaks "your key has returned" itself; the stinger would talk over it.
+	var return_goal: Node = GoalSystem.get_goal(goal_on_return) if goal_on_return != 0 else null
+	var goal_speaks: bool = return_goal != null and return_goal.speaks_without_activator()
+	_place_item(flag_return and not goal_speaks)
 	if flag_return and not _is_network_client():
 		show_return_messages()
 
@@ -377,7 +380,12 @@ func _announce(action: int, param: int = 0) -> void:
 				SentenceSystem.play_words(["vox/doop.wav"])
 		_ACTION_RETURN:
 			if param == 0:
-				SentenceSystem.play_words(["vox/flag.wav", "vox/returned.wav"])
+				SentenceSystem.play_words(["vox/%s.wav" % vox_word(), "vox/returned.wav"])
+
+
+## The announcer's word for this item: the original's VOX has "key" but no "keycard".
+func vox_word() -> String:
+	return "key" if str(ent.get("mdl", "")).get_file().begins_with("keycard") else "flag"
 
 
 func _get_peer_id(player: Node) -> int:

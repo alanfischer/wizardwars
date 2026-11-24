@@ -347,7 +347,7 @@ func _check_criteria(player: Node) -> bool:
 
 	# Item checks (player must be carrying specific item)
 	if item_is_needed != 0:
-		var item := GoalSystem.get_goal(item_is_needed)
+		var item: Node = GoalSystem.get_goal(item_is_needed)
 		if not item or not item.has_method("get_carrier") or item.get_carrier() != player:
 			Log.info("%d: criteria failed: need item %d (found=%s, carrier=%s, player=%s)" % [
 				goal_no, item_is_needed,
@@ -381,12 +381,12 @@ func _check_criteria(player: Node) -> bool:
 
 	# Item moved checks
 	if item_has_moved != 0:
-		var item := GoalSystem.get_goal(item_has_moved)
+		var item: Node = GoalSystem.get_goal(item_has_moved)
 		if not item or not item.has_method("is_moved") or not item.is_moved():
 			return false
 
 	if item_not_has_moved != 0:
-		var item := GoalSystem.get_goal(item_not_has_moved)
+		var item: Node = GoalSystem.get_goal(item_not_has_moved)
 		if not item or not item.has_method("is_moved") or item.is_moved():
 			return false
 
@@ -449,18 +449,19 @@ func process_goals(player: Node) -> void:
 func process_effects(player: Node) -> void:
 	# Team scoring
 	var spoken := speak_coverage()
+	var word := _scored_item_word()
 	for t in range(1, 5):
 		if team_scores[t] != 0:
-			GoalSystem.add_score(t, team_scores[t], spoken)
+			GoalSystem.add_score(t, team_scores[t], spoken, word)
 	if team_scores[0] != 0 and player:
 		# increase_team goes to APA's team (overloaded)
 		var pt: int = _get_team(player)
 		if pt > 0:
-			GoalSystem.add_score(pt, team_scores[0], spoken)
+			GoalSystem.add_score(pt, team_scores[0], spoken, word)
 	if team_score != 0 and player:
 		var pt: int = _get_team(player)
 		if pt > 0:
-			GoalSystem.add_score(pt, team_score, spoken)
+			GoalSystem.add_score(pt, team_score, spoken, word)
 
 	_apply_player_effects(player)
 
@@ -713,6 +714,18 @@ func _select_tier(tiers: Array, is_ap: bool, r_team: int, ap_team: int) -> int:
 	elif not tiers[4].is_empty():
 		return 4
 	return -1
+
+
+## The announcer's word for the item this goal takes (items_allowed): "key captured" on roc2.
+func _scored_item_word() -> String:
+	var item: Node = GoalSystem.get_goal(item_is_needed) if item_is_needed != 0 else null
+	return item.vox_word() if item and item.has_method("vox_word") else "flag"
+
+
+## Fired with no activator (an item's return), every listener falls through to the non-team or
+## bare tier, so either one means everyone hears this goal.
+func speaks_without_activator() -> bool:
+	return not spk_nonteam.is_empty() or not spk_all.is_empty()
 
 
 ## Listener groups this goal already speaks to (GoalSystem.SPOKEN_* bits), so a score

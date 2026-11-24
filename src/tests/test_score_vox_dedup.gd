@@ -85,3 +85,25 @@ func test_ambient_sentences_bypass_the_announcer_queue() -> void:
 	assert_true(SentenceSystem._announcing == null, "ambient does not own the announcer slot")
 	pb.cancel()
 	_drain_announcer()
+
+
+## ww_roc2 carries keycards; its announcer says "key captured", not "flag captured".
+func test_item_word_follows_the_model() -> void:
+	var item: Node3D = preload("res://src/entities/item_tfgoal.gd").new()
+	item.ent = {"mdl": "models/keycard.mdl"}
+	assert_eq(item.vox_word(), "key", "keycard is a key")
+	item.ent = {"mdl": "models/flag.mdl"}
+	assert_eq(item.vox_word(), "flag", "flag stays a flag")
+	item.free()
+
+
+## ww_roc2's key-return goals speak to the owner and everyone else themselves, so the
+## generic "returned" stinger stays quiet.
+func test_return_goal_speaks_to_everyone() -> void:
+	var g := _make_goal({"owned_by": "1", "owners_team_speak": "!RK_KEYBACK",
+		"non_team_speak": "!RK_EKEYBACK"})
+	assert_true(g.speaks_without_activator(), "owner and non-team tiers cover a return")
+	g.free()
+	var quiet := _make_goal({"owners_team_speak": "!RK_KEYBACK"})
+	assert_false(quiet.speaks_without_activator(), "other teams would hear nothing")
+	quiet.free()
