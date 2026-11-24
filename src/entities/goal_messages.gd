@@ -127,4 +127,6 @@ static func translate(text: String) -> String:
 		elif parts.size() >= 2 and parts[0] in ["ctf", "cz", "warpath", "dustbowl"]:
 			clean = "_".join(parts.slice(1))
 		text = clean.replace("_", " ").capitalize()
-	return text.replace("Flag", "Grail").replace("flag", "grail")
+	# Some maps write lowercase sentences (roc2: "your key has returned"); others don't.
+	text = text.replace("Flag", "Grail").replace("flag", "grail")
+	return text.left(1).to_upper() + text.substr(1)
