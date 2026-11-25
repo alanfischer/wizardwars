@@ -6,6 +6,7 @@ extends "res://addons/overcast/overcast_weather.gd"
 ## and the flash lights the map through NightMode.
 
 const TopDownFrame = preload("res://src/systems/top_down_frame.gd")
+const WindParticles = preload("res://src/systems/wind_particles.gd")
 ## How readily each WorldMaterials class pools; anything it leaves unclassified takes the default.
 const PUDDLE_BY_CLASS := {"ground": 1.0, "mineral": 0.6, "wood": 0.0}
 const PUDDLE_DEFAULT := 0.5
@@ -14,6 +15,20 @@ const PUDDLE_DEFAULT := 0.5
 const DRIFT_DEEPEST := 1.0
 ## Steps the server sends the ground's wetness, ice and snow cover in.
 const WET_STEPS := 32.0
+## The wind's push in the open, m/s² per (m/s)² of wind: 0.75 in a 5 m/s breeze, 6.75 in a gale.
+const WIND_PUSH := 0.03
+## A wall's lee reaches LEE times its height above a body downwind; looked for upwind every
+## LEE_STEP metres, LEE_SAMPLES times.
+const LEE := 3.0
+const LEE_STEP := 0.5
+const LEE_SAMPLES := 12
+## A rain floor cell stands at the highest of its corners, so a point on the ground can sit a little
+## under its own cell; a roof stands well above.
+const ROOF_REACH := 0.5
+## Below this speed (m/s) a rigid body is at rest and the wind leaves it be; how often (s) a carried
+## body's exposure is looked at again.
+const CARRY_RESTING := 0.5
+const CARRY_LOOK := 0.25
 
 ## The map, handed over before the system enters the tree. None on a test or tool that has no map.
 var map_root: Node
@@ -21,6 +36,10 @@ var map_root: Node
 ## and dynamic weather throughout.
 var _current_type: int = 0
 var _current_intensity: int = 0
+## Rigid bodies the wind carries -> (exposure, msec it is good until).
+var _carried := {}
+## Drifts the particles in the wind; none on a peer that draws nothing.
+var _particles: WindParticles
 var _ground_sent := Vector3(-1, -1, -1)  # the ground's wetness, ice and snow cover, in WET_STEPS, as last sent to the clients
 
 
@@ -57,6 +76,13 @@ func _ready() -> void:
 		get_tree().node_added.connect(_on_node_added)
 	_apply_rain()
 	_apply_wind()
+	if not Engine.is_editor_hint():
+		if presenting:
+			_particles = WindParticles.new(self)
+		for kind in ["RigidBody3D", "PhysicalBone3D", "GPUParticles3D", "CPUParticles3D"]:
+			for node in get_tree().root.find_children("*", kind, true, false):
+				_track_blown(node)
+		get_tree().node_added.connect(_track_blown)
 
 
 ## The map's rain floor (MapConverter, GoldSrcBSP.bake_surface_below_sky), so no drop is drawn under a
@@ -288,6 +314,97 @@ func footing(feet: Vector3) -> Vector2:
 	return Vector2(wet, snappedf(ground.ice_at(feet), 1.0 / WET_STEPS))
 
 
+## The push of the wind on a body in the air at `p` moving at `velocity` (m/s²), alike on every
+## peer: it goes by the steady `wind` the server sets, never this peer's own gusts. Drag grows with
+## the square of the wind, so a breeze barely moves anyone and a gale throws them, and it pushes
+## only until the body moves downwind as fast as the wind does. `weight` scales it per body.
+func wind_push(p: Vector3, velocity: Vector3, weight := 1.0) -> Vector3:
+	return _push(velocity, weight, func() -> float: return wind_exposure(p))
+
+
+## wind_push, asking `exposure` only when there is a push to scale.
+func _push(velocity: Vector3, weight: float, exposure: Callable) -> Vector3:
+	var speed := wind.length()
+	if speed <= 0.0 or weight <= 0.0:
+		return Vector3.ZERO
+	var dir := wind / speed
+	if velocity.dot(dir) >= speed:
+		return Vector3.ZERO
+	var k := float(ServerVars.get_value("wind_push", 1.0)) * weight
+	if k <= 0.0:
+		return Vector3.ZERO
+	var open: float = exposure.call()
+	if open <= 0.0:
+		return Vector3.ZERO
+	return dir * (WIND_PUSH * speed * speed * k * open)
+
+
+## How open `p` is to the wind, 0 sheltered to 1 out in it: nothing under a roof (where the rain
+## floor stands ROOF_REACH above it), and in a wall's lee for LEE times as far downwind as the wall stands
+## above it, opening up across that. A map with no rain floor has no sky to tell by: sheltered.
+## `blowing` is the wind to be sheltered from, the steady one unless said.
+func wind_exposure(p: Vector3, blowing := Vector3.INF) -> float:
+	if blowing == Vector3.INF:
+		blowing = wind
+	if rain_floor == null or blowing == Vector3.ZERO:
+		return 0.0
+	var own := floor_at(p)
+	if own > p.y + ROOF_REACH:
+		return 0.0
+	var base := maxf(p.y, own)
+	var upwind := -blowing.normalized()
+	var open := 1.0
+	for i in range(1, LEE_SAMPLES + 1):
+		var d := i * LEE_STEP
+		var rise := floor_at(p + upwind * d) - base
+		if rise > 0.0:
+			open = minf(open, d / (LEE * rise))
+	return clampf(open, 0.0, 1.0)
+
+
+## Every rigid body this peer simulates (gibs, corpses and their bones, satchels, stones) is
+## carried as wind_push says while it moves. One at rest is left be, so it can sleep. Its
+## exposure is looked at again every CARRY_LOOK seconds, not each tick: a corpse is 21 bodies.
+func _carry(delta: float) -> void:
+	if wind == Vector3.ZERO or _carried.is_empty():
+		return
+	var now := Time.get_ticks_msec()
+	for body: PhysicsBody3D in _carried.keys():
+		var rid := body.get_rid()
+		var mode := PhysicsServer3D.body_get_mode(rid)
+		if mode != PhysicsServer3D.BODY_MODE_RIGID and mode != PhysicsServer3D.BODY_MODE_RIGID_LINEAR:
+			continue
+		if PhysicsServer3D.body_get_state(rid, PhysicsServer3D.BODY_STATE_SLEEPING):
+			continue
+		var v: Vector3 = PhysicsServer3D.body_get_state(rid, PhysicsServer3D.BODY_STATE_LINEAR_VELOCITY)
+		if v.length_squared() < CARRY_RESTING * CARRY_RESTING:
+			continue
+		var push := _push(v, 1.0, func() -> float: return _exposure_of(body, now))
+		if push != Vector3.ZERO:
+			PhysicsServer3D.body_set_state(rid, PhysicsServer3D.BODY_STATE_LINEAR_VELOCITY, v + push * delta)
+
+
+func _exposure_of(body: PhysicsBody3D, now: int) -> float:
+	var seen: Vector2 = _carried[body]
+	if now >= seen.y:
+		seen = Vector2(wind_exposure(body.global_position), now + CARRY_LOOK * 1000.0)
+		_carried[body] = seen
+	return seen.x
+
+
+func _track_blown(node: Node) -> void:
+	if _particles:
+		_particles.track(node)
+	if node is RigidBody3D or node is PhysicalBone3D:
+		_carried[node] = Vector2(0.0, 0.0)
+		node.tree_exiting.connect(func() -> void: _carried.erase(node), CONNECT_ONE_SHOT)
+
+
+func _physics_process(delta: float) -> void:
+	if not Engine.is_editor_hint():
+		_carry(delta)
+
+
 ## The ground's wetness, ice and snow cover, in the steps the server sends them in.
 func _shared_ground() -> Vector3:
 	return Vector3(ground.wetness, ground.ice, ground.snow_cover).snapped(Vector3.ONE / WET_STEPS)
@@ -319,6 +436,8 @@ func _process(delta: float) -> void:
 	super._process(delta)
 	if server:
 		_share_ground()
+	if _particles:
+		_particles.step(delta)
 
 
 ## The host's strikes reach every client, which draws the same one from the seed.

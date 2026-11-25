@@ -51,6 +51,8 @@ var _step_to := Vector3.ZERO
 ## Radius around the swept segment that counts as touching an actor — the projectile's own
 ## girth. The bigger spells (a skull, a bird) widen it; the small fast ones narrow it.
 var contact_radius := 0.6
+## How much the wind bends its flight (0 = not at all): see WeatherSystem.wind_push.
+var wind_weight := 1.0
 
 
 func setup(data: Dictionary, is_host := true) -> void:
@@ -112,6 +114,7 @@ func _fly_step(delta: float, life: float) -> void:
 ## The sweep half of _fly_step, without the clock. Split out for the projectiles that age on
 ## their own schedule (the bird fades out over its last half-second).
 func _sweep_and_advance(delta: float) -> void:
+	_blow(delta)
 	var result := _trace_step(delta)
 	if not result.is_empty():
 		global_position = result.position
@@ -124,6 +127,21 @@ func _sweep_and_advance(delta: float) -> void:
 		return
 	global_position = _step_to
 	_check_hazards()
+
+
+## Out under the sky the wind bends the flight. The host's alone, and its clients see where it
+## went.
+func _blow(delta: float) -> void:
+	var weather := Game.weather_system
+	if weather == null or speed <= 0.0:
+		return
+	var velocity := direction * speed
+	var push := weather.wind_push(global_position, velocity, wind_weight)
+	if push == Vector3.ZERO:
+		return
+	velocity += push * delta
+	speed = velocity.length()
+	direction = velocity / speed
 
 
 ## A projectile is a bare Node3D: a trigger_hurt's Area3D has no collider to touch, so it would

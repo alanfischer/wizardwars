@@ -245,6 +245,7 @@ func get_modifiers(
 		mods.override_velocity = _flight_velocity(cfg, state.velocity, cmd)
 	StatusSystem.contribute_movement_modifiers(_owner, mods)
 	_slick_when_wet(mods, state)
+	_blown(mods, cfg, state, cmd)
 	# GoldSrc basevelocity: applied to position without altering the player's own state
 	# velocity. Do NOT clear _push_base_vel here — it must survive every command in a
 	# server batch; the caller clears it once per frame.
@@ -256,6 +257,17 @@ func get_modifiers(
 		mods.base_velocity = Vector3(full_push.x, 0.0, full_push.z)
 		mods.no_friction = true
 	return mods
+
+
+## In the air under the open sky the wind carries you. Not on the ground, a ladder or in water
+## (anything that sets the velocity outright).
+func _blown(mods: Movement.MovementModifiers, cfg, state: Movement.MovementState, cmd) -> void:
+	var weather := Game.weather_system
+	if weather == null or state.on_floor or in_water or mods.velocity_override_active:
+		return
+	var height: float = cfg.crouch_height if state.is_crouched else cfg.stand_height
+	var middle := state.position + Vector3.UP * (height * 0.5)
+	mods.velocity_add += weather.wind_push(middle, state.velocity) * float(cmd.delta)
 
 
 ## Rain-soaked ground is a little slick: less ground friction, and so less grip to speed up. Ice

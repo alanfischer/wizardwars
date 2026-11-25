@@ -283,6 +283,16 @@ most, while `dynamic_wind` is on (the default), and blows harder in dynamic weat
 slants the rain, drifts lying snow into the lee of walls, and is heard once it blows hard. `/wind 8
 90` sets it by hand, which turns `dynamic_wind` off; `/wind auto` hands it back.
 
+Out under the sky the wind also carries what is in the air: a player mid-jump or falling, spells
+in flight, and every moving rigid body (satchels, gibs, corpses and their ragdoll bones). Particles
+drift with it too, gusts and all, since they are only drawn. The push grows with the square of the wind, so a breeze hardly moves anyone and
+a gale (15 m/s) throws a jump a metre or two and bends a fireball several metres off its line. It
+pushes only until the body is moving downwind as fast as the wind. A roof shelters you (the
+rain floor stands above you), and so does a wall upwind, for three times its height above you,
+opening up across that. `/windpush 2` doubles it, `/windpush 0` turns it off (`wind_push` server
+var). It goes by the steady `wind` the server sends, not each peer's gusts, so a client predicts
+its own jump.
+
 The host times each strike and sends a seed, so every player sees the same bolt. The bolt is drawn
 above the map, past its sky brushes, so it shows wherever the sky does. Its flash lights the sky
 around it and the sky's share of the world's light (the same baked share the time of day turns down), so the
