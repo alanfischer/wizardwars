@@ -458,3 +458,159 @@ func test_liquids_keep_the_snow_off_their_beds() -> void:
 	assert_gt(weather.ground.snow_depth_at(Vector3(4.5, 0, 3.5)), 0.0, "the ground between keeps its snow")
 	weather.free()
 	map.queue_free()
+
+
+## A 20 m strip from x = 0, open ground at 0 but for a wall 2 m high over x 10..11; wind toward +X.
+func _walled_weather() -> WeatherSystem:
+	var img := Image.create_empty(20, 1, false, Image.FORMAT_RF)
+	img.set_pixel(10, 0, Color(2.0, 0, 0))
+	var weather := WeatherSystem.new()
+	weather.rain_floor = OvercastRainFloor.create(img, Vector3(0, 0, -0.5), Vector2(20, 1), 10.0)
+	weather.wind = Vector3(10, 0, 0)
+	return weather
+
+
+func test_the_wind_reaches_the_open_but_not_under_a_roof_or_in_a_lee() -> void:
+	var weather := _walled_weather()
+	assert_eq(weather.wind_exposure(Vector3(19, 1, 0)), 1.0, "well downwind of the wall, in the open")
+	assert_eq(weather.wind_exposure(Vector3(8, 1, 0)), 1.0, "upwind of it too")
+	assert_almost_eq(weather.wind_exposure(Vector3(12.5, 1, 0)), 2.0 / 3.0, 1e-6,
+		"2 m behind a wall standing 1 m above, its lee is a third of the way to open")
+	assert_lt(weather.wind_exposure(Vector3(11.5, 0.2, 0)), 0.2, "right behind it, low down: hardly any")
+	assert_eq(weather.wind_exposure(Vector3(12.5, 3, 0)), 1.0, "above the wall's top: all of it")
+	assert_eq(weather.wind_exposure(Vector3(19, -0.2, 0)), 1.0, "a spark on the ground just under its own cell is out in it")
+	weather.free()
+	weather = _roofed_weather()
+	weather.wind = Vector3(10, 0, 0)
+	assert_eq(weather.wind_exposure(Vector3(-1, 1, 0)), 0.0, "under the roof")
+	weather.free()
+	weather = WeatherSystem.new()
+	weather.wind = Vector3(10, 0, 0)
+	assert_eq(weather.wind_exposure(Vector3(0, 1, 0)), 0.0, "no rain floor, no telling the sky: none")
+	weather.free()
+
+
+func test_the_wind_pushes_by_its_square_up_to_its_own_speed() -> void:
+	var weather := _walled_weather()
+	var at := Vector3(19, 1, 0)
+	var gale := weather.wind_push(at, Vector3.ZERO)
+	assert_vec3_almost_eq(gale, Vector3(WeatherSystem.WIND_PUSH * 100.0, 0, 0), 1e-5, "downwind")
+	weather.wind = Vector3(5, 0, 0)
+	assert_almost_eq(weather.wind_push(at, Vector3.ZERO).x, gale.x / 4.0, 1e-5, "half the wind, a quarter the push")
+	assert_eq(weather.wind_push(at, Vector3(5, 0, 0)), Vector3.ZERO, "moving with it as fast as it blows")
+	assert_gt(weather.wind_push(at, Vector3(0, 0, 8)).x, 0.0, "across it, carried along")
+	assert_eq(weather.wind_push(at, Vector3.ZERO, 0.0), Vector3.ZERO, "a weightless push is none")
+	ServerVars.set_from_string("wind_push", "0")
+	assert_eq(weather.wind_push(at, Vector3.ZERO), Vector3.ZERO, "wind_push 0 turns it off")
+	ServerVars.set_from_string("wind_push", "1")
+	weather.wind = Vector3.ZERO
+	assert_eq(weather.wind_push(at, Vector3.ZERO), Vector3.ZERO, "calm")
+	weather.free()
+
+
+func test_the_wind_carries_a_player_in_the_air_and_a_projectile() -> void:
+	var weather := _walled_weather()
+	var was: WeatherSystem = Game.weather_system
+	Game.weather_system = weather
+	var body := Node3D.new()
+	var ctx := PlayerMovementContext.new(body, null, null)
+	var cfg := preload("res://addons/pmove/movement_config.gd").new()
+	var cmd := preload("res://addons/pmove/input_command.gd").new()
+	cmd.delta = 0.1
+	var state := Movement.MovementState.new()
+	state.position = Vector3(19, 0.5, 0)
+	var mods := Movement.MovementModifiers.new()
+	ctx._blown(mods, cfg, state, cmd)
+	assert_gt(mods.velocity_add.x, 0.0, "in the air in the open, blown downwind")
+	state.on_floor = true
+	mods = Movement.MovementModifiers.new()
+	ctx._blown(mods, cfg, state, cmd)
+	assert_eq(mods.velocity_add, Vector3.ZERO, "standing on the ground, not")
+	state.on_floor = false
+	mods = Movement.MovementModifiers.new()
+	mods.velocity_override_active = true
+	ctx._blown(mods, cfg, state, cmd)
+	assert_eq(mods.velocity_add, Vector3.ZERO, "on a ladder or swimming, not")
+	var shot := Projectile.new()
+	shot.set_physics_process(false)
+	shot.set_process(false)
+	_root().add_child(shot)
+	shot.global_position = Vector3(19, 1, 0)
+	shot.direction = Vector3(0, 0, 1)
+	shot.speed = 20.0
+	shot._blow(0.1)
+	assert_gt(shot.direction.x, 0.0, "a shot across the wind bends downwind")
+	assert_almost_eq(shot.direction.length(), 1.0, 1e-5, "and still flies one way")
+	Game.weather_system = was
+	shot.free()
+	body.free()
+	weather.free()
+
+
+
+func test_the_wind_carries_every_moving_rigid_body() -> void:
+	var weather := _walled_weather()
+	var body := RigidBody3D.new()
+	body.gravity_scale = 0.0
+	_root().add_child(body)
+	body.global_position = Vector3(19, 1, 0)
+	weather._track_blown(body)
+	var bone := PhysicalBone3D.new()
+	weather._track_blown(bone)
+	assert_true(weather._carried.has(bone), "a ragdoll's bones are carried too")
+	weather._carried.erase(bone)
+	bone.free()
+	var rid := body.get_rid()
+	PhysicsServer3D.body_set_state(rid, PhysicsServer3D.BODY_STATE_LINEAR_VELOCITY, Vector3(0, 0, 12))
+	weather._carry(0.1)
+	var v: Vector3 = PhysicsServer3D.body_get_state(rid, PhysicsServer3D.BODY_STATE_LINEAR_VELOCITY)
+	assert_almost_eq(v.x, WeatherSystem.WIND_PUSH * 100.0 * 0.1, 1e-4, "thrown across the wind, it drifts downwind")
+	PhysicsServer3D.body_set_state(rid, PhysicsServer3D.BODY_STATE_LINEAR_VELOCITY, Vector3(0.1, 0, 0))
+	weather._carry(0.1)
+	v = PhysicsServer3D.body_get_state(rid, PhysicsServer3D.BODY_STATE_LINEAR_VELOCITY)
+	assert_eq(v, Vector3(0.1, 0, 0), "at rest it is left be, to sleep")
+	body.freeze = true
+	PhysicsServer3D.body_set_state(rid, PhysicsServer3D.BODY_STATE_LINEAR_VELOCITY, Vector3(0, 0, 12))
+	weather._carry(0.1)
+	v = PhysicsServer3D.body_get_state(rid, PhysicsServer3D.BODY_STATE_LINEAR_VELOCITY)
+	assert_eq(v.x, 0.0, "a frozen one is not this peer's to move")
+	body.queue_free()
+	await body.tree_exited
+	assert_false(weather._carried.has(body), "gone from the tree, forgotten")
+	weather.free()
+
+
+func test_particles_out_in_the_wind_drift_with_it() -> void:
+	var weather := _walled_weather()
+	weather._wind_now = Vector3(10, 0, 0)
+	var particles := preload("res://src/systems/wind_particles.gd").new(weather)
+	var cpu := CPUParticles3D.new()
+	cpu.gravity = Vector3(0, -2, 0)
+	_root().add_child(cpu)
+	cpu.global_position = Vector3(19, 1, 0)
+	particles.track(cpu)
+	particles._blow(cpu)
+	assert_gt(cpu.gravity.x, 0.0, "out in the open, drifting downwind")
+	assert_eq(cpu.gravity.y, -2.0, "and falling as it did")
+	var shared := ParticleProcessMaterial.new()
+	shared.gravity = Vector3(0, -6, 0)
+	var sparks: Array[GPUParticles3D] = []
+	for at in [Vector3(19, 1, 0), Vector3(18, 1, 0), Vector3(10.5, 1, 0)]:
+		var gpu := GPUParticles3D.new()
+		gpu.process_material = shared
+		_root().add_child(gpu)
+		gpu.global_position = at
+		particles.track(gpu)
+		particles._blow(gpu)
+		sparks.append(gpu)
+	assert_eq(shared.gravity, Vector3(0, -6, 0), "the shared material is left as it was")
+	assert_gt((sparks[0].process_material as ParticleProcessMaterial).gravity.x, 0.0, "sparks in the open drift")
+	assert_eq(sparks[0].process_material, sparks[1].process_material, "and share one blown copy")
+	assert_eq(sparks[2].process_material, shared, "sparks on the wall's top, under the floor, keep the shared one")
+	weather._wind_now = Vector3.ZERO
+	particles._blow(cpu)
+	assert_eq(cpu.gravity, Vector3(0, -2, 0), "calm again, back to its own")
+	cpu.free()
+	for gpu in sparks:
+		gpu.free()
+	weather.free()

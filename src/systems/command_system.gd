@@ -138,7 +138,8 @@ func _register_builtins() -> void:
 	_register("rain", _cmd_rain, Perm.ADMIN, "/rain [amount]", "Rain on any map, 0.01 light to 1 a downpour; values above 1 add drop density. 0 leaves the weather to the map.")
 	_register("dynamicweather", _cmd_dynamic_weather, Perm.ADMIN, "/dynamicweather [on|off]", "Showers come and go on their own, light to heavy, in a shifting wind; the map's own weather is ignored. Setting /rain turns it off.")
 	_register("temperature", _cmd_temperature, Perm.ADMIN, "/temperature [°C]", "Degrees C at the ground: what falls is snow below -1, rain above 3, sleet between, and snow lies while it is freezing.")
-	_register("wind", _cmd_wind, Perm.ADMIN, "/wind [m/s|auto] [degrees]", "Wind across the ground, blowing toward a direction (0 = +Z, 90 = +X); it drifts the snow and slants the rain. auto (the default) lets it rise, fall and turn on its own.")
+	_register("wind", _cmd_wind, Perm.ADMIN, "/wind [m/s|auto] [degrees]", "Wind across the ground, blowing toward a direction (0 = +Z, 90 = +X); it drifts the snow, slants the rain, and carries players and spells in the air out in the open. auto (the default) lets it rise, fall and turn on its own.")
+	_register("windpush", _cmd_windpush, Perm.ADMIN, "/windpush [scale]", "How hard the wind pushes players in the air and spells in flight out in the open: 1 the default, 0 off.")
 	_register("lightning", _cmd_lightning, Perm.ADMIN, "/lightning [on|off]", "Lightning strikes while it rains.")
 	_register("allow_combos", _cmd_allow_combos, Perm.ADMIN, "/allow_combos [on|off]", "Whether two allied wizards can clash staves to earn a combo spell.")
 	_register("siege", _cmd_siege, Perm.ADMIN, "/siege [on|off]", "Co-op: waves of monsters against an altar everyone defends together. Works on any map.")
@@ -829,6 +830,15 @@ func _cmd_wind(sender_id: int, args: String) -> void:
 		ServerVars.set_from_string("wind_dir", str(fposmod(float(parts[1]), 360.0)))
 	ServerVars.set_from_string("wind", parts[0])
 	_reply_ok(sender_id, "wind: %s" % _wind_text())
+
+
+func _cmd_windpush(sender_id: int, args: String) -> void:
+	if not args.strip_edges().is_empty():
+		var result: Dictionary = ServerVars.set_from_string("wind_push", args.strip_edges())
+		if not result["ok"]:
+			_reply_err(sender_id, str(result["error"]))
+			return
+	_reply_ok(sender_id, "windpush = %s" % str(ServerVars.get_value("wind_push")))
 
 
 func _wind_text() -> String:
