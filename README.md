@@ -65,6 +65,9 @@ The scripts look for Godot at `/Applications/Godot.app` or `~/Applications/Godot
 "$GODOT" --path . -- --host --map ww_2fort --bots 4         # listen server: host and play in one process
 ```
 
+`tools/ascii_view/play.sh` plays a listen-server match as text in the terminal, and
+`tools/ascii_view/watch.sh` watches a bot match there. See [tools/ascii_view](tools/ascii_view/README.md).
+
 Game flags go after the `--`. The useful ones: `--map`, `--bots <n>`, `--botskill`, `--name`,
 `--team`, `--class`, `--timelimit`, `--scorelimit`, `--fraglimit`, `--mapcycle <file>`,
 `--admin-password`, `--bsp-hulls on|off`, and `--stock` to fall back from goldnet to Godot's
@@ -97,7 +100,7 @@ connected). It needs the Android export templates and SDK set up in the editor.
 | `extern/` | The five library submodules |
 | `addons/` | Godot plugins: symlinks into `extern/`, plus TwoVoIP and OpenXR |
 | `maps/`, `models/`, `sounds/`, `sprites/`, `sky/`, `*.wad` | Game assets in their GoldSrc formats |
-| `tools/` | Asset tools (`mdl.py`, `spr.py`, `wad.py`, `bsp.py`), the `*_art.py` generators that made the replacement art, one-off map patches (`ww_*.py`), `probe_*.gd` debug scenes, and the screenshot scenes behind the README (`readme_shots`) and the player docs (`doc_shots`) |
+| `tools/` | Asset tools (`mdl.py`, `spr.py`, `wad.py`, `bsp.py`), the `*_art.py` generators that made the replacement art, one-off map patches (`ww_*.py`), `probe_*.gd` debug scenes, the terminal renderer (`ascii_view`), and the screenshot scenes behind the README (`readme_shots`) and the player docs (`doc_shots`) |
 | `plans/`, `TODO.md` | Design notes and open work |
 
 The Python tools need a venv with `numpy`, `scipy` and `pillow`; the sound generator also uses
