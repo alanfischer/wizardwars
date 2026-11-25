@@ -1,48 +1,142 @@
 # ASCII view
 
-Draws a running match as text, and lets you play it from the terminal. Nothing in the game knows
-it exists. It boots `src/main.tscn` from its own scene, keeps a renderer node beside it, and works
-out what each thing is by looking at it.
+Play Wizard Wars in a terminal, or watch a bot match there. The game is drawn as text: walls as
+outlines, floors as `,`, water as `~`, and wizards as little figures with their element's hat,
+coloured by team.
+
+```
+health 100  mana 80  weapon Missile  keys [W* RIGHT]  22 ms
+:::|          /--\  |.............|--....................|.|........
+::::\--\--/---....-\..............|......................|.|........
+::::|...--.........|..............|....______o...........|.|........
+:::::\......____...|..............|...|..|  /^\./----_____----------
+::::::\....||'|.|..|.../_______------------/___\-------.........,,,,
+::::::|--------------------................(o o).........,,,,,,,,,,,
+:::::::\..................................__|=|__.|,,,,,,,,,,,,,,,,,
+::::::::\..........................._____/__|||__\|,,,,,,,,,,,,,,,,,
+:::::::::\.....................,,,__________|||___|,,,,,__,,,,,,/---
+::::::::::--\_...,,,,,,,,,,,,,,,,,,,,,,,,,,,|||,,,,,,,,|_-------....
+:::::::::::::|,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,/,\,,,,,,,,,|_..........
+:::::::::::::/,,,,,,,,,,,,,,,,,,,,,,,,,,,,,/,,,\,,,,,,,,,|__........
+::::::::+:::|,,,,,,,,,,,,,,,,,,,,,,,,,,,,,_|,,,|_,,,,,,,,,,|_.......
+```
+
+*An enemy Archmage (`^` hat) on a ledge in ww_wstland4. The `+` at the bottom left is the
+crosshair.*
+
+Nothing in the game knows this exists. It boots the game from its own scene and works out what
+each thing is by looking at it. See [How a frame is drawn](#how-a-frame-is-drawn).
 
 ## Play
 
+From the repository root:
+
 ```
-tools/ascii_view/play.sh                                    # ww_2fort, 4 bots, blue fire
-tools/ascii_view/play.sh --map ww_chasm --bots 6 --team 2 --class ice
+tools/ascii_view/play.sh
 ```
+
+That hosts a match on ww_2fort against 4 bots, with you as a blue Pyromancer. Game flags
+replace those defaults:
+
+```
+tools/ascii_view/play.sh --map ww_wstland4 --bots 8 --team 1 --class fire
+tools/ascii_view/play.sh --map ww_hunt --bots 6 --team 2 --class ice --botskill 0.3
+```
+
+`--team` is 1 (blue) or 2 (red). `--class` takes the element name: `fire`, `ice`, `lightning`,
+`earth`, `wind`, `nature`, `life` or `death`. Any other game flag works too (`--timelimit`,
+`--fraglimit`, …). `--botskill` runs from 0 (sloppy) to 1 (crack shot). ww_wstland4 is the smallest rotation map, so it's the quickest way into a
+fight.
+
+Ctrl-C quits and puts your terminal back the way it was.
+
+### Controls
 
 | Keys | |
 |---|---|
-| `w` / `s` | run forward / back. These latch: press again, or the opposite key, to stop |
-| `a` / `d` | strafe |
-| arrows | look. A tap nudges, holding turns |
-| `space` `c` | jump, crouch |
-| `f` `g` `x` `e` | fire, alt fire, satchel, use |
-| `1`–`9` `q` `r` | spell slot, last spell, next spell |
+| `w` / `s` | run forward / back. These **latch**: press once to start, again (or the opposite key) to stop |
+| `a` / `d` | strafe while held |
+| ← → ↑ ↓ | look. A tap nudges a few degrees; holding turns |
+| `f` | fire (hold for continuous fire) |
+| `g` | alt fire |
+| `x` | satchel: hold to prime, let go to throw |
+| `e` | use |
+| `space` / `c` | jump / crouch |
+| `1`–`9` | pick a spell slot |
+| `q` / `r` | last spell / next spell |
 | Ctrl-C | quit |
 
-You see through the game's own camera, with a crosshair and a status line.
+### The screen
 
-**Held keys.** A terminal sends no key-up, only the OS key repeat, so a key counts as held while
-its repeats keep arriving. Only the last key pressed repeats, which is why running latches: you
-can run, turn and fire at once. `play.sh` reads your repeat delay and rate from macOS settings.
+- **The top line** shows your health, mana and spell, the keys the game thinks you're holding,
+  and how long the last frame took to draw. A latched key shows with a star (`W*`).
+- **The `+` in the middle** is your crosshair. Spells go where it points.
+- **Team colours:** blue is team 1 and red is team 2. Teammates and enemies are coloured, and so
+  are the flags. Water is cyan.
+- **Wizards** grow from a `@` in the distance to a stick figure to a full figure with a hat as
+  they get closer: `^` Archmage, `*` Pyromancer, `<>` Cryomancer, `Z` Fulgomancer, `m`
+  Geomancer, `~` Aeromancer, `&` Phytomancer, `o` Sanomancer, `n` Necromancer. Right in your
+  face, a wizard is drawn from its actual body parts: `@` head, `=` arms.
+- **Other things:** `*` with a `.` trail is a projectile. `%` is a corpse. `|>` is a flag. `+` is
+  a health pack, and `!` and `?` are other pickups.
 
-**The game window.** Playing needs a real window, because the game reads look and fire only with
-the mouse captured, and a headless display can't capture. A borderless 160×90 window sits in the
-bottom-right corner. It can't take focus, so the captured mouse stays a mode the game sees, and
-your cursor and keyboard stay with the terminal. It hosts the match, so UDP 9050 and TCP 8080 must
-be free.
+### Tips
 
-The frame fills the terminal up to 140×45; set `ASCII_COLS`/`ASCII_ROWS` to override.
+- **Run with `w`, steer with the arrows.** A terminal only repeats the last key you pressed, so
+  holding `w` and then pressing an arrow would stop you running. That's why `w` latches.
+- **Tap the arrows to aim, hold them to turn.** The first press nudges; the turn starts once your
+  keyboard's key repeat kicks in.
+- **Keys feel slightly sticky.** A terminal never says when you let go of a key, so a key counts
+  as held until its repeats stop arriving. `play.sh` reads your macOS key-repeat settings to time
+  this. Shorter settings in System Settings → Keyboard make it more responsive.
+- **Bigger terminal, more detail.** The view fills your terminal, up to 140×45 cells. Past that,
+  frames take too long to draw; `ASCII_COLS` and `ASCII_ROWS` override the cap.
+- **Sound works.** The game plays its sounds as normal, which helps a lot.
+
+### The little window in the corner
+
+While you play, a small borderless window sits in the bottom-right corner of your screen. That's
+the game itself. It needs a real window: the game only accepts looking and firing while the mouse
+is captured, and a windowless game can't capture the mouse. The window never takes focus, so
+your keyboard and mouse stay with the terminal. Leave it alone, and don't minimize it: a
+minimized window stops drawing, and the game won't spawn you until a frame has been drawn.
+
+### Changing the keys or turn speed
+
+Everything is in the `play` section of `tools/ascii_view/rules.json`:
+
+- **`keys`** maps a key to a game action. Use a single character, or `UP`, `DOWN`, `LEFT` or
+  `RIGHT` for the arrows. Add `"latch": true` to make a key toggle, and `"opposite"` to name the
+  action that cancels it.
+- **`look_speed`** is how fast a held arrow turns, and **`look_nudge`** is how far a tap turns.
+  Both are in mouse pixels, at the game's mouse sensitivity.
+- **`hud`** lists what the top line shows: player properties, with a dotted path or a `()` call,
+  such as `weapon.get_display_name()`.
+
+### If something goes wrong
+
+| What you see | Why, and what to do |
+|---|---|
+| "Starting Wizard Wars..." for more than a few seconds | The first run of a map converts it, which takes a while. Otherwise quit and read the game log; `play.sh` prints its path when it exits |
+| The game log says "Failed to host" | Something else holds UDP 9050 or TCP 8080, usually a dedicated server. Stop it (`pkill -f "Godot.*--server"`) and start again |
+| Nothing happens when you press keys | The keyboard went to the game window instead of the terminal. Click the terminal |
+| The picture scrolls or flickers | The terminal is smaller than the frame. Make it bigger, or set `ASCII_ROWS` lower |
+| Turning is too fast or too slow | Change `look_speed` / `look_nudge` in `rules.json` |
+| `play.sh` can't find Godot | Set `GODOT=/path/to/Godot` |
 
 ## Watch
 
+A bot match with a chase camera behind one bot. It runs headless, so no window appears, and it
+needs the same free ports.
+
 ```
-tools/ascii_view/watch.sh                     # a bot match, chase camera
+tools/ascii_view/watch.sh                          # ww_2fort, 8 bots
 tools/ascii_view/watch.sh --map ww_chasm --bots 4
+ASCII_FOLLOW=Bot_3 tools/ascii_view/watch.sh       # follow a particular bot
+ASCII_FOLLOW=item_tfgoal tools/ascii_view/watch.sh # or follow a flag
 ```
 
-or record frames to a file:
+To record frames to a file instead:
 
 ```
 ASCII_OUT=frames.txt ASCII_APPEND=1 ASCII_FRAMES=20 ASCII_EVERY=1 \
@@ -91,8 +185,8 @@ All are environment variables, because the game reports unknown command-line fla
 | Variable | Default | |
 |---|---|---|
 | `ASCII_COLS`, `ASCII_ROWS` | 120, 40 | cells |
-| `ASCII_FOV` | 90 | horizontal degrees |
-| `ASCII_EVERY` | 0.2 | seconds between frames |
+| `ASCII_FOV` | 90 | horizontal degrees (watching only; playing uses the game camera's) |
+| `ASCII_EVERY` | 0.2 | seconds between frames (`play.sh` uses 0.066) |
 | `ASCII_START` | 3 | seconds before the first frame |
 | `ASCII_FRAMES` | 0 | quit after this many; 0 runs on |
 | `ASCII_OUT` | stdout | file to write; replaced each frame unless `ASCII_APPEND=1` |
