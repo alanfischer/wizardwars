@@ -1,0 +1,52 @@
+{
+	"world_layers": [1, 3, 4, 8, 12],
+	"hitbox_layers": [10],
+	"part_bones": {
+		"Arm|Hand|Finger|Clavicle": "arm",
+		"Leg|Foot|Toe|Thigh|Calf": "leg"
+	},
+	"part_glyphs": { "head": "@", "body": "`", "arm": "=", "leg": "|" },
+	"liquid_color": "36",
+
+	"rules": [
+		{
+			"script": "Player", "kind": "figure", "follow": true, "height": 1.8,
+			"tags": {
+				"element": {
+					"1": "archmage", "2": "life", "3": "death", "4": "fire", "5": "ice",
+					"6": "lightning", "7": "nature", "8": "earth", "9": "wind"
+				},
+				"is_dead": { "true": "dead" }
+			},
+			"hat": {
+				"element": {
+					"1": "^", "2": "o", "3": "n", "4": "*", "5": "<>",
+					"6": "Z", "7": "&", "8": "m", "9": "~"
+				}
+			},
+			"color": { "team": { "1": "34", "2": "31", "3": "33", "4": "32" } }
+		},
+		{ "script": "WizardClone", "kind": "figure", "height": 1.8 },
+		{ "script": "Skeleton", "kind": "figure", "height": 1.8, "hat": { "": { "": "%" } } },
+		{ "script": "SpiritWiz", "kind": "figure", "height": 2.2, "color": { "": { "": "37" } } },
+		{ "script": "Sheep", "kind": "critter", "glyph": "m", "height": 0.8 },
+		{ "script": "Wombat", "kind": "critter", "glyph": "w", "height": 0.6 },
+		{ "script": "Bird", "kind": "critter", "glyph": "v", "height": 0.4 },
+		{ "script": "Dragon", "kind": "critter", "glyph": "D", "height": 3.0 },
+		{ "script": "TumblingCorpse", "kind": "corpse", "height": 0.4 },
+
+		{ "script": "Projectile", "kind": "projectile", "glyph": "*" },
+		{ "script": "Satchel", "kind": "projectile", "glyph": "s" },
+		{ "script": "RollingStone", "kind": "projectile", "glyph": "O" },
+
+		{
+			"script": "ItemTFGoal", "kind": "flag", "height": 1.0,
+			"color": { "owned_by": { "1": "34", "2": "31", "3": "33", "4": "32" } }
+		},
+		{ "script": "ItemHealthkit", "kind": "pickup", "glyph": "+", "color": { "": { "": "32" } } },
+		{ "script": "ItemWeapon", "kind": "pickup", "glyph": "!" },
+		{ "script": "ItemDmPickup", "kind": "pickup", "glyph": "?" },
+
+		{ "script": "FuncWater", "kind": "liquid" }
+	]
+}
