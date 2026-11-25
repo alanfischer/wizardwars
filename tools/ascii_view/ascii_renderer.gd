@@ -674,9 +674,9 @@ func _emit(target: Dictionary, ms: float) -> void:
 		print(frame)
 		return
 	if append:
-		var f := FileAccess.open(out_path, FileAccess.READ_WRITE if FileAccess.file_exists(out_path) else FileAccess.WRITE)
-		f.seek_end()
-		f.store_string(frame + "\n")
+		var log_file := FileAccess.open(out_path, FileAccess.READ_WRITE if FileAccess.file_exists(out_path) else FileAccess.WRITE)
+		log_file.seek_end()
+		log_file.store_string(frame + "\n")
 		return
 	var tmp := out_path + ".tmp"
 	var f := FileAccess.open(tmp, FileAccess.WRITE)
