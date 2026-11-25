@@ -1,11 +1,44 @@
 # ASCII view
 
-Draws a running match as text, as a chase camera behind one wizard. Nothing in the game knows it
-exists. It boots `src/main.tscn` from its own scene, keeps a renderer node beside it, and works
+Draws a running match as text, and lets you play it from the terminal. Nothing in the game knows
+it exists. It boots `src/main.tscn` from its own scene, keeps a renderer node beside it, and works
 out what each thing is by looking at it.
 
+## Play
+
 ```
-tools/ascii_view/watch.sh                     # live, in this terminal
+tools/ascii_view/play.sh                                    # ww_2fort, 4 bots, blue fire
+tools/ascii_view/play.sh --map ww_chasm --bots 6 --team 2 --class ice
+```
+
+| Keys | |
+|---|---|
+| `w` / `s` | run forward / back. These latch: press again, or the opposite key, to stop |
+| `a` / `d` | strafe |
+| arrows | look. A tap nudges, holding turns |
+| `space` `c` | jump, crouch |
+| `f` `g` `x` `e` | fire, alt fire, satchel, use |
+| `1`–`9` `q` `r` | spell slot, last spell, next spell |
+| Ctrl-C | quit |
+
+You see through the game's own camera, with a crosshair and a status line.
+
+**Held keys.** A terminal sends no key-up, only the OS key repeat, so a key counts as held while
+its repeats keep arriving. Only the last key pressed repeats, which is why running latches: you
+can run, turn and fire at once. `play.sh` reads your repeat delay and rate from macOS settings.
+
+**The game window.** Playing needs a real window, because the game reads look and fire only with
+the mouse captured, and a headless display can't capture. A borderless 160×90 window sits in the
+bottom-right corner. It can't take focus, so the captured mouse stays a mode the game sees, and
+your cursor and keyboard stay with the terminal. It hosts the match, so UDP 9050 and TCP 8080 must
+be free.
+
+The frame fills the terminal up to 140×45; set `ASCII_COLS`/`ASCII_ROWS` to override.
+
+## Watch
+
+```
+tools/ascii_view/watch.sh                     # a bot match, chase camera
 tools/ascii_view/watch.sh --map ww_chasm --bots 4
 ```
 
@@ -45,6 +78,9 @@ template) and `color` (an ANSI SGR code). Each is a `{property: {value: result}}
 property name gives a constant. Facing and velocity are observed between frames, never asked
 for.
 
+The `play` section maps terminal keys to the game's input actions and lists the status-line
+properties. Keys go in as ordinary `InputEventAction`s and mouse motion.
+
 All game-specific knowledge lives in the rules file. If the game renames a class or property,
 the fix goes here.
 
@@ -62,3 +98,5 @@ All are environment variables, because the game reports unknown command-line fla
 | `ASCII_OUT` | stdout | file to write; replaced each frame unless `ASCII_APPEND=1` |
 | `ASCII_COLOR` | off | `1` for ANSI colour (`watch.sh` turns it on) |
 | `ASCII_FOLLOW` | first player | follow the first tracked node whose name contains this, e.g. `Bot_3`, `item_tfgoal` |
+| `ASCII_KEYS` | unset | key file to read; set by `play.sh`, and it switches to the game's own camera |
+| `ASCII_REPEAT_DELAY`, `ASCII_REPEAT_INTERVAL` | 0.375, 0.09 | seconds; `play.sh` reads them from macOS |
