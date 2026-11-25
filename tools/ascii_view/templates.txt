@@ -1,0 +1,94 @@
+# One block per "=== kind [tags...]". Drawn facing right; mirrored when moving left.
+# Spaces are transparent. $ is the rule's hat. The tallest block that fits the
+# projected height wins; a block whose tags the entity lacks is never picked.
+
+=== figure
+@
+
+=== figure
+o
+A
+
+=== figure
+ o
+/|\
+/ \
+
+=== figure
+ $
+ o
+/|\
+/ \
+
+=== figure
+ $
+(o)
+/|\|
+ |
+/ \
+
+=== figure
+  $
+ (o)
+ /|\|
+/ | |
+  |
+ / \
+
+=== figure
+   $
+  /_\
+  (o)
+ /|||\|
+/ ||| |
+  |||
+  / \
+ /   \
+
+=== figure
+    $
+   /^\
+  /___\
+  (o`o)
+ __|=|__ |
+/  |||  \|
+   |||   |
+   |||
+   / \
+  /   \
+ _|   |_
+
+=== figure dead
+x
+
+=== figure dead
+ x_/
+
+=== figure dead
+   ,
+ x_/\_
+
+=== corpse
+%
+
+=== corpse
+_%_
+
+=== flag
+F
+
+=== flag
+|>
+|
+
+=== flag
+|>>
+|>
+|
+|
+
+=== projectile
+*
+
+=== projectile
+(*)
