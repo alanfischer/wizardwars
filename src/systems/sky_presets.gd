@@ -52,9 +52,9 @@ const OVERRIDES := {
 		"sun_halo_energy": 0.05, "cirrus_amount": 0.08},
 	"avanti": {"cloud_amount": 0.3, "star_amount": 0.45, "sun_energy": 0.6,
 		"sun_glow_energy": 0.3, "sun_halo_energy": 0.12, "cirrus_amount": 0.15},
-	# Overcast. The sun is behind the cloud deck, so it contributes glow and no disc.
-	"dark": {"cloud_amount": 0.85, "cloud_softness": 0.3, "sun_energy": 0.0,
-		"sun_glow_energy": 0.2, "sun_halo_energy": 0.15},
+	# Overcast. The deck hides the disc itself, so the sun still shows through a break.
+	"dark": {"cloud_amount": 0.85, "cloud_softness": 0.3, "sun_glow_energy": 0.2,
+		"sun_halo_energy": 0.15},
 	"null_plainsky256_": {"cloud_amount": 0.0, "sun_energy": 0.0, "sun_glow_energy": 0.25,
 		"sun_halo_energy": 0.15, "horizon_falloff": 0.6},
 	"nottingham": {"cloud_amount": 0.55, "sun_energy": 0.8},
