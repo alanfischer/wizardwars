@@ -8,6 +8,24 @@
 	"part_glyphs": { "head": "@", "body": "`", "arm": "=", "leg": "|" },
 	"liquid_color": "36",
 
+	"play": {
+		"hud": ["health", "mana", "weapon.get_display_name()"],
+		"look_speed": 450,
+		"look_nudge": 25,
+		"keys": {
+			"w": { "action": "move_forward", "latch": true, "opposite": "move_back" },
+			"s": { "action": "move_back", "latch": true, "opposite": "move_forward" },
+			"a": "move_left", "d": "move_right",
+			" ": "jump", "c": "crouch", "e": "use",
+			"f": "attack", "g": "attack2", "x": "satchel",
+			"1": "slot1", "2": "slot2", "3": "slot3", "4": "slot4", "5": "slot5",
+			"6": "slot6", "7": "slot7", "8": "slot8", "9": "slot9",
+			"q": "lastweapon", "r": "weapon_next",
+			"UP": { "look": [0, -1] }, "DOWN": { "look": [0, 1] },
+			"LEFT": { "look": [-1, 0] }, "RIGHT": { "look": [1, 0] }
+		}
+	},
+
 	"rules": [
 		{
 			"script": "Player", "kind": "figure", "follow": true, "height": 1.8,

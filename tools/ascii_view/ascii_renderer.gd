@@ -28,6 +28,7 @@ var out_path := ""
 var append := false
 var color := false
 var follow := ""
+var play := false
 
 var _rules: Array = []
 var _world_mask := 0
@@ -36,6 +37,9 @@ var _part_bones: Array = []
 var _part_glyphs := {}
 var _liquid_color := ""
 var _templates := {}
+var _play_rules := {}
+var _input: Node
+var _self_id := 0
 
 var _tracked := {}
 var _drawn := {}
@@ -74,9 +78,16 @@ func _ready() -> void:
 	follow = OS.get_environment("ASCII_FOLLOW")
 	_load_rules(get_script().resource_path.get_base_dir().path_join("rules.json"))
 	_load_templates(get_script().resource_path.get_base_dir().path_join("templates.txt"))
+	var keys := OS.get_environment("ASCII_KEYS")
+	play = keys != ""
+	if play:
+		_input = preload("ascii_input.gd").new()
+		_input.keys_path = keys
+		_input.repeat_delay = _env_float("ASCII_REPEAT_DELAY", _input.repeat_delay)
+		_input.repeat_interval = _env_float("ASCII_REPEAT_INTERVAL", _input.repeat_interval)
+		_input.setup(_play_rules)
+		add_child(_input)
 
-	_tx = tan(deg_to_rad(hfov) * 0.5)
-	_ty = _tx * rows * CELL_ASPECT / cols
 	var n := cols * rows
 	_dirs.resize(n)
 	_depth.resize(n)
@@ -85,11 +96,8 @@ func _ready() -> void:
 	_hit.resize(n)
 	_glyph.resize(n)
 	_tint.resize(n)
-	for r in rows:
-		for c in cols:
-			var x := (2.0 * (c + 0.5) / cols - 1.0) * _tx
-			var y := (1.0 - 2.0 * (r + 0.5) / rows) * _ty
-			_dirs[r * cols + c] = Vector3(x, y, -1.0)
+	var tx := tan(deg_to_rad(hfov) * 0.5)
+	_set_lens(tx, tx * rows * CELL_ASPECT / cols)
 	_query.collide_with_areas = true
 	_query.collide_with_bodies = true
 	get_tree().node_added.connect(_on_node_added)
@@ -106,9 +114,12 @@ func _process(delta: float) -> void:
 		return
 	var t0 := Time.get_ticks_usec()
 	var target := _update_entities()
+	if play:
+		target = _take_game_camera()
 	if target.is_empty():
 		return
-	_place_camera(target)
+	if not play:
+		_place_camera(target)
 	_cast_world()
 	_shade_world()
 	_draw_entities()
@@ -116,6 +127,42 @@ func _process(delta: float) -> void:
 	_frames += 1
 	if max_frames > 0 and _frames >= max_frames:
 		get_tree().quit()
+
+
+## Rays per cell for a lens; recomputed only when the lens changes.
+func _set_lens(tx: float, ty: float) -> void:
+	if is_equal_approx(tx, _tx) and is_equal_approx(ty, _ty) and _dirs.size() == cols * rows:
+		return
+	_tx = tx
+	_ty = ty
+	_dirs.resize(cols * rows)
+	for r in rows:
+		for c in cols:
+			var x := (2.0 * (c + 0.5) / cols - 1.0) * _tx
+			var y := (1.0 - 2.0 * (r + 0.5) / rows) * _ty
+			_dirs[r * cols + c] = Vector3(x, y, -1.0)
+
+
+## Play mode looks through whatever camera the game is showing, and the tracked entity holding
+## that camera is "you": never drawn, and the one the status line is about.
+func _take_game_camera() -> Dictionary:
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return {}
+	_cam = camera.global_transform
+	var ty := tan(deg_to_rad(camera.fov) * 0.5)
+	if camera.keep_aspect == Camera3D.KEEP_WIDTH:
+		_set_lens(ty, ty * rows * CELL_ASPECT / cols)
+	else:
+		_set_lens(ty * cols / (rows * CELL_ASPECT), ty)
+	_self_id = 0
+	var n: Node = camera
+	while n:
+		if _tracked.has(n.get_instance_id()):
+			_self_id = n.get_instance_id()
+			return _tracked[_self_id]
+		n = n.get_parent()
+	return {"node": camera, "rule": {}, "kind": ""}
 
 
 # --- what things are ---------------------------------------------------------------------------
@@ -386,6 +433,8 @@ func _draw_entities() -> void:
 		var e: Dictionary = _tracked[id]
 		if e.kind == "liquid" or not (e.node as Node3D).is_visible_in_tree():
 			continue
+		if play and (e.node as Node).get_instance_id() == _self_id:
+			continue
 		var d := _project(e.pos).z
 		if d > 0.0 and d < RANGE:
 			order.append([d, e])
@@ -602,6 +651,11 @@ func _emit(target: Dictionary, ms: float) -> void:
 		seen.append("%s %d" % [kind, _drawn[kind]])
 	var header := "t=%.1fs  following %s [%s]  on screen: %s  %.0f ms" % [
 		_clock, tnode.name, ", ".join(tags), ", ".join(seen), ms]
+	if play:
+		header = _status_line(tnode, ms)
+		var mid := int(rows * 0.5) * cols + int(cols * 0.5)
+		_glyph[mid] = "+"
+		_tint[mid] = ""
 	var lines := PackedStringArray([header])
 	for r in rows:
 		var s := ""
@@ -631,6 +685,35 @@ func _emit(target: Dictionary, ms: float) -> void:
 	DirAccess.rename_absolute(tmp, out_path)
 
 
+func _status_line(you: Node, ms: float) -> String:
+	var parts := PackedStringArray()
+	for path: String in _play_rules.get("hud", []):
+		var v: Variant = _read_path(you, path)
+		if v == null:
+			continue
+		var label := path.get_slice(".", 0)
+		parts.append("%s %s" % [label, str(int(v)) if v is float else str(v)])
+	parts.append("keys [%s]" % _input.status())
+	parts.append("%.0f ms" % ms)
+	return "  ".join(parts).rpad(cols).substr(0, cols)
+
+
+## A dotted property path off a node; a step ending in () calls it.
+func _read_path(from: Object, path: String) -> Variant:
+	var v: Variant = from
+	for step in path.split("."):
+		if not v is Object or not is_instance_valid(v):
+			return null
+		if step.ends_with("()"):
+			var method := step.trim_suffix("()")
+			if not (v as Object).has_method(method):
+				return null
+			v = (v as Object).call(method)
+		else:
+			v = (v as Object).get(step)
+	return v
+
+
 # --- config ------------------------------------------------------------------------------------
 
 func _load_rules(path: String) -> void:
@@ -646,6 +729,7 @@ func _load_rules(path: String) -> void:
 		re.compile(pattern)
 		_part_bones.append([re, bones[pattern]])
 	_part_glyphs = data.get("part_glyphs", {})
+	_play_rules = data.get("play", {})
 	_liquid_color = data.get("liquid_color", "")
 
 
