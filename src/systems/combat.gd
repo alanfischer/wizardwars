@@ -426,25 +426,6 @@ func apply_aoe_knockback(space: PhysicsDirectSpaceState3D, impact_pos: Vector3, 
 	return pushed
 
 
-## Set what a node is moving at, whatever shape of body it turns out to be: one that walks,
-## one loose rigid body, or a corpse — which is twenty-one bodies and answers for itself
-## (TumblingCorpse.push). Returns whether anything moved: nothing branches on it today, and it
-## is here because a body that declines a shove is an answer rather than a silence.
-##
-## A corpse IS a RigidBody3D, so the `push` probe has to come before the type tests or the rig
-## never hears about it and the frozen reference node takes the velocity instead.
-func push_body(node: Node3D, velocity: Vector3) -> bool:
-	if node.has_method("push"):
-		return node.push(velocity)
-	if node is CharacterBody3D:
-		(node as CharacterBody3D).velocity = velocity
-		return true
-	if node is RigidBody3D:
-		(node as RigidBody3D).linear_velocity = velocity
-		return true
-	return false
-
-
 func _push_onto(velocity: Vector3, push_dir: Vector3, push: Vector3, set_along: bool) -> Vector3:
 	if set_along:
 		return velocity - push_dir * velocity.dot(push_dir) + push

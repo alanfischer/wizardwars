@@ -525,7 +525,7 @@ func test_the_wind_carries_a_player_in_the_air_and_a_projectile() -> void:
 	state.on_floor = true
 	mods = Movement.MovementModifiers.new()
 	ctx._blown(mods, cfg, state, cmd)
-	assert_eq(mods.velocity_add, Vector3.ZERO, "standing on the ground, not")
+	assert_gt(mods.velocity_add.x, 0.0, "on the ground too: friction is what holds you there")
 	state.on_floor = false
 	mods = Movement.MovementModifiers.new()
 	mods.velocity_override_active = true
@@ -577,6 +577,109 @@ func test_the_wind_carries_every_moving_rigid_body() -> void:
 	body.queue_free()
 	await body.tree_exited
 	assert_false(weather._carried.has(body), "gone from the tree, forgotten")
+	weather.free()
+
+
+## A stand-in tornado: a still column of air rising at `up` m/s within a metre of `at`.
+class Updraft extends Node3D:
+	var up := 30.0
+
+	func airflow(p: Vector3) -> Vector3:
+		var off := p - global_position
+		off.y = 0.0
+		return Vector3(0, up, 0) if off.length() < 1.0 else Vector3.ZERO
+
+
+func _updraft_at(at: Vector3) -> Updraft:
+	var source := Updraft.new()
+	source.add_to_group(WeatherSystem.WIND_SOURCES)
+	_root().add_child(source)
+	source.global_position = at
+	_keep(source)
+	await _physics_frame()  # the sources are looked up once a physics frame
+	return source
+
+
+func test_a_wind_source_adds_its_own_air_under_any_roof() -> void:
+	var weather := _roofed_weather()
+	weather.wind = Vector3(10, 0, 0)
+	await _updraft_at(Vector3(-1, 0, 0))
+	assert_eq(weather.airflow(Vector3(-1, 1, 0)), Vector3(0, 30, 0), "under the roof, the source's air and none of the wind's")
+	assert_eq(weather.airflow(Vector3(-4, 1, 0)), Vector3.ZERO, "out of its reach, still air")
+	var push := weather.wind_push(Vector3(-1, 1, 0), Vector3.ZERO)
+	assert_almost_eq(push.y, WeatherSystem.WIND_PUSH * 900.0, 1e-4, "pushing by the same rule as the wind")
+	assert_eq(weather.wind_push(Vector3(-1, 1, 0), Vector3(0, 30, 0)), Vector3.ZERO, "and only up to its own speed")
+	weather.free()
+	weather = _walled_weather()
+	assert_eq(weather.airflow(Vector3(19, 1, 0)), Vector3(10, 0, 0), "out in the open with no source near: just the wind")
+	weather.free()
+
+
+func test_air_that_lifts_harder_than_gravity_takes_you_off_your_feet() -> void:
+	var weather := WeatherSystem.new()
+	var source := await _updraft_at(Vector3(320, 0, 0))
+	var at := Vector3(320, 1, 0)
+	var change := weather.blow_walker(at, Vector3.ZERO, true, 20.0, 1.0 / 60.0)
+	assert_almost_eq(change.y, WeatherSystem.LIFTOFF + 20.0 / 60.0, 1e-5, "standing, lifted off at LIFTOFF past this tick's gravity")
+	change = weather.blow_walker(at, Vector3.ZERO, false, 20.0, 1.0 / 60.0)
+	assert_almost_eq(change.y, WeatherSystem.WIND_PUSH * 900.0 / 60.0, 1e-5, "in the air, just carried")
+	source.up = 20.0  # 12 m/s² of lift against 20 of gravity
+	change = weather.blow_walker(at, Vector3.ZERO, true, 20.0, 1.0 / 60.0)
+	assert_lt(change.y, 1.0, "a lift weaker than gravity leaves you standing")
+	weather.free()
+
+
+func test_a_wind_source_picks_up_a_body_at_rest() -> void:
+	var weather := WeatherSystem.new()
+	await _updraft_at(Vector3(300, 0, 0))
+	var body := RigidBody3D.new()
+	body.gravity_scale = 0.0
+	_root().add_child(body)
+	_keep(body)
+	body.global_position = Vector3(300, 1, 0)
+	weather._track_blown(body)
+	var rid := body.get_rid()
+	PhysicsServer3D.body_set_state(rid, PhysicsServer3D.BODY_STATE_SLEEPING, true)
+	weather._carry(0.1)
+	var v: Vector3 = PhysicsServer3D.body_get_state(rid, PhysicsServer3D.BODY_STATE_LINEAR_VELOCITY)
+	assert_gt(v.y, 1.0, "asleep where the wind would leave it, the source lifts it")
+	assert_false(PhysicsServer3D.body_get_state(rid, PhysicsServer3D.BODY_STATE_SLEEPING), "and wakes it")
+	weather.free()
+
+
+func test_a_monster_is_blown_like_a_player() -> void:
+	var weather := _walled_weather()
+	var was: WeatherSystem = Game.weather_system
+	Game.weather_system = weather
+	var host := CharacterBody3D.new()
+	_root().add_child(host)
+	_keep(host)
+	host.global_position = Vector3(19, 1, 0)
+	var walker := MonsterBody.new()
+	walker.setup(host, 4.0, 1.8)
+	walker.state.on_floor = false
+	walker._blown(0.1)
+	assert_gt(walker.state.velocity.x, 0.0, "carried downwind")
+	walker.state.velocity = Vector3.ZERO
+	walker.in_water = true
+	walker._blown(0.1)
+	assert_eq(walker.state.velocity, Vector3.ZERO, "but not while it swims")
+	Game.weather_system = was
+	weather.free()
+
+
+func test_particles_near_a_wind_source_take_its_air() -> void:
+	var weather := WeatherSystem.new()
+	await _updraft_at(Vector3(310, 0, 0))
+	var particles := preload("res://src/systems/wind_particles.gd").new(weather)
+	var cpu := CPUParticles3D.new()
+	cpu.gravity = Vector3(0, -2, 0)
+	_root().add_child(cpu)
+	_keep(cpu)
+	cpu.global_position = Vector3(310, 1, 0)
+	particles.track(cpu)
+	particles._blow(cpu)
+	assert_gt(cpu.gravity.y, 0.0, "sparks in an updraft go up")
 	weather.free()
 
 

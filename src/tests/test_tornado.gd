@@ -16,33 +16,12 @@ const ARENA := Vector3(200.0, 90.0, 0.0)   # clear of any map geometry, and of t
 const CHASE_FRAMES := 240                  # 4s at 60Hz: enough to close ~10m at 4.4 m/s
 
 
-## Stands in for the netmove movement state Tornado._on_ground reads off a real player.
-class Stance:
-	var on_floor := true
-
-
-class FakeMovement:
-	var state := Stance.new()
-
-
-## Damageable stand-in for a player. A CharacterBody3D, because the vortex only throws what
-## has a velocity to overwrite.
+## Damageable stand-in for a player.
 class DummyTarget extends CharacterBody3D:
 	var is_dead := false
 	var team := GameConsts.Team.RED
 	var damage_taken := 0.0
 	var hits := 0
-	## The funnel only touches what is standing, and it reads that from netmove when the victim
-	## has a simulation. A bare body never calls move_and_slide, so the engine reports it
-	## airborne forever and every victim here would be immune — so these carry a stance instead,
-	## standing by default. The flight test sets it down to be genuinely off the ground.
-	var movement := FakeMovement.new()
-
-	func has_server_movement() -> bool:
-		return true
-
-	func get_server_movement() -> FakeMovement:
-		return movement
 
 	func take_damage(amount: float, _type: int, _attacker) -> void:
 		damage_taken += amount
@@ -57,6 +36,25 @@ class DummyCaster extends CharacterBody3D:
 
 	func _active_camera() -> Camera3D:
 		return null
+
+
+var _weather: WeatherSystem
+var _was_weather: WeatherSystem
+
+
+## The tornado's air is the weather's (WeatherSystem.airflow), so every test has one: no map and no
+## rain floor, so no wind of its own, and out of the tree, so its carrier runs only when a test
+## drives it (_carry_corpse).
+func _setup_test(_test_name: String) -> void:
+	_was_weather = Game.weather_system
+	_weather = WeatherSystem.new()
+	Game.weather_system = _weather
+
+
+func _teardown_test() -> void:
+	Game.weather_system = _was_weather
+	_weather.free()
+	super._teardown_test()
 
 
 ## Mirrors main._spawn_dyn_entity: setup() first, add_child() after.
@@ -130,6 +128,7 @@ class SimVictim extends CharacterBody3D:
 	var sim
 	var body
 	var state
+	var ctx: PlayerMovementContext
 	var peak_rise := 0.0
 	var peak_vy := 0.0
 	var _floor_y := 0.0
@@ -146,12 +145,16 @@ class SimVictim extends CharacterBody3D:
 		body = GodotBodyScript.new(self)
 		state = Movement.MovementState.new()
 		state.bind_body(body)
+		ctx = PlayerMovementContext.new(self, null, null)
 
-	## One server tick: adopt whatever the tornado wrote, then simulate.
+	## One server tick: blown as a player is (PlayerMovementContext._blown), then simulated.
 	func step() -> void:
 		state.velocity = velocity
 		var cmd := InputCommand.new()
 		cmd.delta = 1.0 / 60.0
+		var mods := Movement.MovementModifiers.new()
+		ctx._blown(mods, sim.cfg, state, cmd)
+		state.velocity += mods.velocity_add
 		sim.simulate_tick(body, state, cmd)
 		velocity = state.velocity
 		peak_rise = maxf(peak_rise, global_position.y - _floor_y)
@@ -177,129 +180,111 @@ func _sim_victim_at(pos: Vector3, floor_y: float) -> SimVictim:
 	return v
 
 
-## The regression. GoldSrc keeps you standing until you are moving up faster than 180 u/s and
-## throws away a standing player's vertical velocity, so every weaker lift did nothing at all.
-## We applied them, and they floated a victim gently up out of the funnel's reach before the pull
-## could drag them to the middle where the real throw is — "it damaged me but barely lifted me".
-func test_a_weak_lift_leaves_you_standing() -> void:
-	var ground := _floor_at(ARENA - Vector3(0.0, 0.5, 0.0))
-	var floor_y: float = ground.global_position.y + 0.5
-	var funnel := _tornado_at(ARENA)
-	funnel.set_physics_process(false)  # the throw is put to it directly, at a distance we choose
-	var victim := _sim_victim_at(ARENA + Vector3(1.6, 0.0, 0.0), floor_y)
-
-	for i in 5:  # let them settle onto the floor first — the rule only applies to a standing victim
-		await (Engine.get_main_loop() as SceneTree).physics_frame
+func _run_victim(victim: SimVictim, ticks: int) -> void:
+	for i in ticks:
+		await _physics_frame()
 		victim.step()
-	assert_true(victim.is_on_floor(), "the victim is standing on the ground")
-
-	# However near the eye, a victim being dragged rather than thrown gets no lift at all.
-	# Nudging them gently upward is what floated them out of reach.
-	for offset in [Vector3(-1.6, 0.0, 0.0), Vector3(-0.05, 0.0, 0.0)]:
-		funnel._grip(victim, offset, false)
-		assert_almost_eq(victim.velocity.y, 0.0, 0.001,
-			"no lift %.2f m from the eye — the ground eats it, as GoldSrc did" % offset.length())
-		assert_gt(Vector2(victim.velocity.x, victim.velocity.z).length(), 0.0,
-			"while the pull still drags them toward the middle")
 
 
-## And when it does get on top of them, the throw is a throw — metres, not a bob.
+## Along the ground the air drags a victim in toward the middle, feet still down.
+func test_it_drags_you_in_along_the_ground() -> void:
+	var ground := _floor_at(ARENA - Vector3(0.0, 0.5, 0.0))
+	var funnel := _tornado_at(ARENA)
+	funnel.set_physics_process(false)  # stands still, so the victim's distance is the air's doing
+	var victim := _sim_victim_at(ARENA + Vector3(2.4, 0.0, 0.0), ground.global_position.y + 0.5)
+	await _run_victim(victim, 10)
+	assert_true(victim.state.on_floor, "dragged, feet down")
+	var r := Vector2(victim.global_position.x - ARENA.x, victim.global_position.z - ARENA.z).length()
+	assert_lt(r, 2.3, "and in toward the middle (%.2f m out)" % r)
+
+
+## ...but not from beyond its reach: the way out is to outrun it.
+func test_beyond_its_field_the_air_is_still() -> void:
+	var funnel := _tornado_at(ARENA)
+	funnel.set_physics_process(false)
+	assert_eq(funnel.airflow(ARENA + Vector3(Tornado.FIELD + 0.1, 0.5, 0.0)), Vector3.ZERO, "out past its field")
+	assert_eq(funnel.airflow(ARENA + Vector3(0.0, Tornado.OUTFLOW_BAND.y + 0.1, 0.0)), Vector3.ZERO, "and above it")
+	var at_reach := funnel.airflow(ARENA + Vector3(Tornado.REACH, 0.5, 0.0))
+	assert_lt(at_reach.x, -30.0, "at its reach, hard inward (%.1f)" % at_reach.x)
+	assert_gt(funnel.airflow(ARENA + Vector3(0.2, 1.0, 0.0)).y, 25.0, "up its core")
+	assert_gt(funnel.airflow(ARENA + Vector3(1.0, Tornado.LIFT_TOP + 1.0, 0.0)).x, 10.0, "and out over its top")
+
+
+## And when it does get on top of them, the throw is a throw: metres, not a bob.
 func test_a_victim_it_reaches_is_launched_not_floated() -> void:
 	var ground := _floor_at(ARENA - Vector3(0.0, 0.5, 0.0))
 	var floor_y: float = ground.global_position.y + 0.5
 	_tornado_at(ARENA, Vector3.FORWARD)
 	var victim := _sim_victim_at(ARENA + Vector3(0.0, 0.0, -5.0), floor_y)
-
-	for i in 300:  # five seconds: it has to cross the gap first
-		await (Engine.get_main_loop() as SceneTree).physics_frame
-		victim.step()
-
+	await _run_victim(victim, 300)  # five seconds: it has to cross the gap first
 	assert_gt(victim.damage_taken, 0.0, "it reached them")
-	# A shade under TOSS_LIFT: the throw lands while the victim is still flagged as standing, so
-	# it takes one tick of ground friction before the next move sends them airborne.
-	assert_gt(victim.peak_vy, Tornado.TOSS_LIFT * 0.85,
-		"and threw them properly, not in nudges (peak %.1f m/s)" % victim.peak_vy)
+	assert_gt(victim.peak_vy, 6.0, "and threw them properly, not in nudges (peak %.1f m/s)" % victim.peak_vy)
 	assert_gt(victim.peak_rise, 3.0, "well off the ground (%.1f m)" % victim.peak_rise)
 
 
-## The other half of being caught, and what the user asked for over the original's design: the
-## funnel drags you to its middle and then throws you up and AWAY from it. Thrown inward (as the
-## original did) you simply came back to the eye and died there.
+## Up its core and out over the top: a victim comes down beside the funnel, to be run down again,
+## not back into its eye. Thrown inward (as the original did) you simply came back to the eye and
+## died there.
 func test_it_throws_what_it_catches_up_and_outward() -> void:
+	var ground := _floor_at(ARENA - Vector3(0.0, 0.5, 0.0))
+	var floor_y: float = ground.global_position.y + 0.5
+	var funnel := _tornado_at(ARENA)
+	funnel.set_physics_process(false)
+	var victim := _sim_victim_at(ARENA + Vector3(0.4, 0.0, 0.0), floor_y)
+	var landed_at := -1.0
+	for i in 240:
+		await _physics_frame()
+		victim.step()
+		if victim.peak_rise > 3.0 and victim.state.on_floor:
+			landed_at = Vector2(victim.global_position.x - ARENA.x, victim.global_position.z - ARENA.z).length()
+			break
+	assert_gt(victim.peak_rise, 3.0, "up its core (%.1f m)" % victim.peak_rise)
+	assert_gt(landed_at, Tornado.REACH, "and down outside its reach (%.1f m out)" % landed_at)
+
+
+## Thrown up its core it still bites: the air throws a victim clear, so the bite is what a catch
+## costs. One catch is most of a wizard; two are any of them.
+func test_a_catch_costs_most_of_a_wizard() -> void:
 	var ground := _floor_at(ARENA - Vector3(0.0, 0.5, 0.0))
 	var funnel := _tornado_at(ARENA)
 	funnel.set_physics_process(false)
 	var victim := _sim_victim_at(ARENA + Vector3(0.4, 0.0, 0.0), ground.global_position.y + 0.5)
-	for i in 5:
-		await (Engine.get_main_loop() as SceneTree).physics_frame
+	for i in 240:
+		await _physics_frame()
+		if i % 6 == 0:
+			funnel._whirl()  # its think, at 10 Hz
 		victim.step()
-	assert_true(victim.is_on_floor(), "standing in the funnel")
-
-	# Dragged inward while the funnel is between throws...
-	var to_eye := Vector3(-0.4, 0.0, 0.0)
-	funnel._grip(victim, to_eye, false)
-	assert_almost_eq(victim.velocity.y, 0.0, 0.001, "dragged, feet down")
-	assert_lt(Vector3(victim.velocity.x, 0.0, victim.velocity.z).normalized().dot(Vector3(1, 0, 0)), 0.0,
-		"and toward the middle, not away from it")
-
-	# ...and heaved out when its clock comes round.
-	funnel._grip(victim, to_eye, true)
-
-	assert_almost_eq(victim.velocity.y, Tornado.TOSS_LIFT, 0.01,
-		"thrown up at what a throw is worth, not at whatever distance it happened to be")
-	assert_lt(victim.velocity.y, Tornado.MAX_LIFT + 0.001, "and never past the cap")
-	# Outward: along +X, the way the victim already lies from the funnel — not back into it.
-	var horizontal := Vector3(victim.velocity.x, 0.0, victim.velocity.z)
-	assert_gt(horizontal.normalized().dot(Vector3(1, 0, 0)), 0.99, "and away from the middle")
-	assert_almost_eq(horizontal.length(), Tornado.TOSS_OUT, 0.01, "at the throw's own speed")
-
-	# It clears the funnel: up at that speed, the arc carries them past its 2.5 m reach.
-	var airborne: float = 2.0 * victim.velocity.y / 20.0  # world gravity
-	assert_gt(horizontal.length() * airborne, Tornado.REACH, "landing outside it, to be run down again")
+		if victim.peak_rise > 3.0 and victim.state.on_floor:
+			break
+	assert_gt(victim.damage_taken, 50.0, "most of a wizard (%.0f)" % victim.damage_taken)
+	assert_lt(victim.damage_taken, 100.0, "but not all of one in a single catch")
 
 
-## And once they are off the ground the funnel has nothing on them at all — no grip and no bite,
-## ballistic and safe until they land. The throw is the relief; without this the funnel simply
-## keeps pace underneath whoever it threw and grinds them out in mid-air anyway, which is what
-## "stuck in it forever till they die" was.
-func test_the_funnel_lets_go_of_you_in_the_air() -> void:
-	_floor_at(ARENA - Vector3(0.0, 0.5, 0.0))
-	var funnel := _tornado_at(ARENA)
-	funnel.set_physics_process(false)
-
-	# A victim sailing through the funnel, feet off the floor.
-	var flier := _target_at(ARENA + Vector3(0.3, 1.2, 0.0))
-	flier.movement.state.on_floor = false
-	flier.velocity = Vector3(3.0, 6.0, 0.0)
-	var before := flier.velocity
-	await _tick(1)
-
-	funnel._whirl()
-	assert_vec3_almost_eq(flier.velocity, before, 0.001, "the funnel does not touch their flight")
-	assert_eq(flier.damage_taken, 0.0, "and does not grind them either, until they come down")
+## Drive the weather's rigid-body carrier over a corpse for `ticks`, as WeatherSystem does each
+## physics frame in a match. Returns the fastest any bone rose.
+func _carry_corpse(corpse: TumblingCorpse, ticks: int) -> float:
+	var lifted := 0.0
+	for i in ticks:
+		await _physics_frame()
+		for bone in corpse._bones:
+			if not _weather._carried.has(bone):
+				_weather._track_blown(bone)
+		_weather._carry(1.0 / 60.0)
+		for bone in corpse._bones:
+			lifted = maxf(lifted, bone.linear_velocity.y)
+	return lifted
 
 
-## The TODO's question, answered: what a tornado kills it goes on throwing. A corpse is not
-## damageable and is on nobody's side, so the funnel reaches it as something it can still move
-## rather than as something it can hurt.
+## What a tornado kills it goes on throwing: a corpse's bones are in its air like anything else.
 func test_it_goes_on_throwing_what_it_killed() -> void:
 	_floor_at(ARENA - Vector3(0.0, 0.5, 0.0))
 	var funnel := _tornado_at(ARENA)
-	# Ahead of the funnel along its heading, so it is still inside the reach when the throw
-	# clock comes round half a second in.
-	var corpse := _corpse_at(ARENA + Vector3(0.0, 0.0, -1.5))
+	funnel.set_physics_process(false)
+	var corpse := _corpse_at(ARENA + Vector3(0.0, 0.0, -0.5))
 	await _tick(2)
-	assert_true(corpse.is_in_group("pushable"), "the corpse is something the funnel can move")
-
-	var lifted := 0.0
-	for i in 45:  # 0.75s: past the funnel's first throw
-		await _tick(1)
-		for bone in corpse._bones:
-			lifted = maxf(lifted, bone.linear_velocity.y)
-	assert_gt(lifted, Tornado.TOSS_LIFT * 0.5,
-		"the funnel heaved the corpse it was standing over (peak %.1f m/s up)" % lifted)
+	var lifted := await _carry_corpse(corpse, 45)
+	assert_gt(lifted, 3.0, "the funnel lifted the corpse it stood over (peak %.1f m/s up)" % lifted)
 	assert_false(corpse._baked, "and a corpse being thrown around has not settled")
-	assert_true(is_instance_valid(funnel), "the funnel is still going")
 
 
 ## ...but only while there is a rig to throw. A corpse that has lain still long enough to bake
@@ -314,15 +299,29 @@ func test_a_settled_corpse_is_left_where_it_lies() -> void:
 			break
 	assert_true(corpse._baked, "the corpse settled and baked")
 	var rest := corpse.global_position
-
 	_tornado_at(corpse.global_position)
-	await _tick(45)
-
+	await _carry_corpse(corpse, 45)
 	assert_true(corpse.global_position.distance_to(rest) < 0.01, "the funnel passed over it")
 
 
-## The grind is on the original's 0.1s think, so standing in one costs 150/s — not
-## 15 per physics frame.
+## A spell flying past bends into it.
+func test_a_spell_flying_past_is_drawn_in() -> void:
+	var funnel := _tornado_at(ARENA)
+	funnel.set_physics_process(false)
+	var shot := Projectile.new()
+	shot.set_physics_process(false)
+	shot.set_process(false)
+	_root().add_child(shot)
+	_keep(shot)
+	shot.global_position = ARENA + Vector3(2.0, 0.5, -1.0)
+	shot.direction = Vector3(0, 0, 1)
+	shot.speed = 20.0
+	shot._blow(0.1)
+	assert_lt(shot.direction.x, 0.0, "a shot passing beside it bends toward it")
+
+
+## The grind is on the original's 0.1s think, so being in one costs 80/s — not
+## 8 per physics frame.
 func test_it_grinds_on_a_timer_not_every_frame() -> void:
 	_floor_at(ARENA - Vector3(0.0, 0.5, 0.0))
 	_tornado_at(ARENA)
@@ -381,8 +380,7 @@ func test_it_spares_its_own_side() -> void:
 
 	await _tick(30)
 
-	assert_eq(ally.damage_taken, 0.0, "a teammate standing in it is untouched")
-	assert_eq(ally.velocity.y, 0.0, "and not thrown either")
+	assert_eq(ally.damage_taken, 0.0, "a teammate standing in it is not ground down (its air throws anyone)")
 
 
 ## The tornado reasons from teams, like the giant plant: only a teamless one still spares
