@@ -55,12 +55,6 @@ varying vec3 world_pos;
 // For light(): the surface as lit before any real-time light, gamma.
 varying vec3 lit_in;
 varying vec3 base_in;
-#ifdef MDL_HOLIDAY
-// The grid's up face is what a point sees looking up, which under the sky is the sky: no lightmap,
-// next to no light. GoldSrc lit a model from the floor under it, so tops were never darker than
-// sides. A prop is mostly top seen from above, so up-facing surfaces take at least the sides' mean.
-varying vec3 side_light;
-#endif
 
 void vertex() {
 #ifdef MDL_HOLIDAY
@@ -70,10 +64,6 @@ void vertex() {
 #endif
 	world_normal = (MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz;
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-#ifdef MDL_HOLIDAY
-	side_light = (ambient_cube(world_pos, vec3(1.0, 0.0, 0.0)) + ambient_cube(world_pos, vec3(-1.0, 0.0, 0.0))
-		+ ambient_cube(world_pos, vec3(0.0, 0.0, 1.0)) + ambient_cube(world_pos, vec3(0.0, 0.0, -1.0))) * 0.25;
-#endif
 }
 
 void fragment() {
@@ -90,9 +80,6 @@ void fragment() {
 	ALBEDO = albedo.rgb * overbright;
 
 	vec3 ambient = ambient_cube(world_pos, world_normal);
-#ifdef MDL_HOLIDAY
-	ambient = max(ambient, side_light * clamp(normalize(world_normal).y, 0.0, 1.0));
-#endif
 	// 1.5x compensates for GoldSrc half-intensity lightmaps without fully doubling.
 	vec3 base_srgb = linear_output ? gs_to_srgb(albedo.rgb) : albedo.rgb;
 	vec3 lit_srgb = base_srgb * ambient * 1.5;
