@@ -15,5 +15,5 @@ void vertex() {
 void fragment() {
 	float d = length(UV * 2.0 - 1.0);
 	ALBEDO = vec3(0.0);
-	ALPHA = (1.0 - smoothstep(0.5, 1.0, d)) * DARKNESS;
+	ALPHA = (1.0 - smoothstep(0.35, 1.0, d)) * DARKNESS;
 }

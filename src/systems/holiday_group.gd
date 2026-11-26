@@ -6,8 +6,8 @@ extends Node3D
 
 const _SHADER := preload("res://shaders/holiday_decor.gdshader")
 const _SHADOW_SHADER := preload("res://shaders/holiday_shadow.gdshader")
-## A prop's blob shadow: this much wider than its footprint, this far off the floor.
-const SHADOW_SPREAD := 1.7
+## A prop's blob shadow: an ellipse this much wider than what it built, this far off the floor.
+const SHADOW_SPREAD := 1.2
 const SHADOW_LIFT := 0.015
 const POP_SOUND := "misc/confetti_pop.wav"
 const CONFETTI := {
@@ -54,12 +54,11 @@ func setup(data: Dictionary, is_host: bool) -> void:
 		for k in props.size():
 			var p: Dictionary = props[k]
 			geo.prop = k
-			HolidayProps.build(geo, Transform3D(Basis(Vector3.UP, p["yaw"]), p["at"]), p["kind"], p["size"], p["seed"])
+			var xf := Transform3D(Basis(Vector3.UP, p["yaw"]), p["at"])
+			var first := geo.verts.size()
+			HolidayProps.build(geo, xf, p["kind"], p["size"], p["seed"])
 			shadows.prop = k
-			var r: float = p["r"] * SHADOW_SPREAD
-			var c: Vector3 = p["at"] + Vector3(0, 0.01 + SHADOW_LIFT, 0)  # `at` stands 1 cm into the floor
-			shadows.quad(Transform3D.IDENTITY, c + Vector3(-r, 0, -r), c + Vector3(r, 0, -r),
-				c + Vector3(-r, 0, r), c + Vector3(r, 0, r), Color.BLACK)
+			_shadow(shadows, xf, geo.verts.slice(first))
 		_mesh = MeshInstance3D.new()
 		_mesh.mesh = geo.to_mesh()
 		shadows.add_to(_mesh.mesh)
@@ -87,6 +86,22 @@ static func material() -> ShaderMaterial:
 		AssetLoader.light_grid.bind(_material)
 		_bound_to = AssetLoader.light_grid
 	return _material
+
+
+## The prop's shadow, fitted to what it built: its outline seen from above, in its own frame.
+static func _shadow(shadows: HolidayProps.Geo, xf: Transform3D, verts: PackedVector3Array) -> void:
+	var inv := xf.affine_inverse()
+	var lo := Vector2(INF, INF)
+	var hi := -lo
+	for v in verts:
+		var l := inv * v
+		lo = Vector2(minf(lo.x, l.x), minf(lo.y, l.z))
+		hi = Vector2(maxf(hi.x, l.x), maxf(hi.y, l.z))
+	var mid := (lo + hi) * 0.5
+	var half := (hi - lo) * 0.5 * SHADOW_SPREAD
+	var y := 0.01 + SHADOW_LIFT  # `at` stands 1 cm into the floor
+	shadows.quad(xf, Vector3(mid.x - half.x, y, mid.y - half.y), Vector3(mid.x + half.x, y, mid.y - half.y),
+		Vector3(mid.x - half.x, y, mid.y + half.y), Vector3(mid.x + half.x, y, mid.y + half.y), Color.BLACK)
 
 
 static func shadow_material() -> ShaderMaterial:
