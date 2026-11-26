@@ -270,7 +270,7 @@ func _blown(mods: Movement.MovementModifiers, cfg, state: Movement.MovementState
 	var height: float = cfg.crouch_height if state.is_crouched else cfg.stand_height
 	var middle := state.position + Vector3.UP * (height * 0.5)
 	mods.velocity_add += weather.blow_walker(middle, state.velocity, state.on_floor,
-			cfg.gravity * state.gravity_scale, float(cmd.delta))
+			cfg.gravity * state.gravity_scale, float(cmd.delta), _owner)
 
 
 ## Rain-soaked ground is a little slick: less ground friction, and so less grip to speed up. Ice

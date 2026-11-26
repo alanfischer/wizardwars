@@ -136,7 +136,7 @@ func _blow(delta: float) -> void:
 	if weather == null or speed <= 0.0:
 		return
 	var velocity := direction * speed
-	var push := weather.wind_push(global_position, velocity, wind_weight)
+	var push := weather.wind_push(global_position, velocity, wind_weight, self)
 	if push == Vector3.ZERO:
 		return
 	velocity += push * delta

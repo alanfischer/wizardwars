@@ -87,6 +87,7 @@ const SHOTS := {
 	"combo_wombat": [E.LIFE, "wombat_weapon", {target_m = 3.5, cam = "close", frames = [0.15, 0.3, 0.45, 0.6, 0.8, 1.0, 1.3, 1.6]}],
 	"combo_tornado": [E.EARTH, "tornado_weapon", {cam = "wide", frames = [1.0, 2.0, 3.0, 4.5, 6.0]}],
 	"combo_raise_dead": [E.DEATH, "raise_dead_weapon", {target_m = 4.0, extra = 2, frames = [0.5, 1.5, 2.5, 3.5, 5.0, 7.0]}],
+	"combo_windwall": [E.WIND, "windwall_weapon", {target_m = 5.0, hold = 3.0, frames = [0.1, 0.3, 0.6, 1.2]}],
 }
 
 var _pvs_cam: Camera3D = null

@@ -171,7 +171,7 @@ func _whirl() -> void:
 
 ## The air it moves at `p` (m/s), for WeatherSystem.airflow: in along the ground, round, up the
 ## core and out over the top, none beyond FIELD. It spares no one: wind has no side.
-func airflow(p: Vector3) -> Vector3:
+func airflow(p: Vector3, _who: Node = null) -> Vector3:
 	var off := p - global_position
 	var h := off.y
 	off.y = 0.0

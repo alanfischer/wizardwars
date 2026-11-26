@@ -29,8 +29,9 @@ const ROOF_REACH := 0.5
 ## body's exposure is looked at again.
 const CARRY_RESTING := 0.5
 const CARRY_LOOK := 0.25
-## Nodes that move the air themselves (a tornado), each with `airflow(p: Vector3) -> Vector3`, the
-## air's velocity it adds at `p` (m/s), zero beyond its reach. See airflow.
+## Nodes that move the air themselves (a tornado, a windwall), each with
+## `airflow(p: Vector3, who: Node) -> Vector3`, the air's velocity it adds at `p` (m/s), zero beyond
+## its reach. `who` is what is being blown, or null for anything; a source may spare it. See airflow.
 const WIND_SOURCES := &"wind_source"
 ## How fast (m/s) air that lifts harder than gravity takes a walker off the ground: see blow_walker.
 const LIFTOFF := 1.0
@@ -323,16 +324,17 @@ func footing(feet: Vector3) -> Vector2:
 
 ## The push of the air at `p` on a body there moving at `velocity` (m/s²), alike on every peer:
 ## it goes by the steady `wind` the server sets, never this peer's own gusts. `weight` scales it
-## per body.
-func wind_push(p: Vector3, velocity: Vector3, weight := 1.0) -> Vector3:
-	return push_through(airflow(p), velocity, weight)
+## per body; `who` is the body, for a source that spares some.
+func wind_push(p: Vector3, velocity: Vector3, weight := 1.0, who: Node = null) -> Vector3:
+	return push_through(airflow(p, Vector3.INF, who), velocity, weight)
 
 
 ## What the air does to a walker (a player, a monster) this tick: its change of velocity over
 ## `delta`. Standing, the ground eats a steady lift (GoldSrc keeps you on it), so air that lifts
 ## harder than `gravity` takes you off your feet at LIFTOFF instead, and carries you from there.
-func blow_walker(p: Vector3, velocity: Vector3, on_floor: bool, gravity: float, delta: float) -> Vector3:
-	var push := wind_push(p, velocity, 1.0)
+func blow_walker(p: Vector3, velocity: Vector3, on_floor: bool, gravity: float, delta: float,
+		who: Node = null) -> Vector3:
+	var push := wind_push(p, velocity, 1.0, who)
 	var change := push * delta
 	if on_floor and push.y > gravity:
 		change.y = maxf(change.y, LIFTOFF - velocity.y + gravity * delta)
@@ -340,22 +342,22 @@ func blow_walker(p: Vector3, velocity: Vector3, on_floor: bool, gravity: float, 
 
 
 ## The air moving at `p` (m/s): the wind, as far as `p` is open to it, and every WIND_SOURCES
-## node's own. `blowing` is the wind, the steady one unless said.
-func airflow(p: Vector3, blowing := Vector3.INF) -> Vector3:
+## node's own. `blowing` is the wind, the steady one unless said; `who` is what it blows on.
+func airflow(p: Vector3, blowing := Vector3.INF, who: Node = null) -> Vector3:
 	if blowing == Vector3.INF:
 		blowing = wind
-	var air := local_airflow(p)
+	var air := local_airflow(p, who)
 	if blowing != Vector3.ZERO:
 		air += blowing * wind_exposure(p, blowing)
 	return air
 
 
 ## Just the WIND_SOURCES' air at `p`, no sky needed: a tornado blows under a roof too.
-func local_airflow(p: Vector3) -> Vector3:
+func local_airflow(p: Vector3, who: Node = null) -> Vector3:
 	var air := Vector3.ZERO
 	for source in _wind_sources():
 		if is_instance_valid(source):
-			air += source.airflow(p)
+			air += source.airflow(p, who)
 	return air
 
 
@@ -419,7 +421,7 @@ func _carry(delta: float) -> void:
 		var mode := PhysicsServer3D.body_get_mode(rid)
 		if mode != PhysicsServer3D.BODY_MODE_RIGID and mode != PhysicsServer3D.BODY_MODE_RIGID_LINEAR:
 			continue
-		var air := local_airflow(body.global_position)
+		var air := local_airflow(body.global_position, body)
 		var asleep: bool = PhysicsServer3D.body_get_state(rid, PhysicsServer3D.BODY_STATE_SLEEPING)
 		var v: Vector3 = PhysicsServer3D.body_get_state(rid, PhysicsServer3D.BODY_STATE_LINEAR_VELOCITY)
 		if air == Vector3.ZERO and (asleep or v.length_squared() < CARRY_RESTING * CARRY_RESTING):
