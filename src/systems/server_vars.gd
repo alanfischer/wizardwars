@@ -81,6 +81,8 @@ func _register_defaults() -> void:
 	register("wet_friction", 0.85, Type.FLOAT)
 	# And on ground the wet has frozen over: below freezing, or where an ice spell landed on it.
 	register("ice_friction", 0.25, Type.FLOAT)
+	# Holiday dressing drawn on every map ("" = none); each peer places it itself. See HolidayDecor.
+	register("holiday", "", Type.STRING)
 
 
 func register(key: String, default_value, type: int, replicate: bool = true) -> void:

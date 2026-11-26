@@ -314,6 +314,19 @@ Rain-soaked ground out in the open is a little slick: up to 15% less ground fric
 `wet_friction` server var (`1` turns it off). The server sends how wet the ground is, so a client
 predicts the same slide.
 
+## Holidays
+
+`/holiday thanksgiving` sets little harvest groups (pumpkins, gourds, Indian corn and cornucopias
+spilling fruit) along the walls of every map; `/holiday christmas` sets trees hung with baubles,
+lights and a star, wrapped presents, candy canes and snowmen; `/holiday off` clears them. It is the
+`holiday` server var, so it lasts across map changes, and `--holiday christmas` sets it at launch.
+The tree lights and stars light themselves, so they still shine at night. Looks
+only: the props have no collision and nothing about them is sent. Each peer that draws the map
+places the same ones itself, seeded by the map and the holiday, on the bot nav's floor points
+(`src/systems/holiday_decor.gd`); the props are built from code (`holiday_props.gd`), coloured per
+vertex over detail layers drawn by `tools/holiday_art.py` (`models/holiday/detail.png`), and lit by
+the map's light grid like any model.
+
 ## BSP hull collision
 
 World collision traces the map's GoldSrc BSP clip hulls (exact plane normals, real

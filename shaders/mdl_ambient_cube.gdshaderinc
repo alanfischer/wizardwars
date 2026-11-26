@@ -1,5 +1,6 @@
 // Everything both MDL model shaders share. mdl_ambient_cube.gdshader includes this as-is;
-// mdl_ambient_cube_fade.gdshader defines MDL_FADE first and gets the alpha uniform with it.
+// mdl_ambient_cube_fade.gdshader defines MDL_FADE first and gets the alpha uniform with it;
+// holiday_decor.gdshader defines MDL_VERTEX_COLOR and is coloured by its vertices instead.
 //
 // They stay two shaders rather than one because writing ALPHA at all — even a constant 1.0 —
 // puts a spatial shader in the transparent pass and costs it the depth prepass. Every model in
@@ -16,6 +17,13 @@ uniform bool linear_output = false;
 
 #include "res://shaders/color_space.gdshaderinc"
 
+
+#ifdef MDL_VERTEX_COLOR
+// Gamma multipliers averaging 0.8 (tools/holiday_art.py), so DETAIL_GAIN keeps the vertex colour;
+// no source_color, so both renderers read the gamma numbers as stored. The layer rides in UV2.x.
+uniform sampler2DArray detail : filter_linear_mipmap, repeat_enable;
+const float DETAIL_GAIN = 1.25;
+#endif
 
 #ifdef MDL_FADE
 uniform float alpha : hint_range(0.0, 1.0) = 1.0;
@@ -52,7 +60,16 @@ void vertex() {
 }
 
 void fragment() {
+#ifdef MDL_VERTEX_COLOR
+	// Gamma, as a texel is after the sampler decodes it on the linear renderers.
+	vec4 texel = texture(detail, vec3(UV, round(UV2.x)));
+	// Alpha under 1 paints the layer's own colour on (a pattern); vertex alpha under 1 glows.
+	vec3 tinted = mix(texel.rgb, min(COLOR.rgb * texel.rgb * DETAIL_GAIN, vec3(1.0)), texel.a);
+	float self_lit = 1.0 - COLOR.a;
+	vec4 albedo = vec4(linear_output ? gs_to_linear(tinted) : tinted, 1.0);
+#else
 	vec4 albedo = texture(albedo_texture, UV);
+#endif
 	ALBEDO = albedo.rgb * overbright;
 
 	vec3 ambient = ambient_cube(world_pos, world_normal);
@@ -69,6 +86,9 @@ void fragment() {
 		float shell = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), GLOW_POWER);
 		lit_srgb = min(lit_srgb + glow_color * glow_strength * mix(GLOW_FLOOR, 1.0, shell), vec3(1.0));
 	}
+#ifdef MDL_VERTEX_COLOR
+	lit_srgb = mix(lit_srgb, min(base_srgb * 1.3, vec3(1.0)), self_lit);
+#endif
 	EMISSION = linear_output ? gs_to_linear(lit_srgb) : lit_srgb;
 	lit_in = lit_srgb;
 	base_in = base_srgb;
