@@ -1,12 +1,11 @@
 class_name HolidayDecor
-extends Node3D
-## Holiday dressing: little groups of props set down along the walls of whatever map is loaded,
-## for the `holiday` server var. Looks only: nothing collides, nothing is networked. Every peer
-## that draws the map places the same ones itself, seeded by the map and the holiday, on the bot
-## nav's floor points.
+extends Node
+## Holiday dressing, the server's half: picks where little groups of props go along the walls of
+## whatever map is loaded, for the `holiday` server var, and spawns each as a HolidayGroup entity.
+## The entities do the rest (drawing, popping, coming back) through the usual entity sync.
 
 const WaypointGraph = preload("res://src/bot/waypoint_graph.gd")
-const _SHADER := preload("res://shaders/holiday_decor.gdshader")
+const _GROUP_SCRIPT := "res://src/systems/holiday_group.gd"
 
 const HOLIDAYS := {
 	"thanksgiving": "pumpkins, gourds, Indian corn and cornucopias along the walls",
@@ -19,13 +18,17 @@ const _WALL_REACH := 2.5
 const _SKIP_FLAGS := WaypointGraph.FL_PRECISE | WaypointGraph.FL_LIFT
 
 var map_name := ""
-var _material: ShaderMaterial
+var _groups: Array[Node] = []
 var _generation := 0
 
 
 func _ready() -> void:
 	ServerVars.value_changed.connect(_on_server_var_changed)
 	_rebuild()
+
+
+func _exit_tree() -> void:
+	_clear()
 
 
 func _on_server_var_changed(key: String, _value: Variant) -> void:
@@ -38,10 +41,8 @@ static func current() -> String:
 
 
 func _rebuild() -> void:
-	_generation += 1
+	_clear()
 	var generation := _generation
-	for child in get_children():
-		child.queue_free()
 	var holiday := current()
 	if not HOLIDAYS.has(holiday):
 		return
@@ -50,23 +51,27 @@ func _rebuild() -> void:
 	await get_tree().physics_frame
 	if generation != _generation or not is_inside_tree():
 		return
-	var space := get_world_3d().direct_space_state
-	var groups := place(space, floor_points(map_name), (map_name + ":" + holiday).hash(), holiday)
-	for group: MeshInstance3D in groups:
-		group.mesh.surface_set_material(0, _get_material())
-		add_child(group)
-	Log.info("[Holiday] %s: %d groups on %s" % [holiday, groups.size(), map_name])
+	var space := get_viewport().find_world_3d().direct_space_state
+	var placed := place(space, floor_points(map_name), (map_name + ":" + holiday).hash(), holiday)
+	for data in placed:
+		_spawn(data)
+	Log.info("[Holiday] %s: %d groups on %s" % [holiday, placed.size(), map_name])
 
 
-func _get_material() -> ShaderMaterial:
-	if _material == null:
-		_material = ShaderMaterial.new()
-		_material.shader = _SHADER
-		_material.set_shader_parameter("linear_output", EntityRender.renderer_is_linear())
-		_material.set_shader_parameter("detail", HolidayProps.detail_texture())
-		if AssetLoader.light_grid:
-			AssetLoader.light_grid.bind(_material)
-	return _material
+## Kept through a round reset, which frees every other dynamic entity, as the siege altar is.
+func _spawn(data: Dictionary) -> void:
+	var node := NetworkManager.spawn_dynamic_entity(data)
+	if node:
+		node.set_meta("_persist_round", true)
+		_groups.append(node)
+
+
+func _clear() -> void:
+	_generation += 1
+	for node in _groups:
+		if is_instance_valid(node):
+			node.queue_free()
+	_groups.clear()
 
 
 ## Where a player can stand: the baked nav, else the original's hand waypoints.
@@ -81,9 +86,9 @@ static func floor_points(map: String) -> PackedVector3Array:
 	return out
 
 
-## One mesh per group, in world space, the same for the same points and seed.
+## The groups, the same for the same points and seed, as HolidayGroup spawn data.
 static func place(space: PhysicsDirectSpaceState3D, points: PackedVector3Array, seed_value: int,
-		holiday: String) -> Array[MeshInstance3D]:
+		holiday: String) -> Array[Dictionary]:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
 	var order := range(points.size())
@@ -92,7 +97,7 @@ static func place(space: PhysicsDirectSpaceState3D, points: PackedVector3Array, 
 		var tmp: int = order[i]
 		order[i] = order[j]
 		order[j] = tmp
-	var out: Array[MeshInstance3D] = []
+	var out: Array[Dictionary] = []
 	var taken := PackedVector3Array()
 	for idx: int in order:
 		if out.size() >= MAX_GROUPS:
@@ -105,15 +110,12 @@ static func place(space: PhysicsDirectSpaceState3D, points: PackedVector3Array, 
 			continue
 		if _near_any(taken, frame.origin, GROUP_SPACING):
 			continue
-		var geo := HolidayProps.Geo.new()
-		if not _dress_group(geo, space, frame, rng, _recipe(holiday, rng)):
+		var props := _dress_group(space, frame, rng, _recipe(holiday, rng))
+		if props.is_empty():
 			continue
 		taken.append(frame.origin)
-		var mi := MeshInstance3D.new()
-		mi.name = "Group%d" % out.size()
-		mi.mesh = geo.to_mesh()
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		out.append(mi)
+		out.append({"script_path": _GROUP_SCRIPT, "position": frame.origin,
+			"yaw": atan2(frame.basis.z.x, frame.basis.z.z), "holiday": holiday, "props": props})
 	return out
 
 
@@ -151,8 +153,8 @@ static func _wall_frame(space: PhysicsDirectSpaceState3D, p: Vector3, turn: floa
 static func _ray(space: PhysicsDirectSpaceState3D, from: Vector3, to: Vector3) -> Dictionary:
 	var q := PhysicsRayQueryParameters3D.create(from, to, GameConsts.MASK_WORLD)
 	var hit := space.intersect_ray(q)
-	if hit.is_empty() or hit.get("collider") is AnimatableBody3D:  # doors, plats, trains move
-		return {} if hit.is_empty() else {"moving": true}
+	if hit.get("collider") is AnimatableBody3D:  # doors, plats, trains move
+		return {"moving": true}
 	return hit
 
 
@@ -181,7 +183,7 @@ static func _recipe(holiday: String, rng: RandomNumberGenerator) -> Array[Dictio
 		items.append({"kind": kind, "r": r, "size": size, "h": h, "big": big})
 	match holiday:
 		"thanksgiving":
-			match rng.randi() % 3:
+			match [0, 0, 1, 2][rng.randi() % 4]:  # the cornucopia leads half of them
 				0:
 					add.call("cornucopia", 0.6, rng.randf_range(0.85, 1.15), 0.6, true)
 					var p := rng.randf_range(0.2, 0.32)
@@ -220,48 +222,39 @@ static func _recipe(holiday: String, rng: RandomNumberGenerator) -> Array[Dictio
 
 
 ## The props of `items` against the wall at `frame`, each kept only where all of it has floor
-## under it and nothing between it and the group's middle. False if none of the big ones fit.
-static func _dress_group(geo: HolidayProps.Geo, space: PhysicsDirectSpaceState3D, frame: Transform3D,
-		rng: RandomNumberGenerator, items: Array[Dictionary]) -> bool:
+## under it and nothing between it and the group's middle, as HolidayGroup records in the
+## group's frame. Empty if none of the big ones fit.
+static func _dress_group(space: PhysicsDirectSpaceState3D, frame: Transform3D, rng: RandomNumberGenerator,
+		items: Array[Dictionary]) -> Array:
+	var props := []
 	var discs := []  # [Vector2 local xz, radius]
 	var centrepieces := 0
 	for item in items:
 		if not item["big"] and centrepieces == 0:
-			return false
+			return []
 		var kind: String = item["kind"]
-		var size: float = item["size"]
 		var r: float = item["r"]
-		var leans := kind in ["corn", "canes"]
-		for attempt in 10:
+		for attempt in (24 if kind == "cornucopia" else 10):  # the widest, so the hardest to fit
 			var at := Vector2(rng.randf_range(-1.2, 1.2), r + 0.02 + rng.randf_range(0.0, 0.1 if item["big"] else 0.5))
-			if leans:
-				at.y = 0.16
+			if kind in ["corn", "canes"]:
+				at.y = 0.16  # stood in front of the wall to lean back on it
 			if _overlaps(discs, at, r):
 				continue
 			var yaw := rng.randf() * TAU
-			if kind == "cornucopia":
-				yaw = (0.0 if rng.randf() < 0.5 else PI) + rng.randf_range(-0.5, 0.5)
-			elif kind in ["tree", "snowman"]:
-				yaw = rng.randf_range(-0.4, 0.4)  # star and face out of the wall
+			match kind:
+				"cornucopia": yaw = (0.0 if rng.randf() < 0.5 else PI) + rng.randf_range(-0.5, 0.5)
+				"tree", "snowman": yaw = rng.randf_range(-0.4, 0.4)  # star and face out of the wall
+				"corn", "canes": yaw = 0.0  # leaning back on the wall
 			var spot := _settle(space, frame, at, r, item["h"])
 			if is_nan(spot):
 				continue
-			var xf := frame * Transform3D(Basis(Vector3.UP, yaw), Vector3(at.x, spot - frame.origin.y - 0.01, at.y))
-			var foot := frame * Transform3D(Basis.IDENTITY, Vector3(at.x, spot - frame.origin.y, at.y))
-			match kind:
-				"pumpkin": HolidayProps.pumpkin(geo, xf, rng, size)
-				"gourd": HolidayProps.gourd(geo, xf, rng, size)
-				"cornucopia": HolidayProps.cornucopia(geo, xf, rng, size)
-				"corn": _leaning(geo, foot, rng, size, 3, 0.28, HolidayProps.corn_ear)
-				"tree": HolidayProps.tree(geo, xf, rng, size)
-				"present": HolidayProps.present(geo, xf, rng, size)
-				"snowman": HolidayProps.snowman(geo, xf, rng, size)
-				"canes": _leaning(geo, foot, rng, size, 2, 0.6, HolidayProps.candy_cane)
 			discs.append([at, r])
+			props.append({"kind": kind, "size": item["size"], "seed": rng.randi(), "r": r, "h": item["h"],
+				"at": Vector3(at.x, spot - frame.origin.y - 0.01, at.y), "yaw": yaw})
 			if item["big"]:
 				centrepieces += 1
 			break
-	return centrepieces > 0
+	return props if centrepieces > 0 else []
 
 
 static func _overlaps(discs: Array, at: Vector2, r: float) -> bool:
@@ -289,16 +282,3 @@ static func _settle(space: PhysicsDirectSpaceState3D, frame: Transform3D, at: Ve
 	if not _ray(space, centre + Vector3(0, 0.05, 0), centre + Vector3(0, height + 0.1, 0)).is_empty():
 		return NAN
 	return y
-
-
-## `count` of something long (an ear of corn, a candy cane) standing on its end in front of the
-## wall and leaning back against it, fanned `spread` radians apart.
-static func _leaning(geo: HolidayProps.Geo, foot: Transform3D, rng: RandomNumberGenerator, length: float,
-		count: int, spread: float, build: Callable) -> void:
-	var lean := atan2(0.16, length * 0.95)
-	for k in count:
-		var fan := (k - (count - 1) * 0.5) * spread + rng.randf_range(-0.08, 0.08)
-		var spin := rng.randf() * TAU if count > 2 else rng.randf_range(-0.4, 0.4) + PI * k  # canes hook apart
-		var b := Basis(Vector3.RIGHT, -lean) * Basis(Vector3.BACK, fan * 0.5) * Basis(Vector3.UP, spin)
-		build.call(geo, foot * Transform3D(b, Vector3((k - (count - 1) * 0.5) * 0.05, 0, rng.randf_range(-0.02, 0.02))),
-				rng, length * rng.randf_range(0.9, 1.05))

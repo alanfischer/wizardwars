@@ -57,6 +57,11 @@ func load_map(map_name: String) -> bool:
 	weather.map_root = map_root
 	_parent.add_child(weather)
 	Game.weather_system = weather
+	if NetworkManager.is_authority():  # places the holiday props; clients get them as entities
+		_holiday = HolidayDecor.new()
+		_holiday.name = "HolidayDecor"
+		_holiday.map_name = map_name
+		_parent.add_child(_holiday)
 
 	if _rendered:
 		var watered := WaterSurfaces.apply(map_root, RenderQuality.water_depth_enabled())
@@ -66,10 +71,6 @@ func load_map(map_name: String) -> bool:
 		MapSun.setup(map_root)  # before the sky, which follows the sun only if it moves
 		_skybox.build(map_root)
 		NightMode.apply(map_root)  # after WaterSurfaces, so it collects the liquids as drawn
-		_holiday = HolidayDecor.new()
-		_holiday.name = "HolidayDecor"
-		_holiday.map_name = map_name
-		_parent.add_child(_holiday)
 
 	AssetLoader.precache_resources(_parent)  # so the first shot has no hitch
 	return true

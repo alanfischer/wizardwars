@@ -320,12 +320,17 @@ predicts the same slide.
 spilling fruit) along the walls of every map; `/holiday christmas` sets trees hung with baubles,
 lights and a star, wrapped presents, candy canes and snowmen; `/holiday off` clears them. It is the
 `holiday` server var, so it lasts across map changes, and `--holiday christmas` sets it at launch.
-The tree lights and stars light themselves, so they still shine at night. Looks
-only: the props have no collision and nothing about them is sent. Each peer that draws the map
-places the same ones itself, seeded by the map and the holiday, on the bot nav's floor points
-(`src/systems/holiday_decor.gd`); the props are built from code (`holiday_props.gd`), coloured per
-vertex over detail layers drawn by `tools/holiday_art.py` (`models/holiday/detail.png`), and lit by
-the map's light grid like any model.
+The tree lights and stars light themselves, so they still shine at night. Nobody bumps into a
+prop, but any blow (a shot, a spell, a blast, a swing) pops it in a burst of confetti, and it is
+back 20-35 s later. Nothing aims at them: they are `unhunted`, so bots, homing spells and monsters
+look past them.
+
+The server picks the spots, along walls on the bot nav's floor points (`src/systems/holiday_decor.gd`),
+and spawns each group as an ordinary dynamic entity (`holiday_group.gd`) that carries its props'
+recipe; every peer builds the props from that, in code (`holiday_props.gd`), coloured over detail
+layers drawn by `tools/holiday_art.py` and lit by the map's light grid like any model, each with a
+soft blob shadow baked into the group's mesh. Which props are popped rides the entity's snapshot,
+and the groups stay through round resets.
 
 ## BSP hull collision
 

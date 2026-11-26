@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Draw the holiday props' detail layers into models/holiday/detail.png.
+"""Draw the holiday props' detail layers into models/holiday/detail.png, and make the sound of
+one popping (sounds/misc/confetti_pop.wav).
 
 One strip of square layers, left to right in LAYERS order (HolidayProps.LAYER_* indexes it). A
 layer's colour is a multiplier in gamma space, averaging about 0.8 so the shader's 1.25 gain leaves
@@ -11,12 +12,15 @@ here from tileable noise and shapes; no photos.
 """
 
 import os
+import wave
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "models", "holiday", "detail.png")
+POP = os.path.join(ROOT, "sounds", "misc", "confetti_pop.wav")
+SR = 44100
 S = 256
 MEAN = 0.8
 LAYERS = ["plain", "pumpkin", "gourd", "kernel", "husk", "wicker", "stem", "apple",
@@ -134,9 +138,13 @@ def apple():
     return out
 
 
+def rgba(layer):
+    return layer if layer.shape[-1] == 4 else np.concatenate([layer, np.ones((S, S, 1))], -1)
+
+
 def painted(base, color, mask):
     """`color` painted over `base` where `mask` (0..1) is up: alpha 1 - mask."""
-    out = np.concatenate([base, np.ones((S, S, 1))], -1)
+    out = rgba(base)
     out[..., :3] = out[..., :3] * (1.0 - mask[..., None]) + np.array(color) * mask[..., None]
     out[..., 3] = 1.0 - mask
     return out
@@ -201,7 +209,7 @@ def candy():
     broad = np.clip(1.0 - np.abs(band - 0.25) / 0.14, 0.0, 1.0) ** 0.3
     thin = np.clip(1.0 - np.abs(band - 0.62) / 0.035, 0.0, 1.0) ** 0.3
     red = np.clip(broad + thin, 0.0, 1.0)
-    return painted(rgb(np.full((S, S), MEAN)), (0.78, 0.07, 0.08), red)
+    return painted(plain(), (0.78, 0.07, 0.08), red)
 
 
 def bark():
@@ -210,18 +218,40 @@ def bark():
     return rgb(lum / (lum.mean() / MEAN))
 
 
+def pop_sound():
+    """A party popper: a sharp crack, a small thump under it, then paper rustling down."""
+    rng = np.random.default_rng(131)
+    n = int(SR * 0.7)
+    t = np.arange(n) / SR
+    crack = np.diff(rng.standard_normal(n + 1)) * np.exp(-t / 0.004)
+    sweep = 2 * np.pi * np.cumsum(220.0 - 1400.0 * np.minimum(t, 0.08)) / SR
+    thump = 0.9 * np.sin(sweep) * np.exp(-t / 0.03)
+    rustle = np.zeros(n)
+    for _ in range(140):
+        at = int(SR * (0.04 + rng.exponential(0.14)))
+        if at >= n - 200:
+            continue
+        burst = rng.standard_normal(90) * np.exp(-np.arange(90) / 25.0)
+        rustle[at:at + 90] += np.diff(burst, prepend=0.0) * rng.uniform(0.2, 1.0)
+    rustle *= 0.12 * np.exp(-t / 0.3)
+    y = crack + thump + rustle
+    y *= np.minimum(1.0, (n - np.arange(n)) / (SR * 0.05))  # no click at the end
+    y = y / np.abs(y).max() * 0.8
+    with wave.open(POP, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(SR)
+        w.writeframes((y * 32767).astype("<i2").tobytes())
+    print("wrote %s" % POP)
+
+
 def main():
-    layers = []
-    for name in LAYERS:
-        layer = globals()[name]()
-        if layer.shape[-1] == 3:
-            layer = np.concatenate([layer, np.ones((S, S, 1))], -1)
-        layers.append(layer)
-    strip = np.concatenate(layers, axis=1)
+    strip = np.concatenate([rgba(globals()[name]()) for name in LAYERS], axis=1)
     img = Image.fromarray((np.clip(strip, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8), "RGBA")
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     img.save(OUT, optimize=True)
     print("wrote %s (%d layers)" % (OUT, len(LAYERS)))
+    pop_sound()
 
 
 if __name__ == "__main__":
