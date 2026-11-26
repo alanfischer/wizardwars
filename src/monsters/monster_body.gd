@@ -196,7 +196,7 @@ func _blown(delta: float) -> void:
 		return
 	var middle := state.position + Vector3.UP * (cfg.stand_height * 0.5)
 	state.velocity += weather.blow_walker(middle, state.velocity, state.on_floor,
-			cfg.gravity * state.gravity_scale, delta)
+			cfg.gravity * state.gravity_scale, delta, _host)
 
 
 ## Whether the point `height` above the monster's feet is inside a liquid. Lava and slime count:

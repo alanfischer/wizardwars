@@ -584,7 +584,7 @@ func test_the_wind_carries_every_moving_rigid_body() -> void:
 class Updraft extends Node3D:
 	var up := 30.0
 
-	func airflow(p: Vector3) -> Vector3:
+	func airflow(p: Vector3, _who: Node = null) -> Vector3:
 		var off := p - global_position
 		off.y = 0.0
 		return Vector3(0, up, 0) if off.length() < 1.0 else Vector3.ZERO

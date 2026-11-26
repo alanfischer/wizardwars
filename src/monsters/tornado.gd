@@ -41,6 +41,15 @@ const ALPHA := 160.0 / 255.0           # renderamt 160, as the original spawned 
 const CAST_SOUND := "spells/combos/tornado_cast.wav"
 const WIND_SOUND := "spells/combos/tornado_spin.wav"
 const WIND_RANGE := 40.0               # heard well outside the room it is wrecking
+## The dust it raises round its foot (OvercastDustCone): a whirl from out past its reach, rising and
+## drawn in toward its core, turning the way its air turns.
+const DUST_HEIGHT := LIFT_TOP + 0.5
+const DUST_FOOT := REACH * 1.2
+const DUST_TOP := CORE
+const DUST_RISE := 4.0
+const DUST_TWIST := -2.0 * PI
+const DUST_MOTES := 1200
+const DUST_WISPS := 0.3
 
 var owner_node: Node3D
 var owner_peer_id := 0  # 0 = nobody's (a /spawn'd tornado); bots own theirs with negative ids
@@ -48,6 +57,7 @@ var team: int = GameConsts.Team.NONE
 
 var _entity := EntityBehavior.new()
 var _model: Node3D
+var _dust: OvercastDustCone
 var _target: Node3D
 var _heading := Vector3.FORWARD  # horizontal unit: where it wanders when nothing is in sight
 var _age := 0.0
@@ -89,6 +99,8 @@ func _ready() -> void:
 	collision_mask = (GameConsts.MASK_WORLD | GameConsts.MASK_CLIP) if _entity.is_host else 0
 
 	add_to_group(WeatherSystem.WIND_SOURCES)
+	if DisplayServer.get_name() != "headless":
+		_raise_dust()
 
 	# Both sounds are attached rather than played into the world: the entity exists on every
 	# peer, so each plays its own copy and the wind travels with the funnel.
@@ -117,6 +129,25 @@ func _physics_process(delta: float) -> void:
 		_whirl()
 
 	_drift(delta)
+
+
+func _raise_dust() -> void:
+	_dust = OvercastDustCone.new()
+	_dust.length = DUST_HEIGHT
+	_dust.start_radius = DUST_FOOT
+	_dust.end_radius = DUST_TOP
+	_dust.speed = DUST_RISE
+	_dust.twist = DUST_TWIST
+	_dust.motes = DUST_MOTES
+	_dust.wisps = DUST_WISPS
+	_dust.basis = Basis(Vector3.RIGHT, PI / 2.0)  # its -Z up
+	add_child(_dust)
+	_dust.blowing = true
+
+
+func _process(_delta: float) -> void:
+	if _dust and AssetLoader.light_grid:
+		_dust.light = AssetLoader.light_grid.sample(global_position + Vector3.UP).srgb_to_linear()
 
 
 ## Ten times a second, as the original thought: it always chases the nearest enemy it can
@@ -171,7 +202,7 @@ func _whirl() -> void:
 
 ## The air it moves at `p` (m/s), for WeatherSystem.airflow: in along the ground, round, up the
 ## core and out over the top, none beyond FIELD. It spares no one: wind has no side.
-func airflow(p: Vector3) -> Vector3:
+func airflow(p: Vector3, _who: Node = null) -> Vector3:
 	var off := p - global_position
 	var h := off.y
 	off.y = 0.0
