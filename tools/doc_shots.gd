@@ -11,7 +11,8 @@ extends Node
 ## SHOT_ONLY takes shot ids (see SHOTS) or a set name: portraits, spells, combos. Combo summons
 ## outlive their shot, so run each combo in its own process. SHOT_CAMS (e.g. over,close,wide) saves
 ## every frame from each of those cameras too, for choosing one; SHOT_TIMEOUT (s, default 180)
-## caps a run.
+## caps a run. SHOT_VIDEO=1 hides the game's own UI, so the window itself is the shot: record it
+## with `--write-movie out.avi --fixed-fps 30`.
 
 const InputCommand = preload("res://addons/pmove/input_command.gd")
 const ServerRequests = preload("res://src/systems/server_requests.gd")
@@ -87,7 +88,7 @@ const SHOTS := {
 	"combo_wombat": [E.LIFE, "wombat_weapon", {target_m = 3.5, cam = "close", frames = [0.15, 0.3, 0.45, 0.6, 0.8, 1.0, 1.3, 1.6]}],
 	"combo_tornado": [E.EARTH, "tornado_weapon", {cam = "wide", frames = [1.0, 2.0, 3.0, 4.5, 6.0]}],
 	"combo_raise_dead": [E.DEATH, "raise_dead_weapon", {target_m = 4.0, extra = 2, frames = [0.5, 1.5, 2.5, 3.5, 5.0, 7.0]}],
-	"combo_windwall": [E.WIND, "windwall_weapon", {target_m = 5.0, hold = 3.0, frames = [0.1, 0.3, 0.6, 1.2]}],
+	"combo_windwall": [E.WIND, "windwall_weapon", {target_m = 5.0, hold = 3.0, frames = [0.3, 1.0, 2.0]}],
 }
 
 var _pvs_cam: Camera3D = null
@@ -125,6 +126,9 @@ func _physics_process(delta: float) -> void:
 		VisibilitySystem.set_local_position(_pvs_cam.global_position)
 		if not _root_cam.current:
 			_root_cam.make_current()
+		if _env("SHOT_VIDEO", "") != "":
+			for layer in get_tree().root.find_children("*", "CanvasLayer", true, false):
+				layer.visible = false
 		var world_env := get_tree().root.find_child("WorldEnvironment", true, false) as WorldEnvironment
 		if world_env and world_env.environment:
 			world_env.environment.fog_enabled = false
@@ -396,8 +400,10 @@ func _cast(caster: RemotePlayer, opts: Dictionary, aim_dir: Vector3, id: String)
 		return
 	var hold: float = opts.get("hold", 0.0)
 	if hold > 0.0:
-		var t_end := Time.get_ticks_msec() / 1000.0 + hold
-		while Time.get_ticks_msec() / 1000.0 < t_end and is_instance_valid(caster):
+		# Counted in game time, so a movie recorded slower than real time holds as long.
+		for i in ceili(hold / maxf(w.cooldown, 0.1)):
+			if not is_instance_valid(caster):
+				break
 			await get_tree().physics_frame
 			ServerRequests.attack(caster, Vector3.INF, aim_dir, 0.0, false, 0)
 			await get_tree().create_timer(maxf(w.cooldown, 0.1)).timeout
