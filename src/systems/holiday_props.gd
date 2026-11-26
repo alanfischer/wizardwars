@@ -276,7 +276,9 @@ static func _pumpkin(g: Geo, xf: Transform3D, rng: RandomNumberGenerator, radius
 			y += (dip if t < 0.5 else -dip) * pow(1.0 - s, 2.0)
 			return Vector2(radius * s, y),
 		func(t: float, a: float) -> Color:
-			var shade: float = 1.0 - 0.28 * groove.call(a) - 0.18 * (1.0 - sin(t * PI))
+			# Darker in the grooves and underneath, not on top: the top is what everyone sees.
+			var shade: float = 1.0 - 0.26 * groove.call(a) * (0.6 + 0.4 * sin(t * PI)) \
+					- (0.18 * (1.0 - sin(t * PI)) if t < 0.5 else 0.0)
 			return Color(base.r * shade, base.g * shade, base.b * shade),
 		func(t: float, a: float) -> float:
 			return 1.0 - 0.09 * groove.call(a) * sin(t * PI),
