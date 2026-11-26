@@ -141,6 +141,7 @@ func _register_builtins() -> void:
 	_register("wind", _cmd_wind, Perm.ADMIN, "/wind [m/s|auto] [degrees]", "Wind across the ground, blowing toward a direction (0 = +Z, 90 = +X); it drifts the snow, slants the rain, and carries players, monsters, spells and loose bodies out in the open. auto (the default) lets it rise, fall and turn on its own.")
 	_register("windpush", _cmd_windpush, Perm.ADMIN, "/windpush [scale]", "How hard moving air (the wind, a tornado) pushes players, monsters, spells and loose bodies: 1 the default, 0 off.")
 	_register("lightning", _cmd_lightning, Perm.ADMIN, "/lightning [on|off]", "Lightning strikes while it rains.")
+	_register("holiday", _cmd_holiday, Perm.ADMIN, "/holiday [name|off]", "Dress every map for a holiday — looks only. thanksgiving: pumpkins, gourds, Indian corn and cornucopias; christmas: lit trees, presents, candy canes and snowmen.")
 	_register("allow_combos", _cmd_allow_combos, Perm.ADMIN, "/allow_combos [on|off]", "Whether two allied wizards can clash staves to earn a combo spell.")
 	_register("siege", _cmd_siege, Perm.ADMIN, "/siege [on|off]", "Co-op: waves of monsters against an altar everyone defends together. Works on any map.")
 	_register("siege_wave", _cmd_siege_wave, Perm.ADMIN, "/siege_wave [count]", "Send a wave at the altar now. Waves run themselves later; this is the hand crank.")
@@ -735,6 +736,20 @@ func _cmd_golem_interp(sender_id: int, args: String) -> void:
 	_reply_ok(sender_id, "golem_interp: %s (%s)" % [
 		"on" if value else "off",
 		"client reconstruct" if value else "per-limb interp"])
+
+
+func _cmd_holiday(sender_id: int, args: String) -> void:
+	var arg := args.strip_edges().to_lower()
+	if arg in ["off", "none"]:
+		arg = ""
+	elif arg.is_empty():
+		_reply_ok(sender_id, "holiday: %s" % (HolidayDecor.current() if HolidayDecor.current() != "" else "off"))
+		return
+	elif not HolidayDecor.HOLIDAYS.has(arg):
+		_reply_err(sender_id, "Usage: /holiday [%s|off]" % "|".join(HolidayDecor.HOLIDAYS.keys()))
+		return
+	ServerVars.set_from_string("holiday", arg)
+	_reply_ok(sender_id, "holiday: %s" % ("off" if arg.is_empty() else "%s — %s" % [arg, HolidayDecor.HOLIDAYS[arg]]))
 
 
 func _cmd_allow_combos(sender_id: int, args: String) -> void:

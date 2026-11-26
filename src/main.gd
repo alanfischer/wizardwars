@@ -203,6 +203,7 @@ func _flag_handlers() -> Dictionary:
 		"--temperature": func(v: String) -> void: _limit_args["temperature"] = v.strip_edges(),
 		"--wind": func(v: String) -> void: _limit_args["wind"] = v.strip_edges(),
 		"--dynamic-weather": func() -> void: _limit_args["dynamic_weather"] = "on",
+		"--holiday": func(v: String) -> void: _limit_args["holiday"] = v.strip_edges().to_lower(),
 		"--http-downloads-dir": func(v: String) -> void: MapTransfer.http_downloads_dir = v,
 		"--http-base-url": func(v: String) -> void:
 			MapTransfer.http_base_url_override = v

@@ -18,6 +18,7 @@ const _MAP_SEARCH_PATHS := [
 var _parent: Node
 var _skybox: Skybox
 var _rendered := false  # this process draws its maps: lighting, sky, water depth, PVS render groups
+var _holiday: HolidayDecor
 
 
 ## `rendered` is false on a dedicated server and the offline bake.
@@ -56,6 +57,11 @@ func load_map(map_name: String) -> bool:
 	weather.map_root = map_root
 	_parent.add_child(weather)
 	Game.weather_system = weather
+	if NetworkManager.is_authority():  # places the holiday props; clients get them as entities
+		_holiday = HolidayDecor.new()
+		_holiday.name = "HolidayDecor"
+		_holiday.map_name = map_name
+		_parent.add_child(_holiday)
 
 	if _rendered:
 		var watered := WaterSurfaces.apply(map_root, RenderQuality.water_depth_enabled())
@@ -75,12 +81,13 @@ func clear() -> void:
 	if Game.map_root:
 		EntityRender.release_override_materials(Game.map_root)
 		Game.map_root.queue_free()
-	for node: Node in [Game.decal_system, Game.weather_system]:
+	for node: Node in [Game.decal_system, Game.weather_system, _holiday]:
 		if node:
 			node.queue_free()
 	Game.map_root = null
 	Game.decal_system = null
 	Game.weather_system = null
+	_holiday = null
 	_skybox.clear()
 	MapSun.clear()
 	AssetLoader.light_grid = null

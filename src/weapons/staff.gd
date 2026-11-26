@@ -33,7 +33,8 @@ func fire(attacker: Node3D, aim_from: Vector3 = Vector3.INF, aim_dir: Vector3 = 
 	# Authority-only, to avoid each peer spawning its own copy.
 	if hit and not ray.result.is_empty() and NetworkManager.is_authoritative_fire(attacker):
 		var collider = ray.result.collider
-		if collider is StaticBody3D:
+		# Not on a holiday prop: it pops at this very blow and the mark would hang in the air.
+		if collider is StaticBody3D and not (Combat.find_damageable(collider) is HolidayProp):
 			if Game.decal_system:
 				var decal_name := "{shot%d" % (randi() % 4 + 1)
 				Game.decal_system.place_rpc.rpc(decal_name, ray.result.position, ray.result.normal, 1.0, collider.get_path())
