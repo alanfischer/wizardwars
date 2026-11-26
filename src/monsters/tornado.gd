@@ -6,10 +6,10 @@ extends CharacterBody3D
 ## ground for half a minute. It is not solid and nothing can hurt it: the only way out of one
 ## is to outrun it, and it moves at better than half a wizard's top speed.
 ##
-## Anything hostile it passes over is ground down and thrown — the funnel drags a victim in and
-## the lift rises the closer they get, so being caught means being flung, and the fall is as
-## dangerous as the wind. What it kills it goes on throwing: a fresh corpse is picked up and
-## heaved with everyone else until it has lain still long enough to settle for good.
+## It is wind, the same air the weather blows (WeatherSystem.airflow): it drags everything near
+## it along the ground into its middle, round, up its core and out over the top — wizards and
+## monsters, spells in flight, corpses, satchels, sparks. Anything hostile inside its reach is
+## ground down on the way through.
 ##
 ## Like the giant plant it belongs to the world once cast: the caster dying, changing class or
 ## leaving takes nothing away from it, and it simply expires.
@@ -19,17 +19,23 @@ const SPEED := 8.0 * 0.55              # sv_maxspeed * TORNADO_VELOCITY — 4.4 
 const LIFETIME := 30.0
 const SIGHT_RANGE := 1024.0 * SCALE    # 25.6 m
 const REACH := 100.0 * SCALE           # 2.5 m — the funnel's own width
-const DAMAGE := 15.0                   # per think — 150/s, but only while it has you grounded
+const DAMAGE := 8.0                    # per think, 80/s: a catch is about a second in it
 const THINK_INTERVAL := 0.1
 const EYE_HEIGHT := 36.0 * SCALE       # chest height: what it sees and grabs with
 const RISE := 10.0 * SCALE             # 0.25 m/s — it never climbs faster than this
 const GRAVITY := 20.0                  # 800 sv_units, as MovementConfig.gravity
-const PULL := 3.0                      # the vortex, applied to both axes at once
-const LIFT := 500.0 * SCALE * SCALE    # 500 u/s at one unit out, in m/s at one metre out
-const MAX_LIFT := 1200.0 * SCALE       # 30 m/s
-const TOSS_DELAY := 0.5                # the funnel heaves whoever it has hold of this often
-const TOSS_LIFT := 12.0                # 480 u/s — what a throw is worth: about 3.6 m of air
-const TOSS_OUT := 4.0                  # 160 u/s outward with it, so the arc clears the funnel
+## Its air (m/s; see airflow). Along the ground it pulls in hard enough at REACH that only a
+## wizard running flat out gets away, up its core it lifts harder than gravity until LIFT_TOP, and
+## over the top it throws out sideways, so a victim comes down beside it, not back into it.
+const FIELD := REACH * 2.0             # no air of its own beyond
+const INFLOW := 40.0
+const INFLOW_TOP := 1.5                # ...fading out a metre above this
+const SWIRL := 12.0
+const CORE := 1.2
+const UPDRAFT := 32.0
+const LIFT_TOP := 3.0                  # ...fading out a metre above this
+const OUTFLOW := 25.0
+const OUTFLOW_BAND := Vector2(LIFT_TOP - 0.5, LIFT_TOP + 2.5)
 const MODEL := "models/combo/tornado.mdl"
 const ALPHA := 160.0 / 255.0           # renderamt 160, as the original spawned it
 const CAST_SOUND := "spells/combos/tornado_cast.wav"
@@ -43,7 +49,6 @@ var team: int = GameConsts.Team.NONE
 var _entity := EntityBehavior.new()
 var _model: Node3D
 var _target: Node3D
-var _toss_ready := TOSS_DELAY  # counts down to the next throw; see _whirl
 var _heading := Vector3.FORWARD  # horizontal unit: where it wanders when nothing is in sight
 var _age := 0.0
 var _think_timer := 0.0
@@ -82,6 +87,8 @@ func _ready() -> void:
 	add_child(col)
 	collision_layer = 0
 	collision_mask = (GameConsts.MASK_WORLD | GameConsts.MASK_CLIP) if _entity.is_host else 0
+
+	add_to_group(WeatherSystem.WIND_SOURCES)
 
 	# Both sounds are attached rather than played into the world: the entity exists on every
 	# peer, so each plays its own copy and the wind travels with the funnel.
@@ -145,19 +152,10 @@ func _drift(delta: float) -> void:
 			_heading = (_heading - 2.0 * _heading.dot(n) * n).normalized()
 
 
-## The funnel: everything hostile standing inside it is ground down and, on the funnel's clock,
-## thrown. No falloff and no line of sight — if you are in it, you are in it — but only while
-## your feet are on the ground.
+## The grind: everything hostile inside its reach, on the ground or thrown up its core. No falloff
+## and no line of sight. Its air throws a victim clear within about a second, so the bite is
+## what one catch costs, not a way to hold anyone up and grind them out.
 func _whirl() -> void:
-	# The funnel throws on its own clock: every half second it heaves whoever it has hold of, and
-	# grinds them the rest of the time. Per-victim timers were the obvious way to do this and the
-	# wrong one — the clock drains while a victim is in the air, and the funnel slides on and off
-	# them between thinks, so the half second almost never banked and the throw kept not coming.
-	_toss_ready -= THINK_INTERVAL
-	var throwing := _toss_ready <= 0.0
-	if throwing:
-		_toss_ready = TOSS_DELAY
-
 	var attacker: Node3D = owner_node if owner_node else self
 	var eye := _eye()
 	for node in SpatialQuery.nodes_near(&"damageable", eye, REACH):
@@ -165,79 +163,35 @@ func _whirl() -> void:
 			continue
 		if node.get("is_dead") or Teams.summon_spares(team, owner_node, node):
 			continue
-		var to_eye := eye - SpatialQuery.collision_center(node)
-		if to_eye.length() > REACH:
-			continue
-		# Neither grip nor bite on a victim in the air. Being thrown is the relief, and the funnel
-		# moves at better than half a wizard's run — it keeps pace under anyone it throws, so
-		# left to bite them in flight it just grinds them out anyway and the throw buys nothing.
-		var body := node as CharacterBody3D
-		if body != null and not _on_ground(body):
+		if (eye - SpatialQuery.collision_center(node)).length() > REACH:
 			continue
 		if node.has_method("take_damage"):
 			node.take_damage(DAMAGE, GameConsts.DamageType.PHYSICAL, attacker)
-		_grip(node, to_eye, throwing)
-
-	# ...and what it cannot hurt but can still move. A corpse is on nobody's side, so nothing is
-	# spared and nothing is bitten: it is picked up and thrown like anything else the funnel has
-	# hold of, until it has lain still long enough to have stopped being a simulation at all.
-	# Only on the throw — the drag is there to beat a victim's own movement, and a corpse has
-	# none to beat; kept up between throws it would hold one hovering instead of letting it fall.
-	if throwing:
-		for node in SpatialQuery.nodes_near(&"pushable", eye, REACH):
-			if not (node is Node3D) or not node.is_inside_tree():
-				continue
-			var to_eye := eye - SpatialQuery.collision_center(node)
-			if to_eye.length() > REACH:
-				continue
-			_grip(node, to_eye, true)
 
 
-## Being caught is a cycle, not a place you are held: dragged along the floor toward the middle,
-## heaved up and outward on the funnel's clock, and picked up again wherever you come down.
-##
-## What decides the throw is that clock, not how near the eye you are. The original threw on
-## distance — a lift of 1/d, which only means anything within a few centimetres of a point that
-## moves 0.4 m between thinks. Whether any think ever lands inside that window is a coin flip, so
-## the throw almost never fired and the funnel just held its victim and ground them to death.
-##
-## Who may be grabbed at all is _whirl's question, not this one — a living victim only while
-## their feet are on the ground, a corpse whenever the funnel reaches it. What is grabbed moves
-## however its own kind of body moves (Combat.push_body). Once thrown a victim is ballistic
-## until they land, and safe until then.
-func _grip(node: Node3D, to_eye: Vector3, throwing: bool) -> void:
-	var pull := Vector3(to_eye.x, 0.0, to_eye.z)
-	if not throwing:
-		# Dragged toward the middle, feet still down. No lift: GoldSrc leaves you standing below
-		# 180 u/s and throws a standing player's vertical velocity away anyway, and a victim
-		# nudged gently upward drifts out of the funnel's reach before it can do anything with them.
-		Combat.push_body(node, Vector3(pull.x * PULL, 0.0, pull.z * PULL))
-		return
-
-	# Up, and outward rather than inward — flung clear you land beside the funnel and have to be
-	# run down again, where the original's inward throw just returned you to the eye to die.
-	# A throw is worth TOSS_LIFT wherever it catches you; dead centre still throws harder.
-	var lift := clampf(PULL * LIFT / maxf(pull.length(), 0.01), TOSS_LIFT, MAX_LIFT)
-	var out := _toss_direction(pull)
-	Combat.push_body(node, Vector3(out.x * TOSS_OUT, lift, out.z * TOSS_OUT))
+## The air it moves at `p` (m/s), for WeatherSystem.airflow: in along the ground, round, up the
+## core and out over the top, none beyond FIELD. It spares no one: wind has no side.
+func airflow(p: Vector3) -> Vector3:
+	var off := p - global_position
+	var h := off.y
+	off.y = 0.0
+	var r := off.length()
+	if r >= FIELD or h < -1.0 or h > OUTFLOW_BAND.y:
+		return Vector3.ZERO
+	var out := off / r if r > 0.001 else Vector3.ZERO
+	var ring := r / REACH if r < REACH else (FIELD - r) / REACH  # 0 on the axis, 1 at REACH, 0 at FIELD
+	var air := Vector3.UP.cross(out) * (SWIRL * ring)
+	air -= out * (INFLOW * ring * _below(h, INFLOW_TOP))
+	if r < CORE:
+		air.y += UPDRAFT * (1.0 - (r * r) / (CORE * CORE)) * _below(h, LIFT_TOP)
+	if h > OUTFLOW_BAND.x:
+		air += out * (OUTFLOW * minf(r / 0.5, 1.0) * (FIELD - r) / FIELD)
+	return air
 
 
-## Which way "out" is. At the eye there is no direction to speak of — the offset is centimetres
-## of noise — so the throw picks one, which is the honest answer for being dead centre.
-func _toss_direction(pull: Vector3) -> Vector3:
-	if pull.length_squared() > 0.0025:  # 5 cm
-		return -pull.normalized()
-	var angle := randf() * TAU
-	return Vector3(cos(angle), 0.0, sin(angle))
-
-
-## GoldSrc's `onground`. netmove owns the authoritative flag for anything it drives — a
-## CharacterBody3D's own is_on_floor() is left corrupted by walk_move's elevated move_and_slide
-## (see movement.gd) — so ask the simulation when the victim has one, and the body otherwise.
-func _on_ground(body: CharacterBody3D) -> bool:
-	if body.has_method("has_server_movement") and body.has_server_movement():
-		return body.get_server_movement().state.on_floor
-	return body.is_on_floor()
+## 1 up to `top`, down to 0 a metre above it.
+static func _below(h: float, top: float) -> float:
+	return clampf(top + 1.0 - h, 0.0, 1.0)
 
 
 func _eye() -> Vector3:

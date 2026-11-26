@@ -1,18 +1,20 @@
 extends RefCounted
-## Particles out under the sky drift in the wind: each system's gravity takes the push, by how
-## exposed its emitter is. Only drawn, so it goes by this peer's own wind, gusts and all.
-## Spark systems share a process material per effect, so they get shared copies of it at a few
-## exposure LEVELS rather than one each.
+## Particles drift in the air: each system's gravity takes the push of the air at its emitter
+## (WeatherSystem.airflow), the wind and any tornado alike. Only drawn, so it goes by this peer's
+## own wind, gusts and all.
+## Spark systems share a process material per effect, so they get shared copies of it, one per
+## push rounded to QUANTUM, rather than one each.
 
 ## Particles are lighter than a wizard: the push on them, against WeatherSystem.wind_push's.
 const WEIGHT := 2.0
-const LEVELS := 4.0
-## How often (s) the emitters' exposure and the gusts are looked at again.
+## Pushes (m/s²) closer than this share a copy.
+const QUANTUM := 0.25
+## How often (s) the emitters' air and the gusts are looked at again.
 const LOOK := 0.25
 
 var _weather: WeatherSystem
 var _systems := {}  # GPUParticles3D / CPUParticles3D -> its own gravity or process material
-var _copies := {}  # [material, level] -> the material blown at that level
+var _copies := {}  # [material, Vector3i push in QUANTUM] -> the material blown that hard
 var _since := 0.0
 
 
@@ -34,41 +36,28 @@ func step(delta: float) -> void:
 	if _since < LOOK:
 		return
 	_since = 0.0
-	for material: ParticleProcessMaterial in _copies_bases():
-		for level in range(1, int(LEVELS) + 1):
-			var copy: ParticleProcessMaterial = _copies.get([material, level])
-			if copy:
-				copy.gravity = material.gravity + _push(level / LEVELS)
 	for node: Node3D in _systems.keys():
 		_blow(node)
+	_drop_unused_copies()
 
 
-func _copies_bases() -> Array:
-	var bases := {}
-	for key: Array in _copies:
-		bases[key[0]] = true
-	return bases.keys()
-
-
-## The push on a particle at `open` exposure (m/s²).
-func _push(open: float) -> Vector3:
-	var w := _weather.wind_now
-	var k := float(ServerVars.get_value("wind_push", 1.0)) * WEIGHT * open
-	return w * (w.length() * WeatherSystem.WIND_PUSH * maxf(k, 0.0))
+## The push on a particle in air moving at `air` (m/s²).
+func _push(air: Vector3) -> Vector3:
+	var k := float(ServerVars.get_value("wind_push", 1.0)) * WEIGHT
+	return air * (air.length() * WeatherSystem.WIND_PUSH * maxf(k, 0.0))
 
 
 func _blow(node: Node3D) -> void:
 	if not is_instance_valid(node) or not node.is_inside_tree() or not _systems.has(node):
 		return
 	var at := node.global_position
-	var open := 0.0
+	var push := Vector3.ZERO
 	if not SpatialQuery.is_point_in_water(node, at):
-		open = _weather.wind_exposure(at, _weather.wind_now)
-	var level := roundf(open * LEVELS)
+		push = _push(_weather.airflow(at, _weather.wind_now))
 	if node is CPUParticles3D:
 		if _systems[node] == null:
 			_systems[node] = node.gravity
-		node.gravity = (_systems[node] as Vector3) + _push(level / LEVELS)
+		node.gravity = (_systems[node] as Vector3) + push
 		return
 	var base: ParticleProcessMaterial = _systems[node]
 	if base == null:
@@ -77,16 +66,28 @@ func _blow(node: Node3D) -> void:
 			_systems.erase(node)
 			return
 		_systems[node] = base
-	node.process_material = base if level == 0.0 else _copy(base, int(level))
+	var notch := Vector3i((push / QUANTUM).round())
+	node.process_material = base if notch == Vector3i.ZERO else _copy(base, notch)
 
 
-func _copy(base: ParticleProcessMaterial, level: int) -> ParticleProcessMaterial:
-	var copy: ParticleProcessMaterial = _copies.get([base, level])
+func _copy(base: ParticleProcessMaterial, notch: Vector3i) -> ParticleProcessMaterial:
+	var copy: ParticleProcessMaterial = _copies.get([base, notch])
 	if copy == null:
 		copy = base.duplicate()
-		copy.gravity = base.gravity + _push(level / LEVELS)
-		_copies[[base, level]] = copy
+		copy.gravity = base.gravity + Vector3(notch) * QUANTUM
+		_copies[[base, notch]] = copy
 	return copy
+
+
+## Gusts and a passing tornado keep minting pushes; a copy no system wears any more goes.
+func _drop_unused_copies() -> void:
+	var worn := {}
+	for node: Node in _systems:
+		if node is GPUParticles3D and is_instance_valid(node):
+			worn[node.process_material] = true
+	for key: Array in _copies.keys():
+		if not worn.has(_copies[key]):
+			_copies.erase(key)
 
 
 func _forget(node: Node) -> void:

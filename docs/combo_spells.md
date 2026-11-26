@@ -177,9 +177,10 @@ was chasing and goes for whoever hit him.
 
 A whirlwind that drifts out of your hands, turns toward the nearest enemy it can see, and
 grinds along the ground for 30 seconds. Nothing can hurt it, and it moves faster than half a
-wizard's top speed, so the only way out is to outrun it. Anyone it passes over is ground down
-and flung into the air, and the fall is as dangerous as the wind. It keeps throwing the bodies
-of whatever it kills.
+wizard's top speed, so the only way out is to outrun it. Its wind drags everything near it in
+along the ground, up its core and out over the top: wizards on both sides and monsters, spells
+flying past, corpses, satchels and sparks. Enemies are ground down on the way through: one
+catch is most of a wizard.
 
 ### Raise Dead
 

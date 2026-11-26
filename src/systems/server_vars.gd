@@ -75,7 +75,7 @@ func _register_defaults() -> void:
 	# The wind rising, falling and turning on its own (WeatherCycle), a breeze at most; harder in
 	# dynamic weather's showers. Setting the wind by hand turns it off.
 	register("dynamic_wind", true, Type.BOOL)
-	# How hard the wind pushes what is in the air out under the sky: players, projectiles (0 = off).
+	# How hard moving air (the wind, a tornado) pushes what is in it: players, monsters, spells, loose bodies (0 = off).
 	register("wind_push", 1.0, Type.FLOAT)
 	# Ground friction on soaked ground, as a fraction of dry (1 = off); damp ground is between.
 	register("wet_friction", 0.85, Type.FLOAT)

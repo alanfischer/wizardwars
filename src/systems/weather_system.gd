@@ -15,7 +15,7 @@ const PUDDLE_DEFAULT := 0.5
 const DRIFT_DEEPEST := 1.0
 ## Steps the server sends the ground's wetness, ice and snow cover in.
 const WET_STEPS := 32.0
-## The wind's push in the open, m/s² per (m/s)² of wind: 0.75 in a 5 m/s breeze, 6.75 in a gale.
+## The air's push, m/s² per (m/s)² of it: 0.75 in a 5 m/s breeze, 6.75 in a 15 m/s gale.
 const WIND_PUSH := 0.03
 ## A wall's lee reaches LEE times its height above a body downwind; looked for upwind every
 ## LEE_STEP metres, LEE_SAMPLES times.
@@ -29,6 +29,11 @@ const ROOF_REACH := 0.5
 ## body's exposure is looked at again.
 const CARRY_RESTING := 0.5
 const CARRY_LOOK := 0.25
+## Nodes that move the air themselves (a tornado), each with `airflow(p: Vector3) -> Vector3`, the
+## air's velocity it adds at `p` (m/s), zero beyond its reach. See airflow.
+const WIND_SOURCES := &"wind_source"
+## How fast (m/s) air that lifts harder than gravity takes a walker off the ground: see blow_walker.
+const LIFTOFF := 1.0
 
 ## The map, handed over before the system enters the tree. None on a test or tool that has no map.
 var map_root: Node
@@ -38,6 +43,8 @@ var _current_type: int = 0
 var _current_intensity: int = 0
 ## Rigid bodies the wind carries -> (exposure, msec it is good until).
 var _carried := {}
+var _sources: Array[Node] = []
+var _sources_frame := -1
 ## Drifts the particles in the wind; none on a peer that draws nothing.
 var _particles: WindParticles
 var _ground_sent := Vector3(-1, -1, -1)  # the ground's wetness, ice and snow cover, in WET_STEPS, as last sent to the clients
@@ -314,29 +321,66 @@ func footing(feet: Vector3) -> Vector2:
 	return Vector2(wet, snappedf(ground.ice_at(feet), 1.0 / WET_STEPS))
 
 
-## The push of the wind on a body in the air at `p` moving at `velocity` (m/s²), alike on every
-## peer: it goes by the steady `wind` the server sets, never this peer's own gusts. Drag grows with
-## the square of the wind, so a breeze barely moves anyone and a gale throws them, and it pushes
-## only until the body moves downwind as fast as the wind does. `weight` scales it per body.
+## The push of the air at `p` on a body there moving at `velocity` (m/s²), alike on every peer:
+## it goes by the steady `wind` the server sets, never this peer's own gusts. `weight` scales it
+## per body.
 func wind_push(p: Vector3, velocity: Vector3, weight := 1.0) -> Vector3:
-	return _push(velocity, weight, func() -> float: return wind_exposure(p))
+	return push_through(airflow(p), velocity, weight)
 
 
-## wind_push, asking `exposure` only when there is a push to scale.
-func _push(velocity: Vector3, weight: float, exposure: Callable) -> Vector3:
-	var speed := wind.length()
+## What the air does to a walker (a player, a monster) this tick: its change of velocity over
+## `delta`. Standing, the ground eats a steady lift (GoldSrc keeps you on it), so air that lifts
+## harder than `gravity` takes you off your feet at LIFTOFF instead, and carries you from there.
+func blow_walker(p: Vector3, velocity: Vector3, on_floor: bool, gravity: float, delta: float) -> Vector3:
+	var push := wind_push(p, velocity, 1.0)
+	var change := push * delta
+	if on_floor and push.y > gravity:
+		change.y = maxf(change.y, LIFTOFF - velocity.y + gravity * delta)
+	return change
+
+
+## The air moving at `p` (m/s): the wind, as far as `p` is open to it, and every WIND_SOURCES
+## node's own. `blowing` is the wind, the steady one unless said.
+func airflow(p: Vector3, blowing := Vector3.INF) -> Vector3:
+	if blowing == Vector3.INF:
+		blowing = wind
+	var air := local_airflow(p)
+	if blowing != Vector3.ZERO:
+		air += blowing * wind_exposure(p, blowing)
+	return air
+
+
+## Just the WIND_SOURCES' air at `p`, no sky needed: a tornado blows under a roof too.
+func local_airflow(p: Vector3) -> Vector3:
+	var air := Vector3.ZERO
+	for source in _wind_sources():
+		if is_instance_valid(source):
+			air += source.airflow(p)
+	return air
+
+
+## What air moving at `air` does to a body moving at `velocity`: drag grows with the square of the
+## air's speed, so a breeze barely moves anyone and a gale or a tornado throws them, and it pushes
+## only until the body moves along with the air as fast as the air does.
+func push_through(air: Vector3, velocity: Vector3, weight := 1.0) -> Vector3:
+	var speed := air.length()
 	if speed <= 0.0 or weight <= 0.0:
 		return Vector3.ZERO
-	var dir := wind / speed
+	var dir := air / speed
 	if velocity.dot(dir) >= speed:
 		return Vector3.ZERO
 	var k := float(ServerVars.get_value("wind_push", 1.0)) * weight
 	if k <= 0.0:
 		return Vector3.ZERO
-	var open: float = exposure.call()
-	if open <= 0.0:
-		return Vector3.ZERO
-	return dir * (WIND_PUSH * speed * speed * k * open)
+	return dir * (WIND_PUSH * speed * speed * k)
+
+
+func _wind_sources() -> Array[Node]:
+	var frame := Engine.get_physics_frames()
+	if frame != _sources_frame:
+		_sources_frame = frame
+		_sources = (Engine.get_main_loop() as SceneTree).get_nodes_in_group(WIND_SOURCES)
+	return _sources
 
 
 ## How open `p` is to the wind, 0 sheltered to 1 out in it: nothing under a roof (where the rain
@@ -363,10 +407,11 @@ func wind_exposure(p: Vector3, blowing := Vector3.INF) -> float:
 
 
 ## Every rigid body this peer simulates (gibs, corpses and their bones, satchels, stones) is
-## carried as wind_push says while it moves. One at rest is left be, so it can sleep. Its
-## exposure is looked at again every CARRY_LOOK seconds, not each tick: a corpse is 21 bodies.
+## carried as the air at it says. One at rest is left be by the wind, so it can sleep, but not by a
+## tornado: that picks it up. Its exposure is looked at again every CARRY_LOOK seconds, not each
+## tick: a corpse is 21 bodies.
 func _carry(delta: float) -> void:
-	if wind == Vector3.ZERO or _carried.is_empty():
+	if _carried.is_empty() or (wind == Vector3.ZERO and _wind_sources().is_empty()):
 		return
 	var now := Time.get_ticks_msec()
 	for body: PhysicsBody3D in _carried.keys():
@@ -374,14 +419,19 @@ func _carry(delta: float) -> void:
 		var mode := PhysicsServer3D.body_get_mode(rid)
 		if mode != PhysicsServer3D.BODY_MODE_RIGID and mode != PhysicsServer3D.BODY_MODE_RIGID_LINEAR:
 			continue
-		if PhysicsServer3D.body_get_state(rid, PhysicsServer3D.BODY_STATE_SLEEPING):
-			continue
+		var air := local_airflow(body.global_position)
+		var asleep: bool = PhysicsServer3D.body_get_state(rid, PhysicsServer3D.BODY_STATE_SLEEPING)
 		var v: Vector3 = PhysicsServer3D.body_get_state(rid, PhysicsServer3D.BODY_STATE_LINEAR_VELOCITY)
-		if v.length_squared() < CARRY_RESTING * CARRY_RESTING:
+		if air == Vector3.ZERO and (asleep or v.length_squared() < CARRY_RESTING * CARRY_RESTING):
 			continue
-		var push := _push(v, 1.0, func() -> float: return _exposure_of(body, now))
-		if push != Vector3.ZERO:
-			PhysicsServer3D.body_set_state(rid, PhysicsServer3D.BODY_STATE_LINEAR_VELOCITY, v + push * delta)
+		if wind != Vector3.ZERO:
+			air += wind * _exposure_of(body, now)
+		var push := push_through(air, v)
+		if push == Vector3.ZERO:
+			continue
+		if asleep:
+			PhysicsServer3D.body_set_state(rid, PhysicsServer3D.BODY_STATE_SLEEPING, false)
+		PhysicsServer3D.body_set_state(rid, PhysicsServer3D.BODY_STATE_LINEAR_VELOCITY, v + push * delta)
 
 
 func _exposure_of(body: PhysicsBody3D, now: int) -> float:

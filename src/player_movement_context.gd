@@ -259,15 +259,18 @@ func get_modifiers(
 	return mods
 
 
-## In the air under the open sky the wind carries you. Not on the ground, a ladder or in water
-## (anything that sets the velocity outright).
+## The air carries you: the wind out under the sky, a tornado anywhere. On the ground friction
+## holds you against all but a gale; an updraft stronger than gravity lifts you off it
+## (WeatherSystem.blow_walker). Not on a ladder or in water (anything that sets the velocity
+## outright).
 func _blown(mods: Movement.MovementModifiers, cfg, state: Movement.MovementState, cmd) -> void:
 	var weather := Game.weather_system
-	if weather == null or state.on_floor or in_water or mods.velocity_override_active:
+	if weather == null or in_water or mods.velocity_override_active:
 		return
 	var height: float = cfg.crouch_height if state.is_crouched else cfg.stand_height
 	var middle := state.position + Vector3.UP * (height * 0.5)
-	mods.velocity_add += weather.wind_push(middle, state.velocity) * float(cmd.delta)
+	mods.velocity_add += weather.blow_walker(middle, state.velocity, state.on_floor,
+			cfg.gravity * state.gravity_scale, float(cmd.delta))
 
 
 ## Rain-soaked ground is a little slick: less ground friction, and so less grip to speed up. Ice

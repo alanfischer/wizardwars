@@ -123,6 +123,7 @@ func walk(delta: float, dir: Vector3, swim_to := Vector3.INF) -> void:
 		var local := dir.rotated(Vector3.UP, -yaw)
 		_cmd.move_input = Vector2(local.x, local.z)
 	_swim(delta, dir, swim_to)
+	_blown(delta)
 	# The walk direction is the intent unstick gates on: a monster standing still on purpose —
 	# idling, or planting its feet to throw — has no symptom to rescue.
 	if _host.is_inside_tree():
@@ -185,6 +186,17 @@ func _swim(delta: float, dir: Vector3, swim_to: Vector3) -> void:
 		wish.y = clampf(rise, -1.0, 1.0) * cfg.water_speed
 	state.velocity_override_active = true
 	state.override_velocity = LadderWater.swim(cfg, state.velocity, wish, delta)
+
+
+## The air carries a monster as it does a player (PlayerMovementContext._blown): the wind, a
+## tornado. Not while it swims.
+func _blown(delta: float) -> void:
+	var weather := Game.weather_system
+	if weather == null or in_water or state.velocity_override_active or not _host.is_inside_tree():
+		return
+	var middle := state.position + Vector3.UP * (cfg.stand_height * 0.5)
+	state.velocity += weather.blow_walker(middle, state.velocity, state.on_floor,
+			cfg.gravity * state.gravity_scale, delta)
 
 
 ## Whether the point `height` above the monster's feet is inside a liquid. Lava and slime count:
