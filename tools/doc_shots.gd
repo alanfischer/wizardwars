@@ -11,7 +11,7 @@ extends Node
 ## SHOT_ONLY takes shot ids (see SHOTS) or a set name: portraits, spells, combos. Combo summons
 ## outlive their shot, so run each combo in its own process. SHOT_CAMS (e.g. over,close,wide) saves
 ## every frame from each of those cameras too, for choosing one; SHOT_TIMEOUT (s, default 180)
-## caps a run. SHOT_VIDEO=1 hides the game's own UI, so the window itself is the shot: record it
+## caps a run. SHOT_VARS sets server vars first (e.g. dynamic_wind=off,wind=18). SHOT_VIDEO=1 hides the game's own UI, so the window itself is the shot: record it
 ## with `--write-movie out.avi --fixed-fps 30`.
 
 const InputCommand = preload("res://addons/pmove/input_command.gd")
@@ -27,7 +27,7 @@ const TARGET_AT := Vector2(0.0, 280.0)
 ## frames (s after the first cast), cam (over | close | wide | front), target_m (enemy distance),
 ## aim (target | ground | feet), charge, extra (enemies placed around the caster), no_target, special,
 ## from / toward / up (GoldSrc xy to stand at and face, and height over the deck, for a spell the deck
-## cannot hold).
+## cannot hold), idle (no one in shot, nothing cast: just the place, for the weather).
 const SHOTS := {
 	"portrait_fire": [E.FIRE, -1, {}],
 	"portrait_ice": [E.ICE, -1, {}],
@@ -88,6 +88,7 @@ const SHOTS := {
 	"combo_wombat": [E.LIFE, "wombat_weapon", {target_m = 3.5, cam = "close", frames = [0.15, 0.3, 0.45, 0.6, 0.8, 1.0, 1.3, 1.6]}],
 	"combo_tornado": [E.EARTH, "tornado_weapon", {cam = "wide", frames = [1.0, 2.0, 3.0, 4.5, 6.0]}],
 	"combo_raise_dead": [E.DEATH, "raise_dead_weapon", {target_m = 4.0, extra = 2, frames = [0.5, 1.5, 2.5, 3.5, 5.0, 7.0]}],
+	"weather_gale": [E.WIND, -1, {idle = true, cam = "wide", frames = [2.0, 4.0, 6.0]}],
 	"combo_windwall": [E.WIND, "windwall_weapon", {target_m = 5.0, hold = 3.0, frames = [0.3, 1.0, 2.0]}],
 }
 
@@ -179,7 +180,8 @@ func _ids() -> Array:
 		var prefix: String = {"portraits": "portrait_", "combos": "combo_"}.get(w, "")
 		for id in SHOTS:
 			if (prefix != "" and id.begins_with(prefix)) or \
-					(w == "spells" and not id.begins_with("portrait_") and not id.begins_with("combo_")):
+					(w == "spells" and not id.begins_with("portrait_") and not id.begins_with("combo_") \
+					and not id.begins_with("weather_")):
 				out.append(id)
 	return out
 
@@ -193,6 +195,10 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(_dir)
 	while not Game.game_active:
 		await get_tree().create_timer(0.5).timeout
+	for pair in _env("SHOT_VARS", "").split(",", false):
+		var kv := pair.split("=")
+		if kv.size() == 2:
+			ServerVars.set_from_string(kv[0].strip_edges(), kv[1].strip_edges())
 	await get_tree().create_timer(float(_env("SHOT_WARMUP", "8"))).timeout
 	# The host's own wizard spawns on no team in the open, where homing spells and raise dead take
 	# it for an enemy. On the casters' team it stands in their fort, out of shot and out of reach.
@@ -301,6 +307,16 @@ func _shoot(id: String) -> void:
 	var target_m: float = opts.get("target_m", 7.0)
 	var fwd := (_deck(opts.get("toward", TARGET_AT)) - _deck(opts.get("from", CASTER_AT))).normalized()
 	var target_at := caster_at + fwd * target_m
+
+	if opts.get("idle", false):
+		_frame_cam(opts.get("cam", "over"), caster_at, target_at)
+		var t_idle := 0.0
+		for i in opts.get("frames", [1.0]).size():
+			var t: float = opts["frames"][i]
+			await get_tree().create_timer(t - t_idle).timeout
+			t_idle = t
+			await _save(id, i + 1)
+		return
 
 	if spec[1] is int and spec[1] < 0:
 		_spawn(element, 1, caster_at, caster_at + fwd * 3.4 + fwd.cross(Vector3.UP).normalized() * 1.6)
