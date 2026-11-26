@@ -11,8 +11,10 @@ extends Node
 ## SHOT_ONLY takes shot ids (see SHOTS) or a set name: portraits, spells, combos. Combo summons
 ## outlive their shot, so run each combo in its own process. SHOT_CAMS (e.g. over,close,wide) saves
 ## every frame from each of those cameras too, for choosing one; SHOT_TIMEOUT (s, default 180)
-## caps a run. SHOT_VARS sets server vars first (e.g. dynamic_wind=off,wind=18). SHOT_VIDEO=1 hides the game's own UI, so the window itself is the shot: record it
-## with `--write-movie out.avi --fixed-fps 30`.
+## caps a run. SHOT_VARS sets server vars first (e.g. dynamic_wind=off,wind=18).
+##
+## Video: SHOT_VIDEO=1 hides the game's own UI, so the window itself is the shot; record it with
+## `--write-movie out.avi --fixed-fps 30`. SHOT_TAIL (s) keeps a shot running past its last frame.
 
 const InputCommand = preload("res://addons/pmove/input_command.gd")
 const ServerRequests = preload("res://src/systems/server_requests.gd")
@@ -150,6 +152,10 @@ func _physics_process(delta: float) -> void:
 	for b in _immortal:
 		if is_instance_valid(b) and not b.is_dead:
 			b.health = 5000.0
+
+
+func _game_time() -> float:
+	return Engine.get_physics_frames() / float(Engine.physics_ticks_per_second)
 
 
 func _env(key: String, fallback: String) -> String:
@@ -385,19 +391,20 @@ func _shoot(id: String) -> void:
 		aim_dir = (aim_point - eye).normalized()
 
 	var frames: Array = opts.get("frames", [0.2, 0.5, 1.0])
-	var t0 := Time.get_ticks_msec() / 1000.0
 	if frames[0] < 0.0:
 		await _save(id, 0)
 		frames = frames.slice(1)
-		t0 = Time.get_ticks_msec() / 1000.0
 	_cast(caster, opts, aim_dir, id)
+	# Game time, so a movie recorded slower than real time keeps the same moments.
+	var t0 := _game_time()
 	var n := 0
 	for t in frames:
-		var wait: float = t0 + float(t) - Time.get_ticks_msec() / 1000.0
+		var wait: float = t0 + float(t) - _game_time()
 		if wait > 0.0:
 			await get_tree().create_timer(wait).timeout
 		await _save(id, n + 1)
 		n += 1
+	await get_tree().create_timer(float(_env("SHOT_TAIL", "0"))).timeout
 
 
 ## Casts land inside a physics tick, as a player's do (FireControl): an effect's deferred add_child
